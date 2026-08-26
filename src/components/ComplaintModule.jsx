@@ -1,15 +1,20 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { subscribeToComplaints } from '../lib/realtime'
 
 const statuses = ['open','assigned','in_progress','on_hold','resolved','closed','cancelled']
+const attachmentTypes = ['image/*','video/*','audio/*']
 
 export default function ComplaintModule({ profile }) {
   const [items, setItems] = useState([])
   const [technicians, setTechnicians] = useState([])
   const [form, setForm] = useState({ title:'', description:'', category:'cctv', priority:'normal', address:'' })
+  const [files, setFiles] = useState([])
+  const [recording, setRecording] = useState(false)
   const [message, setMessage] = useState('')
   const [live, setLive] = useState(false)
+  const recorderRef = useRef(null)
+  const chunksRef = useRef([])
   const isAdmin = profile?.role === 'admin'
   const isTechnician = profile?.role === 'technician'
 
@@ -25,18 +30,42 @@ export default function ComplaintModule({ profile }) {
       if (!result.error) setTechnicians(result.data || [])
     }
   }
-  useEffect(() => {
-    load()
-    const unsubscribe = subscribeToComplaints(() => { setLive(true); load() })
-    return unsubscribe
-  }, [profile?.id, profile?.role])
+  useEffect(() => { load(); const unsubscribe = subscribeToComplaints(() => { setLive(true); load() }); return unsubscribe }, [profile?.id, profile?.role])
+
+  async function uploadAttachments(complaintId, selectedFiles) {
+    for (const file of selectedFiles) {
+      const safeName = `${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
+      const path = `${profile.id}/${complaintId}/${safeName}`
+      const { error } = await supabase.storage.from('complaint-attachments').upload(path, file, { contentType:file.type, upsert:false })
+      if (error) throw error
+      const { error: metaError } = await supabase.from('complaint_attachments').insert({ complaint_id:complaintId, uploaded_by:profile.id, storage_path:path, file_name:file.name, mime_type:file.type, size_bytes:file.size })
+      if (metaError) throw metaError
+    }
+  }
 
   async function createComplaint(e) {
     e.preventDefault(); setMessage('')
-    const { error } = await supabase.from('complaints').insert({ ...form, customer_id: profile.id })
-    if (error) setMessage(error.message)
-    else { setMessage('Complaint raised successfully'); setForm({ title:'',description:'',category:'cctv',priority:'normal',address:'' }); load() }
+    try {
+      const { data, error } = await supabase.from('complaints').insert({ ...form, customer_id: profile.id }).select('id').single()
+      if (error) throw error
+      if (files.length) await uploadAttachments(data.id, files)
+      setMessage('Complaint raised successfully'); setForm({ title:'',description:'',category:'cctv',priority:'normal',address:'' }); setFiles([]); e.target.reset(); load()
+    } catch (error) { setMessage(error.message || 'Unable to submit complaint') }
   }
+
+  async function startVoice() {
+    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) return setMessage('Voice recording is not supported on this device/browser.')
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio:true })
+      chunksRef.current = []
+      const recorder = new MediaRecorder(stream)
+      recorderRef.current = recorder
+      recorder.ondataavailable = event => { if (event.data.size) chunksRef.current.push(event.data) }
+      recorder.onstop = () => { const blob = new Blob(chunksRef.current, { type: recorder.mimeType || 'audio/webm' }); setFiles(prev => [...prev, new File([blob], `voice-${Date.now()}.webm`, { type:blob.type })]); stream.getTracks().forEach(track => track.stop()) }
+      recorder.start(); setRecording(true); setMessage('Recording voice complaint… tap Stop when finished.')
+    } catch (error) { setMessage(error.message || 'Microphone permission denied') }
+  }
+  function stopVoice() { recorderRef.current?.stop(); setRecording(false) }
 
   async function updateComplaint(id, changes) {
     const { error } = await supabase.from('complaints').update({ ...changes, updated_at:new Date().toISOString() }).eq('id',id)
@@ -51,6 +80,8 @@ export default function ComplaintModule({ profile }) {
       <select value={form.priority} onChange={e=>setForm({...form,priority:e.target.value})}><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option><option value="urgent">Urgent</option></select>
       <input placeholder="Service address" value={form.address} onChange={e=>setForm({...form,address:e.target.value})} required />
       <textarea placeholder="Describe the issue" value={form.description} onChange={e=>setForm({...form,description:e.target.value})} rows="4" />
+      <label>Photo / Video / Voice<input type="file" accept={attachmentTypes.join(',')} multiple onChange={e=>setFiles(Array.from(e.target.files || []))} /></label>
+      <div><button type="button" className="secondary" onClick={recording ? stopVoice : startVoice}>{recording ? 'Stop Voice Recording' : '🎤 Record Voice Complaint'}</button>{files.length > 0 && <small>{files.length} attachment(s) selected</small>}</div>
       <button>Raise Complaint</button>
     </form>}
     {message && <p className="muted">{message}</p>}
