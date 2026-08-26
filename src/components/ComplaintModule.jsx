@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { subscribeToComplaints } from '../lib/realtime'
+import { getComplaintAttachments, createAttachmentUrl } from '../lib/attachments'
 
 const statuses = ['open','assigned','in_progress','on_hold','resolved','closed','cancelled']
 const attachmentTypes = ['image/*','video/*','audio/*']
@@ -8,6 +9,7 @@ const attachmentTypes = ['image/*','video/*','audio/*']
 export default function ComplaintModule({ profile }) {
   const [items, setItems] = useState([])
   const [technicians, setTechnicians] = useState([])
+  const [attachments, setAttachments] = useState({})
   const [form, setForm] = useState({ title:'', description:'', category:'cctv', priority:'normal', address:'' })
   const [files, setFiles] = useState([])
   const [recording, setRecording] = useState(false)
@@ -24,7 +26,13 @@ export default function ComplaintModule({ profile }) {
     if (profile?.role === 'customer') query = query.eq('customer_id', profile.id)
     if (profile?.role === 'technician') query = query.eq('technician_id', profile.id)
     const { data, error } = await query
-    if (error) setMessage(error.message); else setItems(data || [])
+    if (error) { setMessage(error.message); return }
+    setItems(data || [])
+    const next = {}
+    for (const item of (data || [])) {
+      try { next[item.id] = await getComplaintAttachments(item.id) } catch { next[item.id] = [] }
+    }
+    setAttachments(next)
     if (isAdmin) {
       const result = await supabase.from('profiles').select('id,full_name,phone').eq('role','technician').order('full_name')
       if (!result.error) setTechnicians(result.data || [])
@@ -38,7 +46,7 @@ export default function ComplaintModule({ profile }) {
       const path = `${profile.id}/${complaintId}/${safeName}`
       const { error } = await supabase.storage.from('complaint-attachments').upload(path, file, { contentType:file.type, upsert:false })
       if (error) throw error
-      const { error: metaError } = await supabase.from('complaint_attachments').insert({ complaint_id:complaintId, uploaded_by:profile.id, storage_path:path, file_name:file.name, mime_type:file.type, size_bytes:file.size })
+      const { error: metaError } = await supabase.from('complaint_attachments').insert({ complaint_id:complaintId, uploaded_by:profile.id, file_path:path, file_name:file.name, mime_type:file.type, file_size:file.size })
       if (metaError) throw metaError
     }
   }
@@ -72,6 +80,13 @@ export default function ComplaintModule({ profile }) {
     if (error) setMessage(error.message); else load()
   }
 
+  async function openAttachment(file) {
+    try {
+      const url = await createAttachmentUrl(file.file_path, 300)
+      if (url) window.open(url, '_blank', 'noopener,noreferrer')
+    } catch (error) { setMessage(error.message || 'Unable to open attachment') }
+  }
+
   return <section className="complaints-panel">
     <div className="panel-heading"><div><span className="badge">SERVICE DESK</span><h2>Complaint Management</h2><p>Raise, assign and track service complaints.</p></div><div><span className={live ? 'status' : 'status offline'}>{live ? 'LIVE' : 'SYNC'}</span> <button className="secondary" onClick={load}>Refresh</button></div></div>
     {profile?.role === 'customer' && <form className="complaint-form" onSubmit={createComplaint}>
@@ -86,7 +101,9 @@ export default function ComplaintModule({ profile }) {
     </form>}
     {message && <p className="muted">{message}</p>}
     <div className="complaint-list">{items.length === 0 ? <p className="muted">No complaints found.</p> : items.map(item => <article className="complaint-card" key={item.id}>
-      <div><h3>{item.title}</h3><p>{item.description || 'No description'}</p><small>{item.category} · {item.priority} · {new Date(item.created_at).toLocaleString()}</small></div>
+      <div><h3>{item.title}</h3><p>{item.description || 'No description'}</p><small>{item.category} · {item.priority} · {new Date(item.created_at).toLocaleString()}</small>
+        {!!attachments[item.id]?.length && <div className="attachments"><strong>Attachments:</strong>{attachments[item.id].map(file => <button type="button" className="secondary" key={file.id} onClick={()=>openAttachment(file)}>{file.mime_type?.startsWith('image/') ? '📷' : file.mime_type?.startsWith('video/') ? '🎥' : '🎤'} {file.file_name}</button>)}</div>}
+      </div>
       <div className="complaint-actions"><strong>{item.status.replace('_',' ')}</strong>
         {isAdmin && <><select value={item.technician_id || ''} onChange={e=>updateComplaint(item.id,{technician_id:e.target.value || null,status:e.target.value ? 'assigned' : 'open'})}><option value="">Unassigned</option>{technicians.map(t=><option key={t.id} value={t.id}>{t.full_name || t.phone || t.id.slice(0,8)}</option>)}</select><select value={item.status} onChange={e=>updateComplaint(item.id,{status:e.target.value})}>{statuses.map(s=><option key={s}>{s}</option>)}</select></>}
         {isTechnician && <select value={item.status} onChange={e=>updateComplaint(item.id,{status:e.target.value})}>{['assigned','in_progress','on_hold','resolved'].map(s=><option key={s}>{s}</option>)}</select>}
