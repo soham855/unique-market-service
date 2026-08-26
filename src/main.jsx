@@ -7,6 +7,7 @@ import { getMyProfile } from './lib/profile'
 import Login from './components/Login'
 import RoleDashboard from './components/RoleDashboard'
 import ComplaintModule from './components/ComplaintModule'
+import NotificationBell from './components/NotificationBell'
 
 function App() {
   const [session, setSession] = useState(undefined)
@@ -40,7 +41,7 @@ function App() {
   if (!profile) return <main className="auth-shell"><div className="login-card"><p className="eyebrow">UNIQUE MARKET</p><h1>Loading profile…</h1></div></main>
 
   return <main className="app-shell">
-    <header className="topbar"><div><p className="eyebrow">UNIQUE MARKET</p><h1>Service Management</h1></div><div className="top-actions"><span className="status">{profile.role.toUpperCase()}</span><button className="secondary" onClick={signOut}>Sign out</button></div></header>
+    <header className="topbar"><div><p className="eyebrow">UNIQUE MARKET</p><h1>Service Management</h1></div><div className="top-actions"><span className="status">{profile.role.toUpperCase()}</span><NotificationBell userId={session.user.id} /><button className="secondary" onClick={signOut}>Sign out</button></div></header>
     <RoleDashboard profile={profile} />
     <ComplaintModule profile={profile} />
     {supabase && <footer className="footer">Signed in as {session.user.email}</footer>}
