@@ -11,10 +11,7 @@ export async function uploadComplaintAttachment(complaintId, file) {
   const { data, error } = await supabase.storage.from(BUCKET).upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false })
   if (error) throw error
   const { error: metadataError } = await supabase.from('complaint_attachments').insert({ complaint_id: complaintId, uploaded_by: user.id, file_path: data.path, file_name: file.name, mime_type: file.type || 'application/octet-stream', file_size: file.size })
-  if (metadataError) {
-    await supabase.storage.from(BUCKET).remove([data.path])
-    throw metadataError
-  }
+  if (metadataError) { await supabase.storage.from(BUCKET).remove([data.path]); throw metadataError }
   return data.path
 }
 
@@ -25,8 +22,16 @@ export async function getComplaintAttachments(complaintId) {
   return data || []
 }
 
-export async function createAttachmentUrl(path, expiresIn = 3600) {
+export async function createAttachmentUrl(path, expiresIn = 300) {
+  if (!supabase) return null
   const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, expiresIn)
   if (error) throw error
-  return data.signedUrl
+  return data?.signedUrl || null
+}
+
+export function attachmentKind(mime = '') {
+  if (mime.startsWith('image/')) return 'image'
+  if (mime.startsWith('video/')) return 'video'
+  if (mime.startsWith('audio/')) return 'audio'
+  return 'file'
 }
