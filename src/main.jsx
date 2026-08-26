@@ -1,33 +1,53 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import './styles.css'
+import { supabase } from './lib/supabase'
+
+const stats = [
+  ['Open Complaints', 'complaints', 'Open tickets requiring action'],
+  ['Customers', 'customers', 'Registered service customers'],
+  ['Technicians', 'technicians', 'Technician team members'],
+]
 
 function App() {
+  const [counts, setCounts] = useState({ complaints: 0, customers: 0, technicians: 0 })
+  const [connected, setConnected] = useState(Boolean(supabase))
+
+  useEffect(() => {
+    let active = true
+    async function loadStats() {
+      if (!supabase) return
+      const tables = ['complaints', 'customers', 'technicians']
+      const results = await Promise.all(tables.map((table) => supabase.from(table).select('*', { count: 'exact', head: true })))
+      if (!active) return
+      const next = {}
+      results.forEach((result, index) => { next[tables[index]] = result.count ?? 0 })
+      setCounts(next)
+      setConnected(results.every((result) => !result.error))
+    }
+    loadStats()
+    return () => { active = false }
+  }, [])
+
   return (
     <main className="app-shell">
       <header className="topbar">
-        <div>
-          <p className="eyebrow">UNIQUE MARKET</p>
-          <h1>Service Management</h1>
-        </div>
-        <span className="status">System Ready</span>
+        <div><p className="eyebrow">UNIQUE MARKET</p><h1>Service Management</h1></div>
+        <span className={connected ? 'status' : 'status offline'}>{connected ? 'Supabase Connected' : 'Configuration Required'}</span>
       </header>
       <section className="hero">
         <div>
           <span className="badge">CCTV • IT • SECURITY</span>
           <h2>One platform for every service call.</h2>
-          <p>Manage customers, complaints, technicians, sites, devices and AMC operations from one secure workspace.</p>
+          <p>Admin workspace for customers, complaints, technicians, sites, devices and AMC operations.</p>
         </div>
-        <div className="hero-card">
-          <strong>Next module</strong>
-          <span>Admin Dashboard</span>
-          <small>Supabase-connected foundation</small>
-        </div>
+        <div className="hero-card"><strong>CONTROL CENTER</strong><span>Admin Dashboard</span><small>Live database counts where configuration is available</small></div>
+      </section>
+      <section className="stats">
+        {stats.map(([label, key, description]) => <article key={key}><small>{label}</small><strong>{counts[key]}</strong><p>{description}</p></article>)}
       </section>
       <section className="modules">
-        {['Complaints','Customers','Technicians','Sites & Devices','AMC','Service History'].map((item) => (
-          <article key={item}><span>●</span><h3>{item}</h3><p>Module foundation ready</p></article>
-        ))}
+        {['Complaints','Customers','Technicians','Sites & Devices','AMC','Service History'].map((item) => <article key={item}><span>●</span><h3>{item}</h3><p>Module foundation ready</p></article>)}
       </section>
     </main>
   )
