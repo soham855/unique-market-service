@@ -1,23 +1,26 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
-const configs = {
-  Customers: { table:'profiles', filter:['role','customer'], columns:['full_name','phone','id'] },
-  Technicians: { table:'profiles', filter:['role','technician'], columns:['full_name','phone','id'] },
-  'Sites & Devices': { table:'sites', columns:['name','address','customer_id','id'] },
-  AMC: { table:'amc_contracts', columns:['customer_id','site_id','start_date','end_date','status','notes','id'] },
-  'Service History': { table:'service_history', columns:['service_date','customer_id','technician_id','work_note','status','id'] },
+const configs={
+ Customers:{table:'customers',fields:[['name','text'],['mobile','text'],['company_name','text'],['address','text']]},
+ Technicians:{table:'technicians',fields:[['name','text'],['mobile','text'],['status','text']]},
+ Sites:{table:'sites',fields:[['customer_id','text'],['site_name','text'],['address','text'],['latitude','number'],['longitude','number']]},
+ Devices:{table:'devices',fields:[['site_id','text'],['device_type','text'],['brand','text'],['model','text'],['serial_number','text'],['ip_address','text'],['channel_count','number'],['hdd_capacity','text'],['installation_date','date'],['warranty_expiry','date']]},
+ AMC:{table:'amc_contracts',fields:[['customer_id','text'],['site_id','text'],['start_date','date'],['end_date','date'],['status','text'],['notes','text']]},
+ 'Service History':{table:'service_history',fields:[['complaint_id','text'],['technician_id','text'],['work_done','text'],['parts_used','text'],['before_photo_url','text'],['after_photo_url','text'],['customer_rating','number'],['customer_feedback','text']]},
+ Products:{table:'products',fields:[['sku','text'],['name','text'],['brand','text'],['model','text'],['category','text'],['hsn','text'],['gst_percent','number'],['purchase_rate','number'],['sale_rate','number'],['serial_tracking','checkbox'],['min_stock','number'],['current_stock','number']]},
+ 'Product Serials':{table:'product_serials',fields:[['product_id','text'],['serial_number','text'],['status','text'],['supplier_id','text'],['customer_id','text'],['site_id','text'],['installation_date','date'],['warranty_expiry','date']]},
+ 'Stock Movements':{table:'stock_movements',fields:[['product_id','text'],['serial_id','text'],['movement_type','text'],['quantity','number'],['reference_type','text'],['reference_id','text'],['notes','text'],['created_by','text']]}
 }
-
-export default function AdminModule({ module, onBack }) {
-  const config=configs[module]
-  const [rows,setRows]=useState([]),[loading,setLoading]=useState(true),[message,setMessage]=useState(''),[editing,setEditing]=useState(null),[form,setForm]=useState({})
-  async function load(){setLoading(true);setMessage('');if(!supabase){setMessage('Supabase is not configured.');setLoading(false);return}let q=supabase.from(config.table).select('*');if(config.filter)q=q.eq(config.filter[0],config.filter[1]);const {data,error}=await q;if(error)setMessage(error.message);else setRows(data||[]);setLoading(false)}
-  useEffect(()=>{load()},[module])
-  function startNew(){setEditing('new');setForm({})}
-  function startEdit(r){setEditing(r.id);setForm(Object.fromEntries(config.columns.filter(c=>c!=='id').map(c=>[c,r[c]??''])))}
-  async function save(e){e.preventDefault();const payload=Object.fromEntries(Object.entries(form).filter(([,v])=>v!==''));const r=editing==='new'?await supabase.from(config.table).insert(payload):await supabase.from(config.table).update(payload).eq('id',editing);if(r.error)setMessage(r.error.message);else{setMessage('Saved successfully');setEditing(null);load()}}
-  async function remove(id){if(!confirm('Delete this record?'))return;const {error}=await supabase.from(config.table).delete().eq('id',id);if(error)setMessage(error.message);else{setMessage('Deleted successfully');load()}}
-  if(!config)return null
-  return <section className="admin-panel"><div className="panel-heading"><div><span className="badge">ADMIN • LIVE</span><h2>{module}</h2><p>Real operational data connected to Supabase.</p></div><button className="secondary" onClick={onBack}>← Dashboard</button></div>{message&&<p className="muted">{message}</p>}<div className="admin-actions"><button onClick={startNew}>＋ Add Record</button><button className="secondary" onClick={load}>↻ Refresh</button></div>{editing!==null&&<form className="admin-form" onSubmit={save}>{config.columns.filter(c=>c!=='id').map(c=><label key={c}>{c.replaceAll('_',' ')}<input type={c.includes('date')?'date':'text'} value={form[c]||''} onChange={e=>setForm({...form,[c]:e.target.value})}/></label>)}<button>Save</button><button type="button" className="secondary" onClick={()=>setEditing(null)}>Cancel</button></form>}{loading?<p className="muted">Loading live records…</p>:<div className="data-list">{rows.map(r=><article key={r.id}><strong>{r.full_name||r.name||r.status||r.work_note||'Record'}</strong><span>{config.columns.map(c=>r[c]).filter(Boolean).slice(0,4).join(' • ')}</span><div><button className="secondary" onClick={()=>startEdit(r)}>Edit</button><button className="secondary" onClick={()=>remove(r.id)}>Delete</button></div></article>)}{!rows.length&&<p className="muted">No records found.</p>}</div>}</section>
+export default function AdminModule({module,onBack}){
+ const config=configs[module],[rows,setRows]=useState([]),[loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[message,setMessage]=useState(''),[editing,setEditing]=useState(null),[form,setForm]=useState({})
+ const fields=useMemo(()=>config?.fields||[],[config])
+ async function load(){setLoading(true);setMessage('');const {data,error}=await supabase.from(config.table).select('*').limit(200);if(error)setMessage(error.message);else setRows(data||[]);setLoading(false)}
+ useEffect(()=>{if(config)load()},[module])
+ function add(){setEditing('new');setForm(Object.fromEntries(fields.map(([f])=>[f,''])))}
+ function edit(r){setEditing(r.id);setForm(Object.fromEntries(fields.map(([f])=>[f,r[f]??''])))}
+ async function save(e){e.preventDefault();setSaving(true);const payload={};fields.forEach(([f,t])=>{let v=form[f];if(t==='number'&&v!=='')v=Number(v);if(t==='checkbox')v=!!v;if(v!==''&&v!==null)payload[f]=v});const r=editing==='new'?await supabase.from(config.table).insert(payload):await supabase.from(config.table).update(payload).eq('id',editing);if(r.error)setMessage(r.error.message);else{setMessage('Saved successfully');setEditing(null);await load()}setSaving(false)}
+ async function remove(id){if(!confirm('Delete this record? This cannot be undone.'))return;const {error}=await supabase.from(config.table).delete().eq('id',id);if(error)setMessage(error.message);else{setMessage('Deleted successfully');load()}}
+ if(!config)return null
+ return <section className="admin-panel"><div className="panel-heading"><div><span className="badge">ADMIN • LIVE</span><h2>{module}</h2><p>Live Supabase records • Add, edit, delete and refresh.</p></div><button className="secondary" onClick={onBack}>← Dashboard</button></div>{message&&<p className={message.includes('successfully')?'muted':'error'}>{message}</p>}<div className="admin-actions"><button onClick={add}>＋ Add Record</button><button className="secondary" onClick={load}>↻ Refresh</button></div>{editing!==null&&<form className="admin-form" onSubmit={save}>{fields.map(([f,t])=><label key={f}>{f.replaceAll('_',' ')}{t==='checkbox'?<input type="checkbox" checked={!!form[f]} onChange={e=>setForm({...form,[f]:e.target.checked})}/>:<input type={t} value={form[f]??''} onChange={e=>setForm({...form,[f]:e.target.value})}/>}</label>)}<button disabled={saving}>{saving?'Saving…':'Save'}</button><button type="button" className="secondary" onClick={()=>setEditing(null)}>Cancel</button></form>}{loading?<p className="muted">Loading live records…</p>:<div className="data-list">{rows.map(r=><article key={r.id}><strong>{r.name||r.site_name||r.sku||r.serial_number||r.device_type||r.status||r.movement_type||r.id}</strong><span>{fields.map(([f])=>r[f]).filter(v=>v!==null&&v!==undefined&&v!=='').slice(0,5).join(' • ')}</span><div><button className="secondary" onClick={()=>edit(r)}>Edit</button><button className="secondary" onClick={()=>remove(r.id)}>Delete</button></div></article>)}{!rows.length&&<p className="muted">No records found.</p>}</div>}</section>
 }
