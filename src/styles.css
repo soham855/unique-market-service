@@ -23,7 +23,7 @@ p { line-height:1.5; }
 .hero-card small { color: #94a3b8; }
 .modules { max-width: 1180px; margin: 48px auto 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
 .modules article, .module-card { padding: 22px; border: 1px solid #1e293b; border-radius: 18px; background: rgba(15,23,42,.55); }
-.module-card { width:100%; text-align:left; color:inherit; }
+.module-card { width:100%; text-align:left; color:inherit; transition: transform .12s ease, border-color .12s ease; }
 .module-card:hover { border-color:#3b82f6; transform:translateY(-1px); }
 .modules article span { color: #60a5fa; }
 .modules h3 { margin: 12px 0 5px; }
@@ -32,6 +32,10 @@ p { line-height:1.5; }
 .role-heading, .panel-heading { display:flex; justify-content:space-between; gap:20px; align-items:flex-start; }
 .panel-heading h2 { font-size:clamp(30px,5vw,54px); }
 .panel-heading p { color:#94a3b8; }
+.admin-stats { max-width:1180px; margin:24px auto 0; display:grid; grid-template-columns:repeat(6,1fr); gap:10px; }
+.stat-card { padding:16px; border:1px solid #1e293b; border-radius:14px; background:rgba(15,23,42,.55); min-width:0; }
+.stat-card strong { display:block; font-size:24px; }
+.stat-card span { display:block; margin-top:5px; color:#94a3b8; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .admin-form { margin-top:24px; display:grid; gap:12px; padding:20px; border:1px solid #1e293b; border-radius:18px; background:rgba(15,23,42,.55); }
 .admin-form input, .admin-form select, .admin-form textarea, .complaint-form input, .complaint-form select, .complaint-form textarea { width:100%; border:1px solid #334155; border-radius:10px; padding:12px; background:#0f172a; color:#e2e8f0; }
 .admin-form textarea { min-height:90px; }
@@ -56,4 +60,5 @@ button:disabled { opacity:.6; cursor:not-allowed; }
 .login-card { width:min(420px,100%); padding:28px; border:1px solid #1e293b; border-radius:20px; background:#0f172a; }
 .login-card label { display:grid; gap:6px; margin:14px 0; color:#94a3b8; }
 .login-card input { width:100%; padding:12px; border:1px solid #334155; border-radius:10px; background:#020617; color:#e2e8f0; }
-@media (max-width: 760px) { .app-shell { padding:20px; } .hero { margin-top:45px; grid-template-columns:1fr; } .modules { grid-template-columns:1fr; } .topbar, .role-heading, .panel-heading, .complaint-card { flex-direction:column; } .status { display:none; } .admin-form { grid-template-columns:1fr; } }
+@media (max-width: 900px) { .admin-stats { grid-template-columns:repeat(3,1fr); } }
+@media (max-width: 760px) { .app-shell { padding:20px; } .hero { margin-top:45px; grid-template-columns:1fr; } .modules { grid-template-columns:1fr; } .topbar, .role-heading, .panel-heading, .complaint-card { flex-direction:column; } .status { display:none; } .admin-form { grid-template-columns:1fr; } .admin-stats { grid-template-columns:repeat(2,1fr); } }
