@@ -55,10 +55,17 @@ button:disabled { opacity:.6; cursor:not-allowed; }
 .complaint-card { padding:18px; border:1px solid #1e293b; border-radius:16px; background:rgba(15,23,42,.55); display:flex; justify-content:space-between; gap:20px; }
 .complaint-actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
 .attachments { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+.payment-card { margin-top:24px; padding:22px; border:1px solid #1e293b; border-radius:18px; background:rgba(15,23,42,.55); display:grid; grid-template-columns:1fr 280px; gap:24px; align-items:center; }
+.payment-qr { width:280px; height:280px; object-fit:contain; border-radius:12px; background:white; padding:8px; }
+.table-wrap { margin-top:20px; overflow:auto; border:1px solid #1e293b; border-radius:16px; }
+table { width:100%; border-collapse:collapse; min-width:850px; }
+th,td { padding:12px 14px; text-align:left; border-bottom:1px solid #1e293b; font-size:13px; vertical-align:top; }
+th { color:#94a3b8; background:#0f172a; }
+tr:last-child td { border-bottom:0; }
 .footer { max-width:1180px; margin:32px auto 0; color:#64748b; font-size:12px; }
 .auth-shell { min-height:100vh; display:grid; place-items:center; padding:20px; background:#020617; }
 .login-card { width:min(420px,100%); padding:28px; border:1px solid #1e293b; border-radius:20px; background:#0f172a; }
 .login-card label { display:grid; gap:6px; margin:14px 0; color:#94a3b8; }
 .login-card input { width:100%; padding:12px; border:1px solid #334155; border-radius:10px; background:#020617; color:#e2e8f0; }
 @media (max-width: 900px) { .admin-stats { grid-template-columns:repeat(3,1fr); } }
-@media (max-width: 760px) { .app-shell { padding:20px; } .hero { margin-top:45px; grid-template-columns:1fr; } .modules { grid-template-columns:1fr; } .topbar, .role-heading, .panel-heading, .complaint-card { flex-direction:column; } .status { display:none; } .admin-form { grid-template-columns:1fr; } .admin-stats { grid-template-columns:repeat(2,1fr); } }
+@media (max-width: 760px) { .app-shell { padding:20px; } .hero { margin-top:45px; grid-template-columns:1fr; } .modules { grid-template-columns:1fr; } .topbar, .role-heading, .panel-heading, .complaint-card { flex-direction:column; } .status { display:none; } .admin-form { grid-template-columns:1fr; } .admin-stats { grid-template-columns:repeat(2,1fr); } .payment-card { grid-template-columns:1fr; } .payment-qr { width:220px; height:220px; margin:auto; } }
