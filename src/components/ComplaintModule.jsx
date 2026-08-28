@@ -87,6 +87,15 @@ export default function ComplaintModule({ profile }) {
     } catch (error) { setMessage(error.message || 'Unable to open attachment') }
   }
 
+  function printComplaint(item) {
+    const safe = value => String(value ?? '—').replace(/[&<>\"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '\"':'&quot;' }[c]))
+    const popup = window.open('', '_blank', 'width=800,height=900')
+    if (!popup) return setMessage('Please allow pop-ups to print the service receipt.')
+    const date = new Date(item.created_at).toLocaleString('en-IN')
+    popup.document.write(`<!doctype html><html><head><title>Unique Market - Service Receipt</title><style>body{font-family:Arial,sans-serif;max-width:760px;margin:0 auto;padding:32px;color:#111}.head{text-align:center;border-bottom:2px solid #111;padding-bottom:16px;margin-bottom:22px}.head h1{margin:0 0 6px}.head p{margin:4px}.row{display:flex;border-bottom:1px solid #ddd;padding:10px 0}.label{width:180px;font-weight:700}.value{flex:1;word-break:break-word}.footer{text-align:center;border-top:1px solid #ddd;margin-top:28px;padding-top:14px;font-size:12px}@media print{body{padding:10mm}}</style></head><body><div class="head"><h1>UNIQUE MARKET</h1><p>CCTV &amp; Security Solutions</p><p>Service Complaint Receipt</p></div><div class="row"><div class="label">Complaint ID</div><div class="value">${safe(item.id)}</div></div><div class="row"><div class="label">Date &amp; Time</div><div class="value">${safe(date)}</div></div><div class="row"><div class="label">Complaint Title</div><div class="value">${safe(item.title)}</div></div><div class="row"><div class="label">Category</div><div class="value">${safe(item.category)}</div></div><div class="row"><div class="label">Priority</div><div class="value">${safe(item.priority)}</div></div><div class="row"><div class="label">Status</div><div class="value">${safe(item.status.replaceAll('_',' '))}</div></div><div class="row"><div class="label">Service Address</div><div class="value">${safe(item.address)}</div></div><div class="row"><div class="label">Problem / Description</div><div class="value">${safe(item.description || 'No description')}</div></div><div class="footer">Thank you for choosing Unique Market.<br>Keep this receipt for your service records.</div><script>window.onload=function(){window.print()}</script></body></html>`)
+    popup.document.close()
+  }
+
   return <section className="complaints-panel">
     <div className="panel-heading"><div><span className="badge">SERVICE DESK</span><h2>Complaint Management</h2><p>Raise, assign and track service complaints.</p></div><div><span className={live ? 'status' : 'status offline'}>{live ? 'LIVE' : 'SYNC'}</span> <button className="secondary" onClick={load}>Refresh</button></div></div>
     {profile?.role === 'customer' && <form className="complaint-form" onSubmit={createComplaint}>
@@ -105,6 +114,7 @@ export default function ComplaintModule({ profile }) {
         {!!attachments[item.id]?.length && <div className="attachments"><strong>Attachments:</strong>{attachments[item.id].map(file => <button type="button" className="secondary" key={file.id} onClick={()=>openAttachment(file)}>{file.mime_type?.startsWith('image/') ? '📷' : file.mime_type?.startsWith('video/') ? '🎥' : '🎤'} {file.file_name}</button>)}</div>}
       </div>
       <div className="complaint-actions"><strong>{item.status.replace('_',' ')}</strong>
+        {profile?.role === 'customer' && <button type="button" className="secondary" onClick={()=>printComplaint(item)}>🖨️ Print</button>}
         {isAdmin && <><select value={item.technician_id || ''} onChange={e=>updateComplaint(item.id,{technician_id:e.target.value || null,status:e.target.value ? 'assigned' : 'open'})}><option value="">Unassigned</option>{technicians.map(t=><option key={t.id} value={t.id}>{t.full_name || t.phone || t.id.slice(0,8)}</option>)}</select><select value={item.status} onChange={e=>updateComplaint(item.id,{status:e.target.value})}>{statuses.map(s=><option key={s}>{s}</option>)}</select></>}
         {isTechnician && <select value={item.status} onChange={e=>updateComplaint(item.id,{status:e.target.value})}>{['assigned','in_progress','on_hold','resolved'].map(s=><option key={s}>{s}</option>)}</select>}
       </div>
