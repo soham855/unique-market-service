@@ -19,7 +19,7 @@ const categories = {
 
 const defaultActive = Object.keys(categories)
 
-export default function CustomerComplaintModule({ profile, activeModule = 'Complaints' }) {
+export default function CustomerComplaintModule({ profile, activeModule = 'Complaints', onSubmitted }) {
   const [items, setItems] = useState([])
   const [activeCategories, setActiveCategories] = useState(defaultActive)
   const [maxRadiusKm, setMaxRadiusKm] = useState(20)
@@ -29,6 +29,7 @@ export default function CustomerComplaintModule({ profile, activeModule = 'Compl
   const [locating, setLocating] = useState(false)
   const isMyComplaints = activeModule === 'My Complaints'
   const isRaiseComplaint = activeModule === 'Raise Complaint'
+  const showList = isMyComplaints || activeModule === 'Complaints'
 
   useEffect(() => {
     setForm(f => ({ ...f, customer_name:profile?.full_name || f.customer_name, customer_phone:profile?.phone || f.customer_phone, company_name:profile?.company_name || f.company_name, location_text:profile?.address || f.location_text }))
@@ -80,9 +81,10 @@ export default function CustomerComplaintModule({ profile, activeModule = 'Compl
       const title = `${categories[form.category][0].replace(/^\S+\s/,'')} - ${form.problem}`
       const { error } = await supabase.from('complaints').insert({ customer_id:profile.id, customer_name:form.customer_name.trim(), customer_phone:form.customer_phone.trim(), company_name:form.company_name.trim() || null, title, description:form.description.trim() || form.problem, category:form.category, priority:form.priority, location_text:form.location_text.trim() })
       if (error) throw error
-      setForm(f=>({ ...f, category:'', problem:'', priority:'normal', location_text:f.location_text, description:'' }))
-      setMessage('Complaint raised successfully. Admin can now assign a technician.')
       await load()
+      setForm(f=>({ ...f, category:'', problem:'', priority:'normal', description:'' }))
+      setMessage('Complaint raised successfully. It is now available in My Complaints.')
+      if (onSubmitted) onSubmitted()
     } catch (error) { setMessage(error.message || 'Unable to submit complaint') }
     finally { setLoading(false) }
   }
@@ -91,8 +93,8 @@ export default function CustomerComplaintModule({ profile, activeModule = 'Compl
   const problems = form.category ? categories[form.category]?.[1] || [] : []
 
   return <section className="complaints-panel">
-    <div className="panel-heading"><div><span className="badge">SERVICE DESK</span><h2>{isMyComplaints ? 'My Complaints' : 'Complaint Management'}</h2><p>{isMyComplaints ? 'Track your complaints and service status.' : 'Select a service category, then choose the exact problem.'}</p></div><button className="secondary" onClick={()=>{load();loadAccess()}}>Refresh</button></div>
-    {!isMyComplaints && <form className="complaint-form" onSubmit={createComplaint}>
+    <div className="panel-heading"><div><span className="badge">SERVICE DESK</span><h2>{isMyComplaints ? 'My Complaints' : isRaiseComplaint ? 'Raise Complaint' : 'Complaint Management'}</h2><p>{isMyComplaints ? 'Track your complaints and service status.' : isRaiseComplaint ? 'Select a service category, then choose the exact problem.' : 'View your complaints and their current service status.'}</p></div><button className="secondary" onClick={()=>{load();loadAccess()}}>Refresh</button></div>
+    {isRaiseComplaint && <form className="complaint-form" onSubmit={createComplaint}>
       <input placeholder="Customer Name" value={form.customer_name} onChange={e=>setForm({...form,customer_name:e.target.value})} required />
       <input type="tel" placeholder="Mobile Number" value={form.customer_phone} onChange={e=>setForm({...form,customer_phone:e.target.value})} required />
       <input placeholder="Company Name (Optional)" value={form.company_name} onChange={e=>setForm({...form,company_name:e.target.value})} />
@@ -104,7 +106,7 @@ export default function CustomerComplaintModule({ profile, activeModule = 'Compl
       <small className="muted">Admin service radius: {maxRadiusKm} km</small>
       <button disabled={loading || !form.problem}>{loading ? 'Submitting…' : 'Raise Complaint'}</button>
     </form>}
-    {message && !isMyComplaints && <p className="muted">{message}</p>}
-    {!isRaiseComplaint && <div className="complaint-list"><h3>My Complaints</h3>{items.length === 0 ? <p className="muted">No complaints found.</p> : items.map(item=><article className="complaint-card" key={item.id}><div><h3>{item.title}</h3><p>{item.description}</p><small>{item.customer_name || ''}{item.customer_phone ? ` · ${item.customer_phone}` : ''}{item.company_name ? ` · ${item.company_name}` : ''} · {item.category} · {item.priority} · {new Date(item.created_at).toLocaleString()}</small><p><strong>Status:</strong> {item.status?.replaceAll('_',' ')}</p></div></article>)}</div>}
+    {message && isRaiseComplaint && <p className="muted">{message}</p>}
+    {showList && <div className="complaint-list"><h3>My Complaints</h3>{items.length === 0 ? <p className="muted">No complaints found.</p> : items.map(item=><article className="complaint-card" key={item.id}><div><h3>{item.title}</h3><p>{item.description}</p><small>{item.customer_name || ''}{item.customer_phone ? ` · ${item.customer_phone}` : ''}{item.company_name ? ` · ${item.company_name}` : ''} · {item.category} · {item.priority} · {new Date(item.created_at).toLocaleString()}</small><p><strong>Status:</strong> {item.status?.replaceAll('_',' ') || 'Pending'}</p></div></article>)}</div>}
   </section>
 }
