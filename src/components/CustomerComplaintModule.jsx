@@ -19,7 +19,7 @@ const categories = {
 
 const defaultActive = Object.keys(categories)
 
-export default function CustomerComplaintModule({ profile }) {
+export default function CustomerComplaintModule({ profile, activeModule = 'Complaints' }) {
   const [items, setItems] = useState([])
   const [activeCategories, setActiveCategories] = useState(defaultActive)
   const [maxRadiusKm, setMaxRadiusKm] = useState(20)
@@ -27,6 +27,8 @@ export default function CustomerComplaintModule({ profile }) {
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
   const [locating, setLocating] = useState(false)
+  const isMyComplaints = activeModule === 'My Complaints'
+  const isRaiseComplaint = activeModule === 'Raise Complaint'
 
   useEffect(() => {
     setForm(f => ({ ...f, customer_name:profile?.full_name || f.customer_name, customer_phone:profile?.phone || f.customer_phone, company_name:profile?.company_name || f.company_name, location_text:profile?.address || f.location_text }))
@@ -89,8 +91,8 @@ export default function CustomerComplaintModule({ profile }) {
   const problems = form.category ? categories[form.category]?.[1] || [] : []
 
   return <section className="complaints-panel">
-    <div className="panel-heading"><div><span className="badge">SERVICE DESK</span><h2>Complaint Management</h2><p>Select a service category, then choose the exact problem.</p></div><button className="secondary" onClick={()=>{load();loadAccess()}}>Refresh</button></div>
-    <form className="complaint-form" onSubmit={createComplaint}>
+    <div className="panel-heading"><div><span className="badge">SERVICE DESK</span><h2>{isMyComplaints ? 'My Complaints' : 'Complaint Management'}</h2><p>{isMyComplaints ? 'Track your complaints and service status.' : 'Select a service category, then choose the exact problem.'}</p></div><button className="secondary" onClick={()=>{load();loadAccess()}}>Refresh</button></div>
+    {!isMyComplaints && <form className="complaint-form" onSubmit={createComplaint}>
       <input placeholder="Customer Name" value={form.customer_name} onChange={e=>setForm({...form,customer_name:e.target.value})} required />
       <input type="tel" placeholder="Mobile Number" value={form.customer_phone} onChange={e=>setForm({...form,customer_phone:e.target.value})} required />
       <input placeholder="Company Name (Optional)" value={form.company_name} onChange={e=>setForm({...form,company_name:e.target.value})} />
@@ -101,8 +103,8 @@ export default function CustomerComplaintModule({ profile }) {
       <textarea placeholder="Additional Details (Optional)" value={form.description} onChange={e=>setForm({...form,description:e.target.value})} rows="4" />
       <small className="muted">Admin service radius: {maxRadiusKm} km</small>
       <button disabled={loading || !form.problem}>{loading ? 'Submitting…' : 'Raise Complaint'}</button>
-    </form>
-    {message && <p className="muted">{message}</p>}
-    <div className="complaint-list"><h3>My Complaints</h3>{items.length === 0 ? <p className="muted">No complaints found.</p> : items.map(item=><article className="complaint-card" key={item.id}><div><h3>{item.title}</h3><p>{item.description}</p><small>{item.customer_name || ''}{item.customer_phone ? ` · ${item.customer_phone}` : ''}{item.company_name ? ` · ${item.company_name}` : ''} · {item.category} · {item.priority} · {new Date(item.created_at).toLocaleString()}</small><p><strong>Status:</strong> {item.status?.replaceAll('_',' ')}</p></div></article>)}</div>
+    </form>}
+    {message && !isMyComplaints && <p className="muted">{message}</p>}
+    {!isRaiseComplaint && <div className="complaint-list"><h3>My Complaints</h3>{items.length === 0 ? <p className="muted">No complaints found.</p> : items.map(item=><article className="complaint-card" key={item.id}><div><h3>{item.title}</h3><p>{item.description}</p><small>{item.customer_name || ''}{item.customer_phone ? ` · ${item.customer_phone}` : ''}{item.company_name ? ` · ${item.company_name}` : ''} · {item.category} · {item.priority} · {new Date(item.created_at).toLocaleString()}</small><p><strong>Status:</strong> {item.status?.replaceAll('_',' ')}</p></div></article>)}</div>}
   </section>
 }
