@@ -6,11 +6,33 @@ import { getComplaintAttachments, createAttachmentUrl } from '../lib/attachments
 const statuses = ['open','assigned','in_progress','on_hold','resolved','closed','cancelled']
 const attachmentTypes = ['image/*','video/*','audio/*']
 
+const complaintOptions = {
+  cctv: ['Camera Not Working','Camera Offline','No Video / Black Screen','Blurred / Low Quality Video','Night Vision Problem','Camera Recording Problem','Motion Detection Problem','Camera Angle / Position Problem','IR Light Problem','Audio Problem','PTZ Problem','Cable / Connector Problem','Camera Power Problem','Multiple Cameras Not Working','Mobile Viewing Problem','Remote Viewing / Hik-Connect Problem','New Camera Installation','Camera Relocation','Camera Configuration','Other CCTV Problem'],
+  dvr_nvr: ['DVR/NVR Not Working','No Recording','HDD Not Detected','HDD Error / Bad Sector','Recording Playback Problem','Backup Problem','Date/Time Problem','Channel Not Showing','Network Configuration','Remote Access Problem','NVR/DVR Configuration','Firmware / Software Problem','Other DVR/NVR Problem'],
+  computer: ['Computer Not Starting','Windows Problem','Slow Computer','Hanging / Freezing','Blue Screen / Error','Software Installation','Software Not Working','Driver Problem','Internet Problem','Wi-Fi Problem','LAN Problem','Keyboard Problem','Mouse Problem','Monitor / Display Problem','Printer Connection Problem','Data Backup / Recovery','Virus / Malware Problem','HDD / SSD Problem','RAM Problem','SMPS / Power Problem','New Computer Installation','Computer Formatting','Windows Installation','Other Computer Problem'],
+  network: ['Internet Not Working','Slow Internet','LAN Not Working','Wi-Fi Not Working','Network Disconnection','Router Problem','Switch Problem','PoE Switch Problem','IP Address Problem','DHCP Problem','DNS Problem','Network Cable Problem','Connector Problem','Network Configuration','New Network Installation','Other Networking Problem'],
+  printer: ['Printer Not Working','Printer Offline','Paper Jam','Printing Quality Problem','Ink / Toner Problem','Printer Network Problem','USB Connection Problem','Scanner Not Working','Scan Quality Problem','Driver Problem','Printer Installation','Printer Configuration','Other Printer Problem'],
+  access_control: ['Fingerprint Not Working','Face Recognition Problem','Card Not Working','Attendance Not Syncing','Device Offline','Door Lock Problem','Exit Button Problem','Power Supply Problem','Software Problem','Network Problem','New Installation','Configuration Problem','Other Access Control Problem'],
+  vdp: ['Indoor Unit Problem','Outdoor Unit Problem','No Video','No Audio','Door Unlock Problem','Calling Problem','Network Problem','Power Problem','Installation','Configuration','Other VDP Problem'],
+  tv: ['TV Not Turning On','No Display','No Signal','HDMI Problem','Display Quality Problem','Audio Problem','Remote Problem','Wall Mount / Installation','Configuration','Other Display Problem'],
+  wifi_router: ['Wi-Fi Not Working','Slow Wi-Fi','Wi-Fi Range Problem','Router Not Working','Router Configuration','Password / SSID Configuration','Internet Connection Problem','Network Drop','New Wi-Fi Installation','Other Wi-Fi Problem'],
+  ups: ['UPS Not Working','Battery Problem','Backup Time Problem','Power Failure','Adapter Problem','SMPS Problem','Voltage Problem','Power Cable Problem','Installation','Battery Replacement','Other Power Problem'],
+  installation: ['New CCTV Installation','Computer Installation','Network Installation','Printer Installation','Wi-Fi Installation','DVR/NVR Configuration','Camera Configuration','Software Installation','Device Relocation','System Upgrade','Other Installation'],
+  amc: ['Preventive Maintenance','CCTV Maintenance','Computer Maintenance','Network Maintenance','Cleaning Required','System Health Check','AMC Service Visit','Breakdown Service','Other AMC Request'],
+  hardware: ['Product Not Working','Warranty Service','Hardware Replacement','Product Installation','Product Configuration','Damaged Product','Product Compatibility','Upgrade Required','Other Hardware Problem']
+}
+
+const categoryLabels = {
+  cctv:'📹 CCTV / Camera', dvr_nvr:'💾 DVR / NVR / Storage', computer:'💻 Computer / Laptop', network:'🌐 Networking / Internet',
+  printer:'🖨️ Printer / Scanner', access_control:'🔐 Biometric / Access Control', vdp:'🚪 Video Door Phone', tv:'📺 TV / Display',
+  wifi_router:'📡 Wi-Fi / Router', ups:'🔌 Power / UPS', installation:'🛠️ Installation / Configuration', amc:'🔧 AMC / Maintenance', hardware:'📦 Product / Hardware'
+}
+
 export default function ComplaintModule({ profile }) {
   const [items, setItems] = useState([])
   const [technicians, setTechnicians] = useState([])
   const [attachments, setAttachments] = useState({})
-  const [form, setForm] = useState({ title:'', description:'', category:'cctv', priority:'normal', location_text:'' })
+  const [form, setForm] = useState({ title:'', description:'', category:'cctv', problem:'', priority:'normal', location_text:'' })
   const [files, setFiles] = useState([])
   const [recording, setRecording] = useState(false)
   const [message, setMessage] = useState('')
@@ -54,10 +76,14 @@ export default function ComplaintModule({ profile }) {
   async function createComplaint(e) {
     e.preventDefault(); setMessage('')
     try {
-      const { data, error } = await supabase.from('complaints').insert({ ...form, customer_id: profile.id }).select('id').single()
+      if (!form.problem) throw new Error('Please select a specific problem.')
+      const title = form.title.trim() || form.problem
+      const description = `Problem: ${form.problem}${form.description.trim() ? `\n${form.description.trim()}` : ''}`
+      const payload = { title, description, category:form.category, priority:form.priority, location_text:form.location_text, customer_id:profile.id }
+      const { data, error } = await supabase.from('complaints').insert(payload).select('id').single()
       if (error) throw error
       if (files.length) await uploadAttachments(data.id, files)
-      setMessage('Complaint raised successfully'); setForm({ title:'',description:'',category:'cctv',priority:'normal',location_text:'' }); setFiles([]); e.target.reset(); load()
+      setMessage('Complaint raised successfully'); setForm({ title:'',description:'',category:'cctv',problem:'',priority:'normal',location_text:'' }); setFiles([]); e.target.reset(); load()
     } catch (error) { setMessage(error.message || 'Unable to submit complaint') }
   }
 
@@ -81,10 +107,8 @@ export default function ComplaintModule({ profile }) {
   }
 
   async function openAttachment(file) {
-    try {
-      const url = await createAttachmentUrl(file.file_path, 300)
-      if (url) window.open(url, '_blank', 'noopener,noreferrer')
-    } catch (error) { setMessage(error.message || 'Unable to open attachment') }
+    try { const url = await createAttachmentUrl(file.file_path, 300); if (url) window.open(url, '_blank', 'noopener,noreferrer') }
+    catch (error) { setMessage(error.message || 'Unable to open attachment') }
   }
 
   function printComplaint(item) {
@@ -92,25 +116,28 @@ export default function ComplaintModule({ profile }) {
     const popup = window.open('', '_blank', 'width=800,height=900')
     if (!popup) return setMessage('Please allow pop-ups to print the service receipt.')
     const date = new Date(item.created_at).toLocaleString('en-IN')
-    popup.document.write(`<!doctype html><html><head><title>Unique Market - Service Receipt</title><style>body{font-family:Arial,sans-serif;max-width:760px;margin:0 auto;padding:32px;color:#111}.head{text-align:center;border-bottom:2px solid #111;padding-bottom:16px;margin-bottom:22px}.head h1{margin:0 0 6px}.head p{margin:4px}.row{display:flex;border-bottom:1px solid #ddd;padding:10px 0}.label{width:180px;font-weight:700}.value{flex:1;word-break:break-word}.footer{text-align:center;border-top:1px solid #ddd;margin-top:28px;padding-top:14px;font-size:12px}@media print{body{padding:10mm}}</style></head><body><div class="head"><h1>UNIQUE MARKET</h1><p>CCTV &amp; Security Solutions</p><p>Service Complaint Receipt</p></div><div class="row"><div class="label">Complaint ID</div><div class="value">${safe(item.id)}</div></div><div class="row"><div class="label">Date &amp; Time</div><div class="value">${safe(date)}</div></div><div class="row"><div class="label">Complaint Title</div><div class="value">${safe(item.title)}</div></div><div class="row"><div class="label">Category</div><div class="value">${safe(item.category)}</div></div><div class="row"><div class="label">Priority</div><div class="value">${safe(item.priority)}</div></div><div class="row"><div class="label">Status</div><div class="value">${safe(item.status.replaceAll('_',' '))}</div></div><div class="row"><div class="label">Service Address</div><div class="value">${safe(item.location_text)}</div></div><div class="row"><div class="label">Problem / Description</div><div class="value">${safe(item.description || 'No description')}</div></div><div class="footer">Thank you for choosing Unique Market.<br>Keep this receipt for your service records.</div><script>window.onload=function(){window.print()}</script></body></html>`)
+    popup.document.write(`<!doctype html><html><head><title>Unique Market - Service Receipt</title><style>body{font-family:Arial,sans-serif;max-width:760px;margin:0 auto;padding:32px;color:#111}.head{text-align:center;border-bottom:2px solid #111;padding-bottom:16px;margin-bottom:22px}.head h1{margin:0 0 6px}.head p{margin:4px}.row{display:flex;border-bottom:1px solid #ddd;padding:10px 0}.label{width:180px;font-weight:700}.value{flex:1;word-break:break-word}.footer{text-align:center;border-top:1px solid #ddd;margin-top:28px;padding-top:14px;font-size:12px}@media print{body{padding:10mm}}</style></head><body><div class="head"><h1>UNIQUE MARKET</h1><p>CCTV &amp; Security Solutions</p><p>Service Complaint Receipt</p></div><div class="row"><div class="label">Complaint ID</div><div class="value">${safe(item.id)}</div></div><div class="row"><div class="label">Date &amp; Time</div><div class="value">${safe(date)}</div></div><div class="row"><div class="label">Complaint Title</div><div class="value">${safe(item.title)}</div></div><div class="row"><div class="label">Category</div><div class="value">${safe(categoryLabels[item.category] || item.category)}</div></div><div class="row"><div class="label">Priority</div><div class="value">${safe(item.priority)}</div></div><div class="row"><div class="label">Status</div><div class="value">${safe(item.status.replaceAll('_',' '))}</div></div><div class="row"><div class="label">Service Address</div><div class="value">${safe(item.location_text)}</div></div><div class="row"><div class="label">Problem / Description</div><div class="value">${safe(item.description || 'No description')}</div></div><div class="footer">Thank you for choosing Unique Market.<br>Keep this receipt for your service records.</div><script>window.onload=function(){window.print()}</script></body></html>`)
     popup.document.close()
   }
+
+  const problemOptions = complaintOptions[form.category] || []
 
   return <section className="complaints-panel">
     <div className="panel-heading"><div><span className="badge">SERVICE DESK</span><h2>Complaint Management</h2><p>Raise, assign and track service complaints.</p></div><div><span className={live ? 'status' : 'status offline'}>{live ? 'LIVE' : 'SYNC'}</span> <button className="secondary" onClick={load}>Refresh</button></div></div>
     {profile?.role === 'customer' && <form className="complaint-form" onSubmit={createComplaint}>
-      <input placeholder="Complaint title" value={form.title} onChange={e=>setForm({...form,title:e.target.value})} required />
-      <select value={form.category} onChange={e=>setForm({...form,category:e.target.value})}><option value="cctv">CCTV</option><option value="computer">Computer</option><option value="network">Network</option><option value="other">Other</option></select>
+      <select value={form.category} onChange={e=>setForm({...form,category:e.target.value,problem:''})} required>{Object.entries(categoryLabels).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select>
+      <select value={form.problem} onChange={e=>setForm({...form,problem:e.target.value})} required><option value="">Select specific problem</option>{problemOptions.map(problem=><option key={problem} value={problem}>{problem}</option>)}</select>
+      <input placeholder="Complaint title (optional)" value={form.title} onChange={e=>setForm({...form,title:e.target.value})} />
       <select value={form.priority} onChange={e=>setForm({...form,priority:e.target.value})}><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option><option value="urgent">Urgent</option></select>
       <input placeholder="Service address" value={form.location_text} onChange={e=>setForm({...form,location_text:e.target.value})} required />
-      <textarea placeholder="Describe the issue" value={form.description} onChange={e=>setForm({...form,description:e.target.value})} rows="4" />
+      <textarea placeholder="Additional details about the problem" value={form.description} onChange={e=>setForm({...form,description:e.target.value})} rows="4" />
       <label>Photo / Video / Voice<input type="file" accept={attachmentTypes.join(',')} multiple onChange={e=>setFiles(Array.from(e.target.files || []))} /></label>
       <div><button type="button" className="secondary" onClick={recording ? stopVoice : startVoice}>{recording ? 'Stop Voice Recording' : '🎤 Record Voice Complaint'}</button>{files.length > 0 && <small>{files.length} attachment(s) selected</small>}</div>
       <button>Raise Complaint</button>
     </form>}
     {message && <p className="muted">{message}</p>}
     <div className="complaint-list">{items.length === 0 ? <p className="muted">No complaints found.</p> : items.map(item => <article className="complaint-card" key={item.id}>
-      <div><h3>{item.title}</h3><p>{item.description || 'No description'}</p><small>{item.category} · {item.priority} · {new Date(item.created_at).toLocaleString()}</small>
+      <div><h3>{item.title}</h3><p>{item.description || 'No description'}</p><small>{categoryLabels[item.category] || item.category} · {item.priority} · {new Date(item.created_at).toLocaleString()}</small>
         {!!attachments[item.id]?.length && <div className="attachments"><strong>Attachments:</strong>{attachments[item.id].map(file => <button type="button" className="secondary" key={file.id} onClick={()=>openAttachment(file)}>{file.mime_type?.startsWith('image/') ? '📷' : file.mime_type?.startsWith('video/') ? '🎥' : '🎤'} {file.file_name}</button>)}</div>}
       </div>
       <div className="complaint-actions"><strong>{item.status.replace('_',' ')}</strong>
