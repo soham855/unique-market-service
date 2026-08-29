@@ -11,7 +11,19 @@ export default function ComplaintForm({ userId, onCreated }) {
   async function submit(event) {
     event.preventDefault(); setLoading(true); setMessage('')
     try {
-      const { data, error } = await supabase.from('complaints').insert({ ...form, customer_id: userId }).select().single()
+      const { data: customer, error: customerError } = await supabase
+        .from('customers')
+        .select('id')
+        .eq('user_id', userId)
+        .maybeSingle()
+      if (customerError) throw customerError
+      if (!customer?.id) throw new Error('Customer profile is not linked. Please contact Unique Market admin.')
+
+      const { data, error } = await supabase
+        .from('complaints')
+        .insert({ ...form, customer_id: customer.id })
+        .select()
+        .single()
       if (error) throw error
       setForm({ title: '', description: '', category: 'cctv', priority: 'normal', address: '' })
       setMessage(`Complaint created: ${data.id.slice(0, 8)}`)
