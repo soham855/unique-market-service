@@ -32,6 +32,8 @@ export default function ComplaintModule({ profile }) {
   const [items, setItems] = useState([])
   const [technicians, setTechnicians] = useState([])
   const [attachments, setAttachments] = useState({})
+  const [activeCategories, setActiveCategories] = useState(Object.keys(categoryLabels))
+  const [serviceRadius, setServiceRadius] = useState(20)
   const [form, setForm] = useState({ customer_name:profile?.full_name || '', customer_phone:profile?.phone || '', company_name:profile?.company_name || '', title:'', description:'', category:'cctv', problem:'', priority:'normal', location_text:'' })
   const [files, setFiles] = useState([])
   const [recording, setRecording] = useState(false)
@@ -45,6 +47,20 @@ export default function ComplaintModule({ profile }) {
   useEffect(() => {
     setForm(prev => ({ ...prev, customer_name: profile?.full_name || prev.customer_name, customer_phone: profile?.phone || prev.customer_phone, company_name: profile?.company_name || prev.company_name }))
   }, [profile?.full_name, profile?.phone, profile?.company_name])
+
+  useEffect(() => {
+    if (profile?.role !== 'customer') return
+    let cancelled = false
+    ;(async()=>{
+      const { data } = await supabase.from('service_access_settings').select('max_radius_km,active_categories').limit(1).maybeSingle()
+      if (cancelled || !data) return
+      const active = Array.isArray(data.active_categories) ? data.active_categories.filter(k=>categoryLabels[k]) : []
+      setActiveCategories(active.length ? active : Object.keys(categoryLabels))
+      setServiceRadius(Number(data.max_radius_km) || 20)
+      if (active.length && !active.includes(form.category)) setForm(prev=>({...prev,category:active[0],problem:''}))
+    })()
+    return ()=>{ cancelled=true }
+  }, [profile?.role])
 
   async function load() {
     if (!supabase) return
@@ -84,6 +100,7 @@ export default function ComplaintModule({ profile }) {
       if (!form.customer_phone.trim()) throw new Error('Mobile Number is required.')
       if (!form.location_text.trim()) throw new Error('Service Address is required.')
       if (!form.category) throw new Error('Service Category is required.')
+      if (!activeCategories.includes(form.category)) throw new Error('This service is currently unavailable.')
       if (!form.problem) throw new Error('Problem is required.')
       if (!form.priority) throw new Error('Priority is required.')
       const title = form.title.trim() || form.problem
@@ -92,7 +109,7 @@ export default function ComplaintModule({ profile }) {
       const { data, error } = await supabase.from('complaints').insert(payload).select('id').single()
       if (error) throw error
       if (files.length) await uploadAttachments(data.id, files)
-      setMessage('Complaint raised successfully'); setForm({ customer_name:profile?.full_name || '', customer_phone:profile?.phone || '', company_name:profile?.company_name || '', title:'',description:'',category:'cctv',problem:'',priority:'normal',location_text:'' }); setFiles([]); e.target.reset(); load()
+      setMessage('Complaint raised successfully'); setForm({ customer_name:profile?.full_name || '', customer_phone:profile?.phone || '', company_name:profile?.company_name || '', title:'',description:'',category:activeCategories[0] || 'cctv',problem:'',priority:'normal',location_text:'' }); setFiles([]); e.target.reset(); load()
     } catch (error) { setMessage(error.message || 'Unable to submit complaint') }
   }
 
@@ -138,14 +155,15 @@ export default function ComplaintModule({ profile }) {
       <input type="tel" placeholder="Mobile Number" value={form.customer_phone} onChange={e=>setForm({...form,customer_phone:e.target.value})} required />
       <input placeholder="Company Name (Optional)" value={form.company_name} onChange={e=>setForm({...form,company_name:e.target.value})} />
       <input placeholder="Service Address" value={form.location_text} onChange={e=>setForm({...form,location_text:e.target.value})} required />
-      <select value={form.category} onChange={e=>setForm({...form,category:e.target.value,problem:''})} required>{Object.entries(categoryLabels).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select>
+      <select value={form.category} onChange={e=>setForm({...form,category:e.target.value,problem:''})} required>{activeCategories.map(value=><option key={value} value={value}>{categoryLabels[value]}</option>)}</select>
       <select value={form.problem} onChange={e=>setForm({...form,problem:e.target.value})} required><option value="">Select specific problem</option>{problemOptions.map(problem=><option key={problem} value={problem}>{problem}</option>)}</select>
       <select value={form.priority} onChange={e=>setForm({...form,priority:e.target.value})} required><option value="">Select Priority</option><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option><option value="urgent">Urgent</option></select>
       <input placeholder="Complaint title (optional)" value={form.title} onChange={e=>setForm({...form,title:e.target.value})} />
       <textarea placeholder="Additional details (Optional)" value={form.description} onChange={e=>setForm({...form,description:e.target.value})} rows="4" />
       <label>Photo / Video / Voice (Optional)<input type="file" accept={attachmentTypes.join(',')} multiple onChange={e=>setFiles(Array.from(e.target.files || []))} /></label>
       <div><button type="button" className="secondary" onClick={recording ? stopVoice : startVoice}>{recording ? 'Stop Voice Recording' : '🎤 Record Voice Complaint'}</button>{files.length > 0 && <small>{files.length} attachment(s) selected</small>}</div>
-      <button type="submit">Raise Complaint</button>
+      <button type="submit" disabled={!activeCategories.length}>{activeCategories.length ? 'Raise Complaint' : 'Service Temporarily Unavailable'}</button>
+      <small className="muted">Service radius controlled by Admin: {serviceRadius} km</small>
     </form>}
     {message && <p className="muted">{message}</p>}
     <div className="complaint-list">{items.length === 0 ? <p className="muted">No complaints found.</p> : items.map(item => <article className="complaint-card" key={item.id}>
