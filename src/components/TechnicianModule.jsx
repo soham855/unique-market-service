@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { subscribeToComplaints } from '../lib/realtime'
 
-const statusLabel = { assigned:'ASSIGNED', in_progress:'IN PROGRESS', resolved:'SERVICE COMPLETED', closed:'CLOSED' }
+const statusLabel = { open:'NEW REQUEST', assigned:'ASSIGNED', in_progress:'IN PROGRESS', resolved:'SERVICE COMPLETED', closed:'CLOSED' }
 
 export default function TechnicianModule({ profile, mode = 'assigned', onBack }) {
   const [items, setItems] = useState([])
@@ -13,11 +13,15 @@ export default function TechnicianModule({ profile, mode = 'assigned', onBack })
   const [payment, setPayment] = useState({ amount:'', mode:'Cash', reference_no:'', notes:'' })
 
   async function load(search = '') {
+    if (!supabase || !profile?.id) return
     setLoading(true); setMessage('')
-    let q = supabase.from('complaints').select('id,complaint_no,title,description,category,priority,status,location_text,created_at,customer_name,customer_phone,company_name,technician_id,customer_id,started_at,completed_at,resolution_notes').eq('technician_id', profile.id).order('created_at', { ascending:false })
+    let q = supabase.from('complaints')
+      .select('id,complaint_no,ticket_no,title,description,category,priority,status,location_text,address,created_at,customer_name,customer_phone,company_name,technician_id,customer_id,started_at,completed_at,resolution_notes,assigned_at')
+      .or(`technician_id.eq.${profile.id},and(technician_id.is.null,status.eq.open)`)
+      .order('created_at', { ascending:false })
     if (search.trim()) {
       const value = search.trim().replace(/,/g, '')
-      q = q.or(`complaint_no.ilike.%${value}%,title.ilike.%${value}%,customer_name.ilike.%${value}%,customer_phone.ilike.%${value}%`)
+      q = q.or(`complaint_no.ilike.%${value}%,ticket_no.ilike.%${value}%,title.ilike.%${value}%,customer_name.ilike.%${value}%,customer_phone.ilike.%${value}%`)
     }
     const { data, error } = await q
     if (error) setMessage(error.message); else setItems(data || [])
@@ -25,11 +29,23 @@ export default function TechnicianModule({ profile, mode = 'assigned', onBack })
   }
 
   useEffect(() => {
-    if (!supabase || !profile?.id) return
+    if (!profile?.id) return
     load()
     const unsubscribe = subscribeToComplaints(() => load(query))
     return unsubscribe
   }, [profile?.id, mode])
+
+  async function claimJob(item) {
+    setMessage('')
+    const { error } = await supabase.from('complaints').update({
+      technician_id: profile.id,
+      status: 'assigned',
+      assigned_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }).eq('id', item.id).is('technician_id', null).eq('status', 'open')
+    if (error) setMessage(error.message)
+    else { setMessage(`${item.complaint_no || 'Complaint'} assigned to you.`); load(query) }
+  }
 
   async function setStatus(item, status, extra = {}) {
     setMessage('')
@@ -65,38 +81,38 @@ export default function TechnicianModule({ profile, mode = 'assigned', onBack })
     setMessage('Payment collected and service file closed successfully.')
   }
 
-  function displayNo(item) { return item.complaint_no || `C/NO-${item.id}` }
+  function displayNo(item) { return item.complaint_no || item.ticket_no || `C/NO-${item.id}` }
 
   return <section className='complaints-panel'>
     <div className='panel-heading'>
-      <div><span className='badge'>TECHNICIAN DESK</span><h2>{mode === 'find' ? 'Find My Complaint' : 'Live Assigned Complaints'}</h2><p>Only complaints assigned to you are shown. Complete the service workflow from this screen.</p></div>
+      <div><span className='badge'>TECHNICIAN DESK</span><h2>{mode === 'find' ? 'Find Service Request' : 'Live Service Requests'}</h2><p>Customer-raised open requests and complaints assigned to you are shown here automatically.</p></div>
       <div><span className='status'>LIVE</span> <button className='secondary' type='button' onClick={onBack}>← Back</button></div>
     </div>
 
     <div className='search-row' style={{display:'flex',gap:8,margin:'18px 0',flexWrap:'wrap'}}>
       <input value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')load(query)}} placeholder='Search C/NO-1, customer, mobile...' />
       <button type='button' onClick={()=>load(query)}>Find</button>
-      <button type='button' className='secondary' onClick={()=>{setQuery('');load('')}}>All Assigned</button>
+      <button type='button' className='secondary' onClick={()=>{setQuery('');load('')}}>Refresh</button>
     </div>
 
-    {message && <p className={message.includes('successfully') ? 'muted' : 'error'}>{message}</p>}
-    {loading ? <p>Loading live complaints…</p> : items.length === 0 ? <div className='module-card'><h3>No assigned complaints</h3><p>New complaints assigned by Admin will appear here automatically.</p></div> : <div className='modules'>
+    {message && <p className={message.includes('successfully') || message.includes('assigned to you') ? 'muted' : 'error'}>{message}</p>}
+    {loading ? <p>Loading live service requests…</p> : items.length === 0 ? <div className='module-card'><h3>No service requests</h3><p>New customer complaints will appear here automatically.</p></div> : <div className='modules'>
       {items.map(item => <article className='module-card' key={item.id}>
         <span className='status'>{displayNo(item)} · {statusLabel[item.status] || String(item.status || 'OPEN').replaceAll('_',' ').toUpperCase()}</span>
         <h3>{item.title || item.description || 'Service Complaint'}</h3>
         <p><strong>Customer:</strong> {item.customer_name || '—'} · {item.customer_phone || '—'}</p>
         <p><strong>Company:</strong> {item.company_name || '—'}</p>
         <p><strong>Category:</strong> {item.category || '—'} · <strong>Priority:</strong> {item.priority || 'normal'}</p>
-        <p><strong>Address:</strong> {item.location_text || '—'}</p>
+        <p><strong>Address:</strong> {item.location_text || item.address || '—'}</p>
         <p style={{whiteSpace:'pre-wrap'}}>{item.description || 'No additional description.'}</p>
-        {item.resolution_notes && <p><strong>Completion notes:</strong> {item.resolution_notes}</p>}
 
         <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',marginTop:12}}>
-          {item.status === 'assigned' && <button type='button' onClick={()=>acceptJob(item)}>✓ Accept & Start Service</button>}
-          {item.status === 'in_progress' && <button type='button' onClick={()=>completeService(item)}>✓ Service Completed</button>}
-          {item.status === 'resolved' && <button type='button' onClick={()=>setPaymentFor(item)}>💳 Collect Cash / UPI & Close</button>}
-          {item.status === 'closed' && <strong>✓ Service File Closed</strong>}
-          <small>{item.started_at ? `Started: ${new Date(item.started_at).toLocaleString('en-IN')} · ` : ''}{item.completed_at ? `Completed: ${new Date(item.completed_at).toLocaleString('en-IN')} · ` : ''}Assigned to you</small>
+          {item.status === 'open' && !item.technician_id && <button type='button' onClick={()=>claimJob(item)}>✓ Accept Request</button>}
+          {item.status === 'assigned' && item.technician_id === profile.id && <button type='button' onClick={()=>acceptJob(item)}>✓ Start Service</button>}
+          {item.status === 'in_progress' && item.technician_id === profile.id && <button type='button' onClick={()=>completeService(item)}>✓ Service Completed</button>}
+          {item.status === 'resolved' && item.technician_id === profile.id && <button type='button' onClick={()=>setPaymentFor(item)}>💳 Collect Cash / UPI & Close</button>}
+          {item.status === 'closed' && item.technician_id === profile.id && <strong>✓ Service File Closed</strong>}
+          {item.status === 'assigned' && item.technician_id === profile.id && <small>Assigned to you</small>}
         </div>
 
         {paymentFor?.id === item.id && <div className='module-card' style={{marginTop:14}}>
