@@ -37,12 +37,26 @@ export default function TechnicianModule({ profile, mode = 'assigned', onBack })
 
   async function claimJob(item) {
     setMessage('')
+    // complaints.technician_id references profiles.id. Resolve the current
+    // technician from profiles before assigning, instead of trusting a
+    // potentially stale/non-profile ID from the dashboard state.
+    const { data: technician, error: profileError } = await supabase
+      .from('profiles')
+      .select('id,role')
+      .eq('id', profile.id)
+      .eq('role', 'technician')
+      .maybeSingle()
+
+    if (profileError) return setMessage(profileError.message)
+    if (!technician?.id) return setMessage('Technician profile is not linked correctly. Please check the technician profile ID.')
+
     const { error } = await supabase.from('complaints').update({
-      technician_id: profile.id,
+      technician_id: technician.id,
       status: 'assigned',
       assigned_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     }).eq('id', item.id).is('technician_id', null).eq('status', 'open')
+
     if (error) setMessage(error.message)
     else { setMessage(`${item.complaint_no || 'Complaint'} assigned to you.`); load(query) }
   }
@@ -55,9 +69,7 @@ export default function TechnicianModule({ profile, mode = 'assigned', onBack })
     else load(query)
   }
 
-  async function acceptJob(item) {
-    await setStatus(item, 'in_progress', { started_at:new Date().toISOString() })
-  }
+  async function acceptJob(item) { await setStatus(item, 'in_progress', { started_at:new Date().toISOString() }) }
 
   async function completeService(item) {
     const notes = window.prompt('Service completion notes (optional):', item.resolution_notes || '')
@@ -105,7 +117,6 @@ export default function TechnicianModule({ profile, mode = 'assigned', onBack })
         <p><strong>Category:</strong> {item.category || '—'} · <strong>Priority:</strong> {item.priority || 'normal'}</p>
         <p><strong>Address:</strong> {item.location_text || item.address || '—'}</p>
         <p style={{whiteSpace:'pre-wrap'}}>{item.description || 'No additional description.'}</p>
-
         <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',marginTop:12}}>
           {item.status === 'open' && !item.technician_id && <button type='button' onClick={()=>claimJob(item)}>✓ Accept Request</button>}
           {item.status === 'assigned' && item.technician_id === profile.id && <button type='button' onClick={()=>acceptJob(item)}>✓ Start Service</button>}
@@ -114,7 +125,6 @@ export default function TechnicianModule({ profile, mode = 'assigned', onBack })
           {item.status === 'closed' && item.technician_id === profile.id && <strong>✓ Service File Closed</strong>}
           {item.status === 'assigned' && item.technician_id === profile.id && <small>Assigned to you</small>}
         </div>
-
         {paymentFor?.id === item.id && <div className='module-card' style={{marginTop:14}}>
           <h3>Collect Payment — {displayNo(item)}</h3>
           <input type='number' min='1' step='0.01' placeholder='Amount ₹' value={payment.amount} onChange={e=>setPayment({...payment,amount:e.target.value})} />
