@@ -26,8 +26,9 @@ export default function CustomerComplaintModule({ profile, activeModule = 'Compl
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
   const [locating, setLocating] = useState(false)
-  const isMyComplaints = activeModule === 'My Complaints'
-  const isRaiseComplaint = activeModule === 'Raise Complaint'
+  const moduleKey = String(activeModule || '').trim().toLowerCase()
+  const isMyComplaints = moduleKey === 'my complaints'
+  const isRaiseComplaint = moduleKey === 'raise complaint'
 
   useEffect(() => {
     setForm(f => ({ ...f, customer_name:profile?.full_name || f.customer_name, customer_phone:profile?.phone || f.customer_phone, company_name:profile?.company_name || f.company_name, location_text:profile?.address || f.location_text }))
@@ -87,7 +88,7 @@ export default function CustomerComplaintModule({ profile, activeModule = 'Compl
   const visibleCategories = Object.entries(categories).filter(([id]) => activeCategories.includes(id))
   const problems = form.category ? categories[form.category]?.[1] || [] : []
 
-  // HARD RULE: My Complaints can NEVER render the complaint form.
+  // My Complaints is a strict read-only route. No complaint form is rendered here.
   if (isMyComplaints) return <section className="complaints-panel">
     <div className="panel-heading"><div><span className="badge">SERVICE DESK</span><h2>My Complaints</h2><p>Track your complaints and service status.</p></div><button className="secondary" onClick={load}>Refresh</button></div>
     <div className="complaint-list">{items.length === 0 ? <p className="muted">No complaints found.</p> : items.map(item=><article className="complaint-card" key={item.id}><div><h3>{item.title}</h3><p>{item.description}</p><small>{item.customer_name || ''}{item.customer_phone ? ` · ${item.customer_phone}` : ''}{item.company_name ? ` · ${item.company_name}` : ''} · {item.category} · {item.priority} · {new Date(item.created_at).toLocaleString()}</small><p><strong>Status:</strong> {item.status?.replaceAll('_',' ') || 'Pending'}</p></div></article>)}</div>
