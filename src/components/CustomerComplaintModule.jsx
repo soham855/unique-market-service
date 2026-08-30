@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
 const categories = {
-  cctv: ['📹 CCTV / Camera', ['Camera Not Working','Camera Offline','No Video / Black Screen','Blurred / Low Quality Video','Night Vision Problem','Camera Recording Problem','Motion Detection Problem','Camera Angle / Position Problem','IR Light Problem','Audio Problem','PTZ Problem','Cable / Connector Problem','Camera Power Problem','Multiple Cameras Not Working','Mobile Viewing Problem','Remote Viewing / Hik-Connect Problem','New Camera Installation','Camera Relocation','Camera Configuration','Other CCTV Problem']],
+  cctv: ['📹 CCTV / Camera', ['Camera Not Working','Camera Offline','No Video / Black Screen','Blurred / Low Quality Video','Night Vision Problem','Camera Recording Problem','Motion Detection Problem','Camera Angle / Position Problem','IR Light Problem','Cable / Connector Problem','Camera Power Problem','Multiple Cameras Not Working','Mobile Viewing Problem','Remote Viewing / Hik-Connect Problem','New Camera Installation','Camera Relocation','Camera Configuration','Other CCTV Problem']],
   dvr_nvr: ['💾 DVR / NVR / Storage', ['DVR/NVR Not Working','No Recording','HDD Not Detected','HDD Error / Bad Sector','Recording Playback Problem','Backup Problem','Date/Time Problem','Channel Not Showing','Network Configuration','Remote Access Problem','NVR/DVR Configuration','Firmware / Software Problem','Other DVR/NVR Problem']],
   computer: ['💻 Computer / Laptop', ['Computer Not Starting','Windows Problem','Slow Computer','Hanging / Freezing','Blue Screen / Error','Software Installation','Software Not Working','Driver Problem','Internet Problem','Wi-Fi Problem','LAN Problem','Keyboard Problem','Mouse Problem','Monitor / Display Problem','Printer Connection Problem','Data Backup / Recovery','Virus / Malware Problem','HDD / SSD Problem','RAM Problem','SMPS / Power Problem','New Computer Installation','Computer Formatting','Windows Installation','Other Computer Problem']],
   network: ['🌐 Networking / Internet', ['Internet Not Working','Slow Internet','LAN Not Working','Wi-Fi Not Working','Network Disconnection','Router Problem','Switch Problem','PoE Switch Problem','IP Address Problem','DHCP Problem','DNS Problem','Network Cable Problem','Connector Problem','Network Configuration','New Network Installation','Other Networking Problem']],
@@ -16,7 +16,6 @@ const categories = {
   amc: ['🔧 AMC / Maintenance', ['Preventive Maintenance','CCTV Maintenance','Computer Maintenance','Network Maintenance','Cleaning Required','System Health Check','AMC Service Visit','Breakdown Service','Other AMC Request']],
   hardware: ['📦 Product / Hardware', ['Product Not Working','Warranty Service','Hardware Replacement','Product Installation','Product Configuration','Damaged Product','Product Compatibility','Upgrade Required','Other Hardware Problem']]
 }
-
 const defaultActive = Object.keys(categories)
 
 export default function CustomerComplaintModule({ profile, activeModule = 'Complaints', onSubmitted }) {
@@ -29,8 +28,6 @@ export default function CustomerComplaintModule({ profile, activeModule = 'Compl
   const [locating, setLocating] = useState(false)
   const isMyComplaints = activeModule === 'My Complaints'
   const isRaiseComplaint = activeModule === 'Raise Complaint'
-  // IMPORTANT: My Complaints is read-only. The complaint form is rendered ONLY on Raise Complaint.
-  const showList = isMyComplaints
 
   useEffect(() => {
     setForm(f => ({ ...f, customer_name:profile?.full_name || f.customer_name, customer_phone:profile?.phone || f.customer_phone, company_name:profile?.company_name || f.company_name, location_text:profile?.address || f.location_text }))
@@ -44,13 +41,11 @@ export default function CustomerComplaintModule({ profile, activeModule = 'Compl
       setActiveCategories(Array.isArray(data.active_categories) && data.active_categories.length ? data.active_categories : defaultActive)
     }
   }
-
   async function load() {
     if (!supabase || !profile?.id) return
     const { data, error } = await supabase.from('complaints').select('id,title,description,category,priority,status,location_text,created_at,customer_name,customer_phone,company_name').eq('customer_id', profile.id).order('created_at',{ascending:false})
     if (error) setMessage(error.message); else setItems(data || [])
   }
-
   useEffect(() => { load(); loadAccess() }, [profile?.id])
 
   async function useMyLocation() {
@@ -82,8 +77,7 @@ export default function CustomerComplaintModule({ profile, activeModule = 'Compl
       const title = `${categories[form.category][0].replace(/^\S+\s/,'')} - ${form.problem}`
       const { error } = await supabase.from('complaints').insert({ customer_id:profile.id, customer_name:form.customer_name.trim(), customer_phone:form.customer_phone.trim(), company_name:form.company_name.trim() || null, title, description:form.description.trim() || form.problem, category:form.category, priority:form.priority, location_text:form.location_text.trim() })
       if (error) throw error
-      await load()
-      setForm(f=>({ ...f, category:'', problem:'', priority:'normal', description:'' }))
+      await load(); setForm(f=>({ ...f, category:'', problem:'', priority:'normal', description:'' }))
       setMessage('Complaint raised successfully. It is now available in My Complaints.')
       if (onSubmitted) onSubmitted()
     } catch (error) { setMessage(error.message || 'Unable to submit complaint') }
@@ -93,8 +87,14 @@ export default function CustomerComplaintModule({ profile, activeModule = 'Compl
   const visibleCategories = Object.entries(categories).filter(([id]) => activeCategories.includes(id))
   const problems = form.category ? categories[form.category]?.[1] || [] : []
 
+  // HARD RULE: My Complaints can NEVER render the complaint form.
+  if (isMyComplaints) return <section className="complaints-panel">
+    <div className="panel-heading"><div><span className="badge">SERVICE DESK</span><h2>My Complaints</h2><p>Track your complaints and service status.</p></div><button className="secondary" onClick={load}>Refresh</button></div>
+    <div className="complaint-list">{items.length === 0 ? <p className="muted">No complaints found.</p> : items.map(item=><article className="complaint-card" key={item.id}><div><h3>{item.title}</h3><p>{item.description}</p><small>{item.customer_name || ''}{item.customer_phone ? ` · ${item.customer_phone}` : ''}{item.company_name ? ` · ${item.company_name}` : ''} · {item.category} · {item.priority} · {new Date(item.created_at).toLocaleString()}</small><p><strong>Status:</strong> {item.status?.replaceAll('_',' ') || 'Pending'}</p></div></article>)}</div>
+  </section>
+
   return <section className="complaints-panel">
-    <div className="panel-heading"><div><span className="badge">SERVICE DESK</span><h2>{isMyComplaints ? 'My Complaints' : isRaiseComplaint ? 'Raise Complaint' : 'Complaint Management'}</h2><p>{isMyComplaints ? 'Track your complaints and service status.' : isRaiseComplaint ? 'Select a service category, then choose the exact problem.' : 'View your complaints and their current service status.'}</p></div><button className="secondary" onClick={()=>{load();loadAccess()}}>Refresh</button></div>
+    <div className="panel-heading"><div><span className="badge">SERVICE DESK</span><h2>{isRaiseComplaint ? 'Raise Complaint' : 'Complaint Management'}</h2><p>{isRaiseComplaint ? 'Select a service category, then choose the exact problem.' : 'View your complaints and their current service status.'}</p></div><button className="secondary" onClick={()=>{load();loadAccess()}}>Refresh</button></div>
     {isRaiseComplaint && <form className="complaint-form" onSubmit={createComplaint}>
       <input placeholder="Customer Name" value={form.customer_name} onChange={e=>setForm({...form,customer_name:e.target.value})} required />
       <input type="tel" placeholder="Mobile Number" value={form.customer_phone} onChange={e=>setForm({...form,customer_phone:e.target.value})} required />
@@ -108,6 +108,5 @@ export default function CustomerComplaintModule({ profile, activeModule = 'Compl
       <button disabled={loading || !form.problem}>{loading ? 'Submitting…' : 'Raise Complaint'}</button>
     </form>}
     {message && isRaiseComplaint && <p className="muted">{message}</p>}
-    {showList && <div className="complaint-list"><h3>My Complaints</h3>{items.length === 0 ? <p className="muted">No complaints found.</p> : items.map(item=><article className="complaint-card" key={item.id}><div><h3>{item.title}</h3><p>{item.description}</p><small>{item.customer_name || ''}{item.customer_phone ? ` · ${item.customer_phone}` : ''}{item.company_name ? ` · ${item.company_name}` : ''} · {item.category} · {item.priority} · {new Date(item.created_at).toLocaleString()}</small><p><strong>Status:</strong> {item.status?.replaceAll('_',' ') || 'Pending'}</p></div></article>)}</div>}
   </section>
 }
