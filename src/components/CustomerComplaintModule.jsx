@@ -29,7 +29,8 @@ export default function CustomerComplaintModule({ profile, activeModule = 'Compl
   const [locating, setLocating] = useState(false)
   const isMyComplaints = activeModule === 'My Complaints'
   const isRaiseComplaint = activeModule === 'Raise Complaint'
-  const showList = isMyComplaints || activeModule === 'Complaints'
+  // IMPORTANT: My Complaints is read-only. The complaint form is rendered ONLY on Raise Complaint.
+  const showList = isMyComplaints
 
   useEffect(() => {
     setForm(f => ({ ...f, customer_name:profile?.full_name || f.customer_name, customer_phone:profile?.phone || f.customer_phone, company_name:profile?.company_name || f.company_name, location_text:profile?.address || f.location_text }))
