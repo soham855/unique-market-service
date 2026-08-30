@@ -44,7 +44,7 @@ export default function CustomerComplaintModule({ profile, activeModule = 'Compl
   }
   async function load() {
     if (!supabase || !profile?.id) return
-    const { data, error } = await supabase.from('complaints').select('id,title,description,category,priority,status,location_text,created_at,customer_name,customer_phone,company_name').eq('customer_id', profile.id).order('created_at',{ascending:false})
+    const { data, error } = await supabase.from('complaints').select('*').eq('customer_id', profile.id).order('created_at',{ascending:false})
     if (error) setMessage(error.message); else setItems(data || [])
   }
   useEffect(() => { load(); loadAccess() }, [profile?.id])
@@ -91,7 +91,7 @@ export default function CustomerComplaintModule({ profile, activeModule = 'Compl
   // My Complaints is a strict read-only route. No complaint form is rendered here.
   if (isMyComplaints) return <section className="complaints-panel">
     <div className="panel-heading"><div><span className="badge">SERVICE DESK</span><h2>My Complaints</h2><p>Track your complaints and service status.</p></div><button className="secondary" onClick={load}>Refresh</button></div>
-    <div className="complaint-list">{items.length === 0 ? <p className="muted">No complaints found.</p> : items.map(item=><article className="complaint-card" key={item.id}><div><h3>{item.title}</h3><p>{item.description}</p><small>{item.customer_name || ''}{item.customer_phone ? ` · ${item.customer_phone}` : ''}{item.company_name ? ` · ${item.company_name}` : ''} · {item.category} · {item.priority} · {new Date(item.created_at).toLocaleString()}</small><p><strong>Status:</strong> {item.status?.replaceAll('_',' ') || 'Pending'}</p></div></article>)}</div>
+    <div className="complaint-list">{items.length === 0 ? <p className="muted">No complaints found.</p> : items.map(item=><article className="complaint-card" key={item.id}><div><h3>{item.ticket_no || item.title || item.problem || 'Service Complaint'}</h3><p>{item.description || item.problem || 'No additional details provided.'}</p><small>{item.customer_name || ''}{item.customer_phone ? ` · ${item.customer_phone}` : ''}{item.company_name ? ` · ${item.company_name}` : ''}{item.category ? ` · ${item.category}` : ''}{item.priority ? ` · ${item.priority}` : ''}{item.created_at ? ` · ${new Date(item.created_at).toLocaleString()}` : ''}</small><p><strong>Status:</strong> {item.status?.replaceAll('_',' ') || 'New'}</p></div></article>)}</div>
   </section>
 
   return <section className="complaints-panel">
