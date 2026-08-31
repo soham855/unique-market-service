@@ -9,8 +9,11 @@ export async function signIn(email, password) {
 
 export async function signOut() {
   if (!supabase) return
-  const { error } = await supabase.auth.signOut()
+  const { error } = await supabase.auth.signOut({ scope: 'local' })
   if (error) throw error
+  // Supabase auth storage changes propagate to all tabs/windows of the same origin.
+  // This keeps Admin, Customer and Technician sessions in sync without revoking
+  // the session on other devices.
 }
 
 export async function getSession() {
