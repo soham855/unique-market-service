@@ -1,0 +1,38 @@
+import React from 'react'
+
+const services=[
+ {title:'CCTV & Surveillance',text:'Complete CCTV solutions for homes, shops, offices, factories, warehouses and commercial sites.',items:['IP & HD CCTV cameras','DVR / NVR systems','HDD & storage solutions','Remote mobile viewing']},
+ {title:'CCTV Installation',text:'Professional site survey, camera placement, cabling, networking, configuration and commissioning.',items:['Site survey & planning','Cat5e/Cat6 & PoE networking','DVR/NVR configuration','Testing & handover']},
+ {title:'CCTV Service & AMC',text:'Preventive maintenance, troubleshooting and Annual Maintenance Contract support for surveillance systems.',items:['Camera & recorder service','Recording & HDD health checks','Remote viewing troubleshooting','Preventive maintenance']},
+ {title:'Computer & IT Solutions',text:'Computer sales, setup, Windows support, troubleshooting and IT infrastructure assistance.',items:['Desktop & PC setup','Windows & driver support','Computer troubleshooting','IT peripherals & networking']},
+ {title:'Networking Solutions',text:'Reliable wired and wireless networking for homes, offices and business environments.',items:['LAN cabling','Wi-Fi & routers','PoE switches','Network troubleshooting']},
+ {title:'Security Infrastructure',text:'Integrated security infrastructure designed around your site, coverage requirements and budget.',items:['Security system planning','Structured cabling','Access & connectivity support','System upgrades']}
+]
+const products=['CCTV Cameras','DVR / NVR','Surveillance HDD','PoE Switches','Cat5e / Cat6 Cable','Routers & Networking','Computer Systems','IT Peripherals']
+const areas=['Ichalkaranji','Kolhapur','Sangli','Jaysingpur','Hatkanangale','Goa']
+
+export default function CompanyLandingPage(){
+ return <main className='company-site'>
+  <nav className='company-nav'><a className='company-logo' href='/'>UNIQUE <span>MARKET</span></a><div className='company-navlinks'><a href='#services'>Services</a><a href='#products'>Products</a><a href='#about'>About</a><a href='#contact'>Contact</a></div><a className='nav-portal' href='/login'>Service Portal</a></nav>
+
+  <section className='company-hero'>
+   <div className='hero-copy'><div className='company-kicker'>CCTV • SECURITY • COMPUTER • NETWORKING</div><h1>Complete Security & IT Solutions for Your Business.</h1><p>Unique Market delivers professional CCTV, surveillance, computer, networking and maintenance solutions for homes, offices, shops, factories and commercial properties.</p><div className='company-ctas'><a className='cta-primary' href='#contact'>Get a Free Consultation</a><a className='cta-secondary' href='#services'>Explore Services →</a></div><div className='hero-trust'><span>✓ Professional Installation</span><span>✓ Service & AMC Support</span><span>✓ Business IT Solutions</span></div></div>
+   <div className='hero-panel'><div className='panel-top'>UNIQUE MARKET <span>EST. SERVICE</span></div><div className='camera-visual'><div className='camera-ring'></div><div className='camera-lens'></div></div><h3>Security that works.<br/>Support you can trust.</h3><p>End-to-end solutions from product selection to installation and after-sales service.</p></div>
+  </section>
+
+  <section className='company-stats'><div><strong>6+</strong><span>Core Solutions</span></div><div><strong>24×7</strong><span>Security Focus</span></div><div><strong>4</strong><span>Key Service Regions</span></div><div><strong>360°</strong><span>Support Approach</span></div></section>
+
+  <section id='services' className='company-section'><div className='section-head'><div><span className='section-label'>WHAT WE DO</span><h2>Solutions built for real-world security.</h2></div><p>From a single camera installation to complete surveillance and IT infrastructure, we plan, supply, install and support the system you actually need.</p></div><div className='service-grid'>{services.map(s=><article className='service-card' key={s.title}><div className='service-icon'>◈</div><h3>{s.title}</h3><p>{s.text}</p><ul>{s.items.map(i=><li key={i}>{i}</li>)}</ul><a href='/login'>Request Service →</a></article>)}</div></section>
+
+  <section id='products' className='company-section products-section'><div className='section-head'><div><span className='section-label'>WHAT WE SELL</span><h2>Quality products. Complete systems.</h2></div><p>We supply the core hardware required to build dependable CCTV, security and IT infrastructure.</p></div><div className='product-grid'>{products.map((p,i)=><div className='product-item' key={p}><span>0{i+1}</span><strong>{p}</strong><small>Sales • Supply • Support</small></div>)}</div></section>
+
+  <section id='about' className='company-section about-section'><div className='about-card'><div><span className='section-label'>ABOUT UNIQUE MARKET</span><h2>Your local technology & security partner.</h2></div><div><p>Unique Market is a CCTV, security and IT solutions business serving customers with product supply, professional installation, troubleshooting and ongoing maintenance.</p><p>Our focus is simple: understand the site, recommend the right equipment, install it properly and remain available when support is needed.</p><div className='about-points'><span>01 — Site Assessment</span><span>02 — Right Product</span><span>03 — Professional Installation</span><span>04 — After-Sales Support</span></div></div></div></section>
+
+  <section className='company-section areas-section'><div className='section-head'><div><span className='section-label'>SERVICE AREA</span><h2>Serving businesses across the region.</h2></div><p>Based in Ichalkaranji and supporting customers across nearby commercial and industrial areas.</p></div><div className='area-list'>{areas.map(a=><span key={a}>● {a}</span>)}</div></section>
+
+  <section id='contact' className='contact-section'><div><span className='section-label'>LET'S TALK</span><h2>Need CCTV, IT or security support?</h2><p>Tell us what you need. Our team can help with product selection, site requirements, installation, service and AMC.</p></div><div className='contact-card'><strong>UNIQUE MARKET</strong><p>CCTV & Security Solutions<br/>Computer & IT Services<br/>Ichalkaranji, Maharashtra, India</p><div className='contact-links'><a href='/login'>Raise a Service Request →</a><a href='/' className='contact-outline'>Back to Website</a></div></div></section>
+
+  <footer className='company-footer'><div><a className='company-logo' href='/'>UNIQUE <span>MARKET</span></a><p>CCTV & Security Solutions • Computer & IT Services</p></div><div><strong>QUICK LINKS</strong><a href='#services'>Services</a><a href='#products'>Products</a><a href='#contact'>Contact</a></div><div><strong>ONLINE SERVICE</strong><a href='/login'>Customer Portal</a><a href='/login'>Technician Portal</a></div><div><strong>LOCATION</strong><p>Ichalkaranji, Maharashtra<br/>Serving Kolhapur • Sangli • Goa</p></div></footer>
+  <div className='copyright'>© {new Date().getFullYear()} Unique Market. All rights reserved.</div>
+ </main>
+}
