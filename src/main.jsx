@@ -22,9 +22,12 @@ import CustomerPayment from './components/CustomerPayment'
 import PaymentLedger from './components/PaymentLedger'
 import NotificationBell from './components/NotificationBell'
 import LocalSeoPage,{pages as localSeoPages} from './components/LocalSeoPage'
+import CompanyLandingPage from './components/CompanyLandingPage'
 const publicSeoPaths=Object.keys(localSeoPages)
 function App(){
- if(publicSeoPaths.includes(window.location.pathname.replace(/\/$/,''))) return <LocalSeoPage/>
+ const pathname=window.location.pathname.replace(/\/$/,'')
+ if(pathname===''||pathname==='/home') return <CompanyLandingPage/>
+ if(publicSeoPaths.includes(pathname)) return <LocalSeoPage/>
  const[session,setSession]=useState(undefined),[profile,setProfile]=useState(null),[profileError,setProfileError]=useState(''),[activeModule,setActiveModule]=useState(null)
  async function loadProfile(){try{setProfileError('');const p=await getMyProfile();if(!p?.role)throw new Error('Your account has no valid role assigned.');if(!['admin','technician','customer'].includes(p.role))throw new Error('Invalid account role.');setProfile(p);setActiveModule(null)}catch(e){setProfile(null);setProfileError(e.message||'Unable to load profile')}}
  useEffect(()=>{let mounted=true;getSession().then(async v=>{if(!mounted)return;setSession(v);if(v){try{const p=await getMyProfile();if(!p?.role||!['admin','technician','customer'].includes(p.role))throw new Error('Invalid account role.');setProfile(p)}catch(e){setProfileError(e.message||'Unable to load profile')}}});const{data}=onAuthStateChange((_e,n)=>{setSession(n);if(n)loadProfile();else{setProfile(null);setActiveModule(null)}});return()=>{mounted=false;data.subscription.unsubscribe()}},[])
