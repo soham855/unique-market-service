@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
+const GOOGLE_REVIEW_URL = 'https://g.page/r/CWY_3B12wn32EBI/review'
+
 export default function CustomerServiceHistory({ profile }) {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
@@ -45,7 +47,20 @@ export default function CustomerServiceHistory({ profile }) {
         </div>
       </div>
       <h3>{new Date(selectedDate + 'T00:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })}</h3>
-      {selected.length === 0 ? <p className="muted">No service record on this date.</p> : <div className="complaint-list">{selected.map(item => <article className="complaint-card" key={item.id}><h3>{item.ticket_no || item.title || 'Service Complaint'}</h3><p>{item.description || 'No additional details provided.'}</p><small>{item.category || 'Service'}{item.priority ? ` · ${item.priority}` : ''}</small><p><strong>Status:</strong> {String(item.status || 'new').replaceAll('_', ' ')}</p></article>)}</div>}
+      {selected.length === 0 ? <p className="muted">No service record on this date.</p> : <div className="complaint-list">{selected.map(item => {
+        const completed = ['resolved', 'closed', 'completed'].includes(String(item.status || '').toLowerCase())
+        return <article className="complaint-card" key={item.id}>
+          <h3>{item.ticket_no || item.title || 'Service Complaint'}</h3>
+          <p>{item.description || 'No additional details provided.'}</p>
+          <small>{item.category || 'Service'}{item.priority ? ` · ${item.priority}` : ''}</small>
+          <p><strong>Status:</strong> {String(item.status || 'new').replaceAll('_', ' ')}</p>
+          {completed && <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid currentColor' }}>
+            <strong>Service completed? ⭐</strong>
+            <p className="muted">Please share your genuine feedback about our service on Google.</p>
+            <a className="primary" href={GOOGLE_REVIEW_URL} target="_blank" rel="noreferrer">⭐ Give Google Review</a>
+          </div>}
+        </article>
+      })}</div>}
     </>}
   </section>
 }
