@@ -6,7 +6,8 @@ button { cursor: pointer; }
 .app-shell { min-height: 100vh; padding: 32px; background: radial-gradient(circle at top right, #172554 0, #020617 42%); }
 .topbar { max-width: 1180px; margin: auto; display: flex; justify-content: space-between; align-items: center; gap: 20px; }
 .top-actions { display:flex; align-items:center; gap:10px; }
-.eyebrow { margin: 0 0 4px; font-size: 12px; letter-spacing: .18em; font-weight: 800; color: #60a5fa; }
+.eyebrow { margin: 0 0 4px; font-size: clamp(22px, 3vw, 32px); letter-spacing: .10em; line-height: 1.1; font-weight: 900; color: #60a5fa; }
+.topbar .eyebrow { font-size: clamp(28px, 3.2vw, 36px); font-weight: 900; letter-spacing: .08em; }
 h1 { margin: 0; font-size: clamp(24px, 4vw, 36px); }
 .status, .badge { border: 1px solid #334155; border-radius: 999px; padding: 8px 12px; font-size: 12px; font-weight: 700; }
 .status { color: #86efac; background: #052e16; }
@@ -68,4 +69,4 @@ tr:last-child td { border-bottom:0; }
 .login-card label { display:grid; gap:6px; margin:14px 0; color:#94a3b8; }
 .login-card input { width:100%; padding:12px; border:1px solid #334155; border-radius:10px; background:#020617; color:#e2e8f0; }
 @media (max-width: 900px) { .admin-stats { grid-template-columns:repeat(3,1fr); } }
-@media (max-width: 760px) { .app-shell { padding:20px; } .hero { margin-top:45px; grid-template-columns:1fr; } .modules { grid-template-columns:1fr; } .topbar, .role-heading, .panel-heading, .complaint-card { flex-direction:column; } .status { display:none; } .admin-form { grid-template-columns:1fr; } .admin-stats { grid-template-columns:repeat(2,1fr); } .payment-card { grid-template-columns:1fr; } .payment-qr { width:220px; height:220px; margin:auto; } }
+@media (max-width: 760px) { .app-shell { padding:20px; } .hero { margin-top:45px; grid-template-columns:1fr; } .modules { grid-template-columns:1fr; } .topbar, .role-heading, .panel-heading, .complaint-card { flex-direction:column; } .status { display:none; } .admin-form { grid-template-columns:1fr; } .admin-stats { grid-template-columns:repeat(2,1fr); } .payment-card { grid-template-columns:1fr; } .payment-qr { width:220px; height:220px; margin:auto; } .topbar .eyebrow { font-size: clamp(26px, 9vw, 32px); } }
