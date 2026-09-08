@@ -1,5 +1,5 @@
 -- Unique Market complaint numbering
--- Format: UM-YYZZ/NNN where YYZZ is the financial year (April-March).
+-- Format: UM-YYZZ/NN where YYZZ is the financial year (April-March).
 -- The numeric sequence is GLOBAL and NEVER resets. Only the FY prefix changes.
 -- Existing ticket_no values are preserved.
 
@@ -12,7 +12,6 @@ create table if not exists public.complaint_ticket_counter (
 );
 
 -- Seed the global counter from the highest numeric suffix already present.
--- This never modifies existing ticket numbers.
 do $$
 declare
   v_next bigint;
@@ -42,6 +41,36 @@ as $$
   end;
 $$;
 
+-- Backfill only rows that have no ticket number. Existing values are untouched.
+-- Backfilled rows consume numbers from the same global sequence.
+do $$
+declare
+  r record;
+  v_number bigint;
+begin
+  for r in
+    select id, coalesce(created_at, now()) as created_at
+    from public.complaints
+    where ticket_no is null or btrim(ticket_no) = ''
+    order by created_at, id
+  loop
+    update public.complaint_ticket_counter
+       set next_number = next_number + 1
+     where id = true
+     returning next_number - 1 into v_number;
+
+    if v_number is null then
+      insert into public.complaint_ticket_counter(id, next_number)
+      values (true, 2);
+      v_number := 1;
+    end if;
+
+    update public.complaints
+       set ticket_no = 'UM-' || public.complaint_financial_year(r.created_at) || '/' || lpad(v_number::text, 2, '0')
+     where id = r.id;
+  end loop;
+end $$;
+
 create or replace function public.assign_complaint_ticket_no()
 returns trigger
 language plpgsql
@@ -59,7 +88,7 @@ begin
 
   v_date := coalesce(new.created_at, now());
 
-  -- Row lock makes concurrent complaint creation safe and guarantees no duplicates.
+  -- Atomic counter update is safe for concurrent complaint creation.
   update public.complaint_ticket_counter
      set next_number = next_number + 1
    where id = true
@@ -105,21 +134,3 @@ for each row execute function public.prevent_complaint_ticket_no_change();
 create unique index if not exists complaints_ticket_no_unique
   on public.complaints(ticket_no)
   where ticket_no is not null;
-
--- Backfill only complaints that currently have no ticket number.
--- Existing ticket_no values remain untouched.
-do $$
-declare
-  r record;
-begin
-  for r in
-    select id, created_at
-    from public.complaints
-    where ticket_no is null or btrim(ticket_no) = ''
-    order by created_at, id
-  loop
-    update public.complaints
-       set ticket_no = null
-     where id = r.id;
-  end loop;
-end $$;
