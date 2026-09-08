@@ -1,0 +1,12 @@
+{
+  "name": "Unique Market Service",
+  "short_name": "Unique Market",
+  "description": "Unique Market CCTV service and customer management app",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "lang": "en-IN"
+}
