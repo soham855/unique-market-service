@@ -1,7 +1,7 @@
 {
-  "name": "Unique Market Service",
-  "short_name": "Unique Market",
-  "description": "Unique Market CCTV service and customer management app",
+  "name": "Instant Services for Your Security",
+  "short_name": "Instant Services",
+  "description": "Unique Market CCTV and security service management app",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
