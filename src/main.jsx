@@ -1,5 +1,6 @@
 import React,{useEffect,useState} from 'react'
 import {createRoot} from 'react-dom/client'
+import {App as CapacitorApp} from '@capacitor/app'
 import './styles.css'
 import {supabase} from './lib/supabase'
 import {getSession,onAuthStateChange,signOut} from './lib/auth'
@@ -29,6 +30,7 @@ function App(){
  if(pathname===''||pathname==='/home') return <CompanyLandingPage/>
  if(publicSeoPaths.includes(pathname)) return <LocalSeoPage/>
  const[session,setSession]=useState(undefined),[profile,setProfile]=useState(null),[profileError,setProfileError]=useState(''),[activeModule,setActiveModule]=useState(null)
+ useEffect(()=>{let listener;CapacitorApp.addListener('backButton',({canGoBack})=>{if(activeModule){setActiveModule(null);return}if(canGoBack&&window.history.length>1){window.history.back();return}CapacitorApp.exitApp()}).then(v=>{listener=v});return()=>{listener?.remove()}},[activeModule])
  async function loadProfile(){try{setProfileError('');const p=await getMyProfile();if(!p?.role)throw new Error('Your account has no valid role assigned.');if(!['admin','technician','customer'].includes(p.role))throw new Error('Invalid account role.');setProfile(p);setActiveModule(null)}catch(e){setProfile(null);setProfileError(e.message||'Unable to load profile')}}
  useEffect(()=>{let mounted=true;getSession().then(async v=>{if(!mounted)return;setSession(v);if(v){try{const p=await getMyProfile();if(!p?.role||!['admin','technician','customer'].includes(p.role))throw new Error('Invalid account role.');setProfile(p)}catch(e){setProfileError(e.message||'Unable to load profile')}}});const{data}=onAuthStateChange((_e,n)=>{setSession(n);if(n)loadProfile();else{setProfile(null);setActiveModule(null)}});return()=>{mounted=false;data.subscription.unsubscribe()}},[])
  if(session===undefined)return <main className='auth-shell'><div className='login-card'><p className='eyebrow'>UNIQUE MARKET</p><h1>Loading…</h1></div></main>
@@ -54,6 +56,6 @@ function App(){
  else if(complaint){content=<section className='role-dashboard'><button className='secondary' type='button' onClick={()=>setActiveModule(null)}>← Back to Dashboard</button>{customer?<CustomerComplaintModule profile={profile} activeModule={selected} onSubmitted={()=>setActiveModule('__MY_COMPLAINTS__')}/>:<ComplaintModule profile={profile}/>}</section>}
  else if(admin){content=<AdminModule module={selected} onBack={()=>setActiveModule(null)}/>}
  else{content=<section className='role-dashboard'><button className='secondary' type='button' onClick={()=>setActiveModule(null)}>← Back to Dashboard</button><div className='modules'><article className='module-card'><span>●</span><h3>{selected}</h3><p>Module will use the live service database.</p></article></div></section>}
- return <main className='app-shell'><header className='topbar'><div><p className='eyebrow'>UNIQUE MARKET</p><h1>Service Management</h1></div><div className='top-actions'><span className='status'>{profile.role.toUpperCase()}</span><NotificationBell userId={session.user.id}/><button className='secondary' onClick={signOut}>Sign out</button></div></header>{content}{supabase&&<footer className='footer'>Signed in as {session.user.email}</footer>}</main>
+ return <main className='app-shell'><header className='topbar'><div><p className='eyebrow'>UNIQUE MARKET</p><h1>Instant Services for Your Security</h1></div><div className='top-actions'><span className='status'>{profile.role.toUpperCase()}</span><NotificationBell userId={session.user.id}/><button className='secondary' onClick={signOut}>Sign out</button></div></header>{content}{supabase&&<footer className='footer'>Signed in as {session.user.email}</footer>}</main>
 }
 createRoot(document.getElementById('root')).render(<React.StrictMode><App/></React.StrictMode>)
