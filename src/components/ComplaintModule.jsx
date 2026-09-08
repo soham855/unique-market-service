@@ -28,6 +28,8 @@ const categoryLabels = {
   wifi_router:'📡 Wi-Fi / Router', ups:'🔌 Power / UPS', installation:'🛠️ Installation / Configuration', amc:'🔧 AMC / Maintenance', hardware:'📦 Product / Hardware'
 }
 
+const priorityLabels = { low:'🟢 Low', normal:'🟡 Normal', high:'🟠 High', urgent:'🔴 Urgent' }
+
 export default function ComplaintModule({ profile }) {
   const [items, setItems] = useState([])
   const [technicians, setTechnicians] = useState([])
@@ -98,19 +100,31 @@ export default function ComplaintModule({ profile }) {
     try {
       if (!form.customer_name.trim()) throw new Error('Customer Name is required.')
       if (!form.customer_phone.trim()) throw new Error('Mobile Number is required.')
-      if (!form.location_text.trim()) throw new Error('Service Address is required.')
-      if (!form.category) throw new Error('Service Category is required.')
+      if (!form.location_text.trim()) throw new Error('Service Address is required. Tap “Use Current Location” or enter an address.')
+      if (!form.category) throw new Error('Please select a service.')
       if (!activeCategories.includes(form.category)) throw new Error('This service is currently unavailable.')
-      if (!form.problem) throw new Error('Problem is required.')
-      if (!form.priority) throw new Error('Priority is required.')
+      if (!form.problem) throw new Error('Please tap your problem.')
+      if (!form.priority) throw new Error('Please select priority.')
       const title = form.title.trim() || form.problem
       const description = `Problem: ${form.problem}${form.description.trim() ? `\n${form.description.trim()}` : ''}`
       const payload = { title, description, category:form.category, priority:form.priority, location_text:form.location_text.trim(), customer_id:profile.id, customer_name:form.customer_name.trim(), customer_phone:form.customer_phone.trim(), company_name:form.company_name.trim() || null }
       const { data, error } = await supabase.from('complaints').insert(payload).select('id,ticket_no').single()
       if (error) throw error
       if (files.length) await uploadAttachments(data.id, files)
-      setMessage(`Complaint ${data.ticket_no || 'raised successfully'} raised successfully`); setForm({ customer_name:profile?.full_name || '', customer_phone:profile?.phone || '', company_name:profile?.company_name || '', title:'',description:'',category:activeCategories[0] || 'cctv',problem:'',priority:'normal',location_text:'' }); setFiles([]); e.target.reset(); load()
+      setMessage(`✅ Complaint ${data.ticket_no || 'raised successfully'} raised successfully.`)
+      setForm({ customer_name:profile?.full_name || '', customer_phone:profile?.phone || '', company_name:profile?.company_name || '', title:'',description:'',category:activeCategories[0] || 'cctv',problem:'',priority:'normal',location_text:'' })
+      setFiles([]); e.target.reset(); load()
     } catch (error) { setMessage(error.message || 'Unable to submit complaint') }
+  }
+
+  function useCurrentLocation() {
+    if (!navigator.geolocation) return setMessage('Location is not supported on this device.')
+    setMessage('📍 Getting your current location…')
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => setForm(prev => ({ ...prev, location_text:`GPS: ${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)}` })),
+      error => setMessage(error.code === 1 ? 'Location permission denied. Please allow location access.' : 'Unable to get location. You can enter the address manually.'),
+      { enableHighAccuracy:true, timeout:10000, maximumAge:60000 }
+    )
   }
 
   async function startVoice() {
@@ -121,8 +135,13 @@ export default function ComplaintModule({ profile }) {
       const recorder = new MediaRecorder(stream)
       recorderRef.current = recorder
       recorder.ondataavailable = event => { if (event.data.size) chunksRef.current.push(event.data) }
-      recorder.onstop = () => { const blob = new Blob(chunksRef.current, { type: recorder.mimeType || 'audio/webm' }); setFiles(prev => [...prev, new File([blob], `voice-${Date.now()}.webm`, { type:blob.type })]); stream.getTracks().forEach(track => track.stop()) }
-      recorder.start(); setRecording(true); setMessage('Recording voice complaint… tap Stop when finished.')
+      recorder.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || 'audio/webm' })
+        setFiles(prev => [...prev, new File([blob], `voice-${Date.now()}.webm`, { type:blob.type })])
+        stream.getTracks().forEach(track => track.stop())
+        setMessage('🎤 Voice complaint attached. You can raise the complaint now.')
+      }
+      recorder.start(); setRecording(true); setMessage('🔴 Recording… बोलून सांगा. पूर्ण झाल्यावर Stop दाबा.')
     } catch (error) { setMessage(error.message || 'Microphone permission denied') }
   }
   function stopVoice() { recorderRef.current?.stop(); setRecording(false) }
@@ -147,27 +166,70 @@ export default function ComplaintModule({ profile }) {
   }
 
   const problemOptions = complaintOptions[form.category] || []
+  const customerFormStyles = { display:'grid', gap:12 }
+  const tapButton = selected => ({ padding:'15px 12px', minHeight:62, borderRadius:14, border:`2px solid ${selected ? '#111' : '#ddd'}`, background:selected ? '#111' : '#fff', color:selected ? '#fff' : '#111', fontWeight:700, fontSize:15, cursor:'pointer', textAlign:'center' })
 
   return <section className="complaints-panel">
     <div className="panel-heading"><div><span className="badge">SERVICE DESK</span><h2>Complaint Management</h2><p>Raise, assign and track service complaints.</p></div><div><span className={live ? 'status' : 'status offline'}>{live ? 'LIVE' : 'SYNC'}</span> <button className="secondary" onClick={load}>Refresh</button></div></div>
-    {profile?.role === 'customer' && <form className="complaint-form" onSubmit={createComplaint}>
-      <input placeholder="Customer Name" value={form.customer_name} onChange={e=>setForm({...form,customer_name:e.target.value})} required />
-      <input type="tel" placeholder="Mobile Number" value={form.customer_phone} onChange={e=>setForm({...form,customer_phone:e.target.value})} required />
-      <input placeholder="Company Name (Optional)" value={form.company_name} onChange={e=>setForm({...form,company_name:e.target.value})} />
-      <input placeholder="Service Address" value={form.location_text} onChange={e=>setForm({...form,location_text:e.target.value})} required />
-      <select value={form.category} onChange={e=>setForm({...form,category:e.target.value,problem:''})} required>{activeCategories.map(value=><option key={value} value={value}>{categoryLabels[value]}</option>)}</select>
-      <select value={form.problem} onChange={e=>setForm({...form,problem:e.target.value})} required><option value="">Select specific problem</option>{problemOptions.map(problem=><option key={problem} value={problem}>{problem}</option>)}</select>
-      <select value={form.priority} onChange={e=>setForm({...form,priority:e.target.value})} required><option value="">Select Priority</option><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option><option value="urgent">Urgent</option></select>
-      <input placeholder="Complaint title (optional)" value={form.title} onChange={e=>setForm({...form,title:e.target.value})} />
-      <textarea placeholder="Additional details (Optional)" value={form.description} onChange={e=>setForm({...form,description:e.target.value})} rows="4" />
-      <label>Photo / Video / Voice (Optional)<input type="file" accept={attachmentTypes.join(',')} multiple onChange={e=>setFiles(Array.from(e.target.files || []))} /></label>
-      <div><button type="button" className="secondary" onClick={recording ? stopVoice : startVoice}>{recording ? 'Stop Voice Recording' : '🎤 Record Voice Complaint'}</button>{files.length > 0 && <small>{files.length} attachment(s) selected</small>}</div>
-      <button type="submit" disabled={!activeCategories.length}>{activeCategories.length ? 'Raise Complaint' : 'Service Temporarily Unavailable'}</button>
+
+    {profile?.role === 'customer' && <form className="complaint-form" onSubmit={createComplaint} style={customerFormStyles}>
+      <div style={{ padding:'14px 16px', borderRadius:16, background:'#f6f7f9', border:'1px solid #e5e7eb' }}>
+        <strong>👤 {form.customer_name || 'Customer'}</strong>
+        <div style={{ marginTop:4, fontSize:14, opacity:.75 }}>📱 {form.customer_phone || 'Mobile number not available'}</div>
+        {form.company_name && <div style={{ marginTop:3, fontSize:14, opacity:.75 }}>🏢 {form.company_name}</div>}
+      </div>
+
+      <div>
+        <div style={{ fontWeight:800, fontSize:18, marginBottom:8 }}>1️⃣ कुठल्या service ची problem आहे?</div>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(2,minmax(0,1fr))', gap:9 }}>
+          {activeCategories.map(value => <button key={value} type="button" style={tapButton(form.category === value)} onClick={()=>setForm(prev=>({...prev,category:value,problem:''}))}>{categoryLabels[value]}</button>)}
+        </div>
+      </div>
+
+      <div>
+        <div style={{ fontWeight:800, fontSize:18, marginBottom:8 }}>2️⃣ काय problem आहे?</div>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(2,minmax(0,1fr))', gap:9 }}>
+          {problemOptions.map(problem => <button key={problem} type="button" style={tapButton(form.problem === problem)} onClick={()=>setForm(prev=>({...prev,problem}))}>{problem}</button>)}
+        </div>
+      </div>
+
+      <div>
+        <div style={{ fontWeight:800, fontSize:18, marginBottom:8 }}>3️⃣ Priority</div>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(4,minmax(0,1fr))', gap:8 }}>
+          {Object.entries(priorityLabels).map(([value,label]) => <button key={value} type="button" style={tapButton(form.priority === value)} onClick={()=>setForm(prev=>({...prev,priority:value}))}>{label}</button>)}
+        </div>
+      </div>
+
+      <div>
+        <div style={{ fontWeight:800, fontSize:18, marginBottom:8 }}>4️⃣ Service Location</div>
+        <button type="button" className="secondary" onClick={useCurrentLocation} style={{ width:'100%', minHeight:54, fontSize:16, fontWeight:800 }}>📍 Use Current Location</button>
+        {form.location_text && <div style={{ marginTop:8, padding:'10px 12px', borderRadius:10, background:'#f6f7f9', fontSize:13, wordBreak:'break-word' }}>📍 {form.location_text}</div>}
+        <input placeholder="Or type service address (optional if GPS used)" value={form.location_text.startsWith('GPS:') ? '' : form.location_text} onChange={e=>setForm({...form,location_text:e.target.value})} style={{ marginTop:8 }} />
+      </div>
+
+      <div>
+        <div style={{ fontWeight:800, fontSize:18, marginBottom:8 }}>5️⃣ Problem नीट समजावून सांगा</div>
+        <button type="button" onClick={recording ? stopVoice : startVoice} style={{ width:'100%', minHeight:76, borderRadius:16, border:'2px solid #111', background:recording ? '#111' : '#fff', color:recording ? '#fff' : '#111', fontSize:18, fontWeight:900, cursor:'pointer' }}>
+          {recording ? '⏹️ Stop — Recording चालू आहे' : '🎤 बोलून सांगा — Voice Complaint'}
+        </button>
+        <div style={{ marginTop:6, fontSize:13, opacity:.7 }}>Marathi / Hindi / English मध्ये बोलू शकता. Typing करण्याची गरज नाही.</div>
+      </div>
+
+      <div>
+        <label style={{ display:'block', padding:'15px', border:'2px dashed #bbb', borderRadius:14, textAlign:'center', cursor:'pointer', fontWeight:800 }}>
+          📷 Photo / 🎥 Video जोडायचा असल्यास इथे tap करा
+          <input type="file" accept={attachmentTypes.join(',')} multiple onChange={e=>setFiles(prev=>[...prev.filter(f=>f.type.startsWith('audio/')), ...Array.from(e.target.files || [])])} style={{ display:'none' }} />
+        </label>
+        {files.length > 0 && <div style={{ marginTop:7, fontSize:13 }}>📎 {files.length} attachment(s) ready</div>}
+      </div>
+
+      <button type="submit" disabled={!activeCategories.length || !form.problem || !form.location_text} style={{ minHeight:64, borderRadius:16, fontSize:20, fontWeight:900 }}>{activeCategories.length ? '🚨 RAISE COMPLAINT' : 'Service Temporarily Unavailable'}</button>
       <small className="muted">Service radius controlled by Admin: {serviceRadius} km</small>
     </form>}
+
     {message && <p className="muted">{message}</p>}
     <div className="complaint-list">{items.length === 0 ? <p className="muted">No complaints found.</p> : items.map(item => <article className="complaint-card" key={item.id}>
-      <div><h3>{item.ticket_no || 'Complaint'}{item.ticket_no ? ` — ${item.title}` : ` — ${item.title}`}</h3><p>{item.description || 'No description'}</p><small>{item.ticket_no ? `${item.ticket_no} · ` : ''}{item.customer_name ? `${item.customer_name} · ${item.customer_phone || ''} · ` : ''}{item.company_name ? `${item.company_name} · ` : ''}{categoryLabels[item.category] || item.category} · {item.priority} · {new Date(item.created_at).toLocaleString()}</small>
+      <div><h3>{item.ticket_no || 'Complaint'} — {item.title}</h3><p>{item.description || 'No description'}</p><small>{item.ticket_no ? `${item.ticket_no} · ` : ''}{item.customer_name ? `${item.customer_name} · ${item.customer_phone || ''} · ` : ''}{item.company_name ? `${item.company_name} · ` : ''}{categoryLabels[item.category] || item.category} · {item.priority} · {new Date(item.created_at).toLocaleString()}</small>
         {!!attachments[item.id]?.length && <div className="attachments"><strong>Attachments:</strong>{attachments[item.id].map(file => <button type="button" className="secondary" key={file.id} onClick={()=>openAttachment(file)}>{file.mime_type?.startsWith('image/') ? '📷' : file.mime_type?.startsWith('video/') ? '🎥' : '🎤'} {file.file_name}</button>)}</div>}
       </div>
       <div className="complaint-actions"><strong>{item.status.replace('_',' ')}</strong>
