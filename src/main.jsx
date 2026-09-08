@@ -22,6 +22,7 @@ import TechnicianModule from './components/TechnicianModule'
 import CustomerPayment from './components/CustomerPayment'
 import PaymentLedger from './components/PaymentLedger'
 import NotificationBell from './components/NotificationBell'
+import AdminAccountManager from './components/CustomerRegister'
 import LocalSeoPage,{pages as localSeoPages} from './components/LocalSeoPage'
 import CompanyLandingPage from './components/CompanyLandingPage'
 const publicSeoPaths=Object.keys(localSeoPages)
@@ -40,6 +41,7 @@ function App(){
  const admin=profile.role==='admin',technician=profile.role==='technician',customer=profile.role==='customer',selected=String(activeModule||'').trim(),isMyComplaints=customer&&(selected==='__MY_COMPLAINTS__'||selected.toLowerCase()==='my complaints'),isRaiseComplaint=customer&&selected.toLowerCase()==='raise complaint',isServiceHistory=selected.toLowerCase()==='service history',isCustomerProfile=customer&&selected.toLowerCase()==='my profile',isFindComplaint=(admin||technician)&&selected==='Find Complaint',isTodayVisits=technician&&selected==="Today's Visits",isTechnicianServiceHistory=technician&&selected==='Service History',isTechnicianComplaints=technician&&(selected==='My Assigned Complaints'||selected==='Find Complaint'||isTodayVisits),complaint=selected==='Complaints'||isRaiseComplaint||isMyComplaints
  let content
  if(!activeModule){content=<RoleDashboard profile={profile} onSelectModule={setActiveModule}/>}
+ else if(admin&&selected==='User Accounts'){content=<AdminAccountManager onBack={()=>setActiveModule(null)}/>}
  else if(isTechnicianServiceHistory){content=<TechnicianServiceHistory profile={profile} onBack={()=>setActiveModule(null)}/>}
  else if(isTechnicianComplaints){content=<TechnicianModule profile={profile} mode={isTodayVisits?'today':selected==='Find Complaint'?'find':'assigned'} onBack={()=>setActiveModule(null)}/>}
  else if(isFindComplaint){content=<ComplaintSearch profile={profile} onBack={()=>setActiveModule(null)}/>}
