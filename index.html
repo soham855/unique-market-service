@@ -2,11 +2,15 @@
 <html lang="en-IN">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#0f172a" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Unique Market" />
+    <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
     <meta name="description" content="Unique Market is an Ichalkaranji CCTV camera dealer and security systems company offering CCTV sales, installation, service, AMC, computer and networking solutions." />
-    <meta name="keywords" content="CCTV camera dealer Ichalkaranji, CCTV installation Ichalkaranji, CCTV service Ichalkaranji, CCTV AMC Ichalkaranji, security system dealer Ichalkaranji, computer service Ichalkaranji, networking service Ichalkaranji" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Unique Market" />
     <meta property="og:title" content="CCTV Camera Dealer in Ichalkaranji | Unique Market" />
@@ -32,6 +36,11 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));
+      }
+    </script>
     <script src="https://www.bubblav.com/widget.js" data-site-id="d0182222-1b03-439c-bf73-63f351d28c6d" defer></script>
   </body>
 </html>
