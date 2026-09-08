@@ -1,14 +1,11 @@
 import { useState } from 'react'
 import { signIn } from '../lib/auth'
-import CustomerRegister from './CustomerRegister'
 
 export default function Login({ onLogin }) {
-  const [registering, setRegistering] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  if (registering) return <CustomerRegister onBack={()=>setRegistering(false)} />
   async function submit(event) {
     event.preventDefault(); setError(''); setLoading(true)
     try { const data = await signIn(email.trim(), password); onLogin(data.session) }
@@ -23,7 +20,6 @@ export default function Login({ onLogin }) {
       <label>Password<input type='password' value={password} onChange={e=>setPassword(e.target.value)} required autoComplete='current-password' /></label>
       {error && <div className='error'>{error}</div>}
       <button disabled={loading}>{loading ? 'Signing in…' : 'Sign in'}</button>
-      <button type='button' className='secondary' onClick={()=>setRegistering(true)}>New Customer? Register</button>
     </form>
   </main>
 }
