@@ -20,6 +20,7 @@ const defaultActive = Object.keys(categories)
 
 export default function CustomerComplaintModule({ profile, activeModule = 'Complaints', onSubmitted }) {
   const [items, setItems] = useState([])
+  const [technicianNames, setTechnicianNames] = useState({})
   const [activeCategories, setActiveCategories] = useState(defaultActive)
   const [maxRadiusKm, setMaxRadiusKm] = useState(20)
   const [form, setForm] = useState({ customer_name:profile?.full_name || '', customer_phone:profile?.phone || '', company_name:profile?.company_name || '', category:'', problem:'', priority:'normal', location_text:profile?.address || '', description:'', latitude:null, longitude:null, gps_accuracy_m:null, location_captured_at:null })
@@ -35,125 +36,31 @@ export default function CustomerComplaintModule({ profile, activeModule = 'Compl
   useEffect(() => {
     setForm(f => ({ ...f, customer_name:profile?.full_name || f.customer_name, customer_phone:profile?.phone || f.customer_phone, company_name:profile?.company_name || f.company_name, location_text:profile?.address || f.location_text }))
   }, [profile?.full_name, profile?.phone, profile?.company_name, profile?.address])
-
   useEffect(() => () => { if (watchIdRef.current !== null && navigator.geolocation) navigator.geolocation.clearWatch(watchIdRef.current) }, [])
 
-  async function loadAccess() {
-    if (!supabase) return
-    const { data, error } = await supabase.from('service_access_settings').select('max_radius_km,active_categories').limit(1).maybeSingle()
-    if (!error && data) {
-      setMaxRadiusKm(Number(data.max_radius_km) || 20)
-      setActiveCategories(Array.isArray(data.active_categories) && data.active_categories.length ? data.active_categories : defaultActive)
-    }
-  }
+  async function loadAccess() { if (!supabase) return; const { data, error } = await supabase.from('service_access_settings').select('max_radius_km,active_categories').limit(1).maybeSingle(); if (!error && data) { setMaxRadiusKm(Number(data.max_radius_km) || 20); setActiveCategories(Array.isArray(data.active_categories) && data.active_categories.length ? data.active_categories : defaultActive) } }
   async function load() {
     if (!supabase || !profile?.id) return
     const { data, error } = await supabase.from('complaints').select('*').eq('customer_id', profile.id).order('created_at',{ascending:false})
-    if (error) setMessage(error.message); else setItems(data || [])
+    if (error) setMessage(error.message); else { setItems(data || []); const ids=[...new Set((data||[]).map(x=>x.technician_id).filter(Boolean))]; if(ids.length){const {data:techs}=await supabase.from('profiles').select('id,full_name,phone').in('id',ids); const map={}; (techs||[]).forEach(t=>{map[t.id]=t.full_name||t.phone||'Technician'}); setTechnicianNames(map)} else setTechnicianNames({}) }
   }
   useEffect(() => { load(); loadAccess() }, [profile?.id])
 
-  async function reverseGeocode(latitude, longitude) {
-    const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&addressdetails=1`
-    const response = await fetch(url, { headers:{ Accept:'application/json', 'Accept-Language':'en-IN' } })
-    if (!response.ok) throw new Error('Address lookup failed')
-    const data = await response.json()
-    const address = data.display_name || `${latitude.toFixed(7)}, ${longitude.toFixed(7)}`
-    const pincode = data.address?.postcode ? `, Pincode: ${data.address.postcode}` : ''
-    return `${address}${pincode}`
-  }
-
+  async function reverseGeocode(latitude, longitude) { const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&addressdetails=1`; const response = await fetch(url, { headers:{ Accept:'application/json', 'Accept-Language':'en-IN' } }); if (!response.ok) throw new Error('Address lookup failed'); const data = await response.json(); const address = data.display_name || `${latitude.toFixed(7)}, ${longitude.toFixed(7)}`; const pincode = data.address?.postcode ? `, Pincode: ${data.address.postcode}` : ''; return `${address}${pincode}` }
   async function useMyLocation() {
     if (!navigator.geolocation) return setMessage('Precise GPS location is not supported by this browser.')
     if (!window.isSecureContext) return setMessage('Precise GPS requires HTTPS. Please open the website using the secure HTTPS address.')
-    setLocating(true); setMessage('Getting precise GPS location… Keep Location/GPS ON and wait a few seconds.')
-    bestPositionRef.current = null
-    if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current)
-
-    const finish = async (position, reason = '') => {
-      if (!position) { setLocating(false); return }
-      const { latitude, longitude, accuracy } = position.coords
-      const accuracyM = Number(accuracy)
-      if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || !Number.isFinite(accuracyM)) {
-        setLocating(false); setMessage('Unable to read valid GPS coordinates. Please try again.'); return
-      }
-      try {
-        const address = await reverseGeocode(latitude, longitude)
-        setForm(f => ({ ...f, location_text:address, latitude, longitude, gps_accuracy_m:accuracyM, location_captured_at:new Date().toISOString() }))
-        const quality = accuracyM <= 10 ? 'Excellent' : accuracyM <= 25 ? 'Good' : accuracyM <= 50 ? 'Fair' : 'Approximate'
-        setMessage(`GPS locked: ${latitude.toFixed(7)}, ${longitude.toFixed(7)} • Accuracy ±${Math.round(accuracyM)} m • ${quality}${reason ? ` • ${reason}` : ''}`)
-      } catch {
-        setForm(f => ({ ...f, location_text:`${latitude.toFixed(7)}, ${longitude.toFixed(7)}`, latitude, longitude, gps_accuracy_m:accuracyM, location_captured_at:new Date().toISOString() }))
-        setMessage(`GPS locked: ${latitude.toFixed(7)}, ${longitude.toFixed(7)} • Accuracy ±${Math.round(accuracyM)} m. Address lookup unavailable.`)
-      } finally { setLocating(false) }
-    }
-
-    const handlePosition = position => {
-      const accuracy = Number(position.coords.accuracy)
-      if (!bestPositionRef.current || accuracy < bestPositionRef.current.coords.accuracy) bestPositionRef.current = position
-      // Stop early once a genuinely precise reading is available.
-      if (accuracy <= 20) {
-        if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current)
-        watchIdRef.current = null
-        finish(bestPositionRef.current)
-      }
-    }
-    const handleError = error => {
-      if (error.code === 1) { setLocating(false); setMessage('Location permission denied. Allow Location permission for this website and try again.'); return }
-      if (error.code === 2 && !bestPositionRef.current) { setLocating(false); setMessage('GPS signal unavailable. Turn ON device Location/GPS and try again outdoors or near a window.'); return }
-    }
-    watchIdRef.current = navigator.geolocation.watchPosition(handlePosition, handleError, { enableHighAccuracy:true, timeout:30000, maximumAge:0 })
-    setTimeout(() => {
-      if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current)
-      watchIdRef.current = null
-      if (bestPositionRef.current) finish(bestPositionRef.current, 'Best reading after GPS scan')
-      else { setLocating(false); setMessage('Could not obtain a GPS fix. Turn ON precise device location and try again.') }
-    }, 20000)
+    setLocating(true); setMessage('Getting precise GPS location… Keep Location/GPS ON and wait a few seconds.'); bestPositionRef.current = null; if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current)
+    const finish = async (position, reason = '') => { if (!position) { setLocating(false); return }; const { latitude, longitude, accuracy } = position.coords; const accuracyM = Number(accuracy); if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || !Number.isFinite(accuracyM)) { setLocating(false); setMessage('Unable to read valid GPS coordinates. Please try again.'); return }; try { const address = await reverseGeocode(latitude, longitude); setForm(f => ({ ...f, location_text:address, latitude, longitude, gps_accuracy_m:accuracyM, location_captured_at:new Date().toISOString() })); const quality = accuracyM <= 10 ? 'Excellent' : accuracyM <= 25 ? 'Good' : accuracyM <= 50 ? 'Fair' : 'Approximate'; setMessage(`GPS locked: ${latitude.toFixed(7)}, ${longitude.toFixed(7)} • Accuracy ±${Math.round(accuracyM)} m • ${quality}${reason ? ` • ${reason}` : ''}`) } catch { setForm(f => ({ ...f, location_text:`${latitude.toFixed(7)}, ${longitude.toFixed(7)}`, latitude, longitude, gps_accuracy_m:accuracyM, location_captured_at:new Date().toISOString() })); setMessage(`GPS locked: ${latitude.toFixed(7)}, ${longitude.toFixed(7)} • Accuracy ±${Math.round(accuracyM)} m. Address lookup unavailable.`) } finally { setLocating(false) } }
+    const handlePosition = position => { const accuracy = Number(position.coords.accuracy); if (!bestPositionRef.current || accuracy < bestPositionRef.current.coords.accuracy) bestPositionRef.current = position; if (accuracy <= 20) { if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; finish(bestPositionRef.current) } }
+    const handleError = error => { if (error.code === 1) { setLocating(false); setMessage('Location permission denied. Allow Location permission for this website and try again.'); return } if (error.code === 2 && !bestPositionRef.current) { setLocating(false); setMessage('GPS signal unavailable. Turn ON device Location/GPS and try again outdoors or near a window.'); return } }
+    watchIdRef.current = navigator.geolocation.watchPosition(handlePosition, handleError, { enableHighAccuracy:true, timeout:30000, maximumAge:0 }); setTimeout(() => { if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; if (bestPositionRef.current) finish(bestPositionRef.current, 'Best reading after GPS scan'); else { setLocating(false); setMessage('Could not obtain a GPS fix. Turn ON precise device location and try again.') } }, 20000)
   }
-
   async function createComplaint(e) {
     e.preventDefault(); setMessage(''); setLoading(true)
-    try {
-      if (!form.customer_name.trim()) throw new Error('Customer Name is required.')
-      if (!form.customer_phone.trim()) throw new Error('Mobile Number is required.')
-      if (!form.location_text.trim()) throw new Error('Service Address is required.')
-      if (!form.category || !activeCategories.includes(form.category)) throw new Error('Please select an available service category.')
-      if (!form.problem) throw new Error('Problem is required.')
-      if (!form.priority) throw new Error('Priority is required.')
-      if (form.latitude == null || form.longitude == null) throw new Error('Please tap “📍 Use My Location” and wait for GPS accuracy before raising the complaint.')
-      const title = `${categories[form.category][0].replace(/^\S+\s/,'')} - ${form.problem}`
-      const { error } = await supabase.from('complaints').insert({ customer_id:profile.id, customer_name:form.customer_name.trim(), customer_phone:form.customer_phone.trim(), company_name:form.company_name.trim() || null, title, description:form.description.trim() || form.problem, category:form.category, priority:form.priority, location_text:form.location_text.trim(), latitude:form.latitude, longitude:form.longitude, gps_accuracy_m:form.gps_accuracy_m, location_captured_at:form.location_captured_at })
-      if (error) throw error
-      await load(); setForm(f=>({ ...f, category:'', problem:'', priority:'normal', description:'', latitude:null, longitude:null, gps_accuracy_m:null, location_captured_at:null }))
-      setMessage('Complaint raised successfully with precise GPS location.')
-      if (onSubmitted) onSubmitted()
-    } catch (error) { setMessage(error.message || 'Unable to submit complaint') }
-    finally { setLoading(false) }
+    try { if (!form.customer_name.trim()) throw new Error('Customer Name is required.'); if (!form.customer_phone.trim()) throw new Error('Mobile Number is required.'); if (!form.location_text.trim()) throw new Error('Service Address is required.'); if (!form.category || !activeCategories.includes(form.category)) throw new Error('Please select an available service category.'); if (!form.problem) throw new Error('Problem is required.'); if (!form.priority) throw new Error('Priority is required.'); if (form.latitude == null || form.longitude == null) throw new Error('Please tap “📍 Use My Location” and wait for GPS accuracy before raising the complaint.'); const title = `${categories[form.category][0].replace(/^\S+\s/,'')} - ${form.problem}`; const { error } = await supabase.from('complaints').insert({ customer_id:profile.id, customer_name:form.customer_name.trim(), customer_phone:form.customer_phone.trim(), company_name:form.company_name.trim() || null, title, description:form.description.trim() || form.problem, category:form.category, priority:form.priority, location_text:form.location_text.trim(), latitude:form.latitude, longitude:form.longitude, gps_accuracy_m:form.gps_accuracy_m, location_captured_at:form.location_captured_at }); if (error) throw error; await load(); setForm(f=>({ ...f, category:'', problem:'', priority:'normal', description:'', latitude:null, longitude:null, gps_accuracy_m:null, location_captured_at:null })); setMessage('Complaint raised successfully with precise GPS location.'); if (onSubmitted) onSubmitted() } catch (error) { setMessage(error.message || 'Unable to submit complaint') } finally { setLoading(false) }
   }
-
-  const visibleCategories = Object.entries(categories).filter(([id]) => activeCategories.includes(id))
-  const problems = form.category ? categories[form.category]?.[1] || [] : []
-
-  if (isMyComplaints) return <section className="complaints-panel">
-    <div className="panel-heading"><div><span className="badge">SERVICE DESK</span><h2>My Complaints</h2><p>Track your complaints and service status.</p></div><button className="secondary" onClick={load}>Refresh</button></div>
-    <div className="complaint-list">{items.length === 0 ? <p className="muted">No complaints found.</p> : items.map(item=><article className="complaint-card" key={item.id}><div><h3>{item.ticket_no || item.title || item.problem || 'Service Complaint'}</h3><p>{item.description || item.problem || 'No additional details provided.'}</p><small>{item.customer_name || ''}{item.customer_phone ? ` · ${item.customer_phone}` : ''}{item.company_name ? ` · ${item.company_name}` : ''}{item.category ? ` · ${item.category}` : ''}{item.priority ? ` · ${item.priority}` : ''}{item.created_at ? ` · ${new Date(item.created_at).toLocaleString()}` : ''}</small><p><strong>Status:</strong> {item.status?.replaceAll('_',' ') || 'New'}</p></div></article>)}</div>
-  </section>
-
-  return <section className="complaints-panel">
-    <div className="panel-heading"><div><span className="badge">SERVICE DESK</span><h2>{isRaiseComplaint ? 'Raise Complaint' : 'Complaint Management'}</h2><p>{isRaiseComplaint ? 'Select a service category, then choose the exact problem.' : 'View your complaints and their current service status.'}</p></div><button className="secondary" onClick={()=>{load();loadAccess()}}>Refresh</button></div>
-    {isRaiseComplaint && <form className="complaint-form" onSubmit={createComplaint}>
-      <input placeholder="Customer Name" value={form.customer_name} onChange={e=>setForm({...form,customer_name:e.target.value})} required />
-      <input type="tel" placeholder="Mobile Number" value={form.customer_phone} onChange={e=>setForm({...form,customer_phone:e.target.value})} required />
-      <input placeholder="Company Name (Optional)" value={form.company_name} onChange={e=>setForm({...form,company_name:e.target.value})} />
-      <div><label>Service Address</label><input placeholder="Service Address" value={form.location_text} onChange={e=>setForm({...form,location_text:e.target.value})} required /><button type="button" className="secondary" onClick={useMyLocation} disabled={locating}>{locating ? '📡 Getting Precise GPS…' : '📍 Get Precise GPS Location'}</button></div>
-      {form.latitude != null && <small className="muted">GPS: {form.latitude.toFixed(7)}, {form.longitude.toFixed(7)} • Accuracy ±{Math.round(form.gps_accuracy_m || 0)} m</small>}
-      <select value={form.category} onChange={e=>setForm({...form,category:e.target.value,problem:''})} required><option value="">Select Service Category</option>{visibleCategories.map(([id,[label]])=><option key={id} value={id}>{label}</option>)}</select>
-      {form.category && <select value={form.problem} onChange={e=>setForm({...form,problem:e.target.value})} required><option value="">Select Specific Problem</option>{problems.map(p=><option key={p} value={p}>{p}</option>)}</select>}
-      <select value={form.priority} onChange={e=>setForm({...form,priority:e.target.value})} required><option value="">Select Priority</option><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option><option value="urgent">Urgent</option></select>
-      <textarea placeholder="Additional Details (Optional)" value={form.description} onChange={e=>setForm({...form,description:e.target.value})} rows="4" />
-      <small className="muted">Admin service radius: {maxRadiusKm} km</small>
-      <button disabled={loading || !form.problem || form.latitude == null}>{loading ? 'Submitting…' : 'Raise Complaint'}</button>
-    </form>}
-    {message && isRaiseComplaint && <p className="muted">{message}</p>}
-  </section>
+  const visibleCategories = Object.entries(categories).filter(([id]) => activeCategories.includes(id)); const problems = form.category ? categories[form.category]?.[1] || [] : []
+  if (isMyComplaints) return <section className="complaints-panel"><div className="panel-heading"><div><span className="badge">SERVICE DESK</span><h2>My Complaints</h2><p>Track your complaints, assigned technician and service status.</p></div><button className="secondary" onClick={load}>Refresh</button></div><div className="complaint-list">{items.length === 0 ? <p className="muted">No complaints found.</p> : items.map(item=><article className="complaint-card" key={item.id}><div><h3>{item.ticket_no || item.title || item.problem || 'Service Complaint'}</h3><p>{item.description || item.problem || 'No additional details provided.'}</p><small>{item.customer_name || ''}{item.customer_phone ? ` · ${item.customer_phone}` : ''}{item.company_name ? ` · ${item.company_name}` : ''}{item.category ? ` · ${item.category}` : ''}{item.priority ? ` · ${item.priority}` : ''}{item.created_at ? ` · ${new Date(item.created_at).toLocaleString()}` : ''}</small><p><strong>Status:</strong> {item.status?.replaceAll('_',' ') || 'New'}</p><p><strong>Assigned Technician:</strong> {item.technician_id ? (technicianNames[item.technician_id] || 'Assigned technician') : 'Not assigned yet'}</p></div></article>)}</div></section>
+  return <section className="complaints-panel"><div className="panel-heading"><div><span className="badge">SERVICE DESK</span><h2>{isRaiseComplaint ? 'Raise Complaint' : 'Complaint Management'}</h2><p>{isRaiseComplaint ? 'Select a service category, then choose the exact problem.' : 'View your complaints and their current service status.'}</p></div><button className="secondary" onClick={()=>{load();loadAccess()}}>Refresh</button></div>{isRaiseComplaint && <form className="complaint-form" onSubmit={createComplaint}><input placeholder="Customer Name" value={form.customer_name} onChange={e=>setForm({...form,customer_name:e.target.value})} required /><input type="tel" placeholder="Mobile Number" value={form.customer_phone} onChange={e=>setForm({...form,customer_phone:e.target.value})} required /><input placeholder="Company Name (Optional)" value={form.company_name} onChange={e=>setForm({...form,company_name:e.target.value})} /><div><label>Service Address</label><input placeholder="Service Address" value={form.location_text} onChange={e=>setForm({...form,location_text:e.target.value})} required /><button type="button" className="secondary" onClick={useMyLocation} disabled={locating}>{locating ? '📡 Getting Precise GPS…' : '📍 Get Precise GPS Location'}</button></div>{form.latitude != null && <small className="muted">GPS: {form.latitude.toFixed(7)}, {form.longitude.toFixed(7)} • Accuracy ±{Math.round(form.gps_accuracy_m || 0)} m</small>}<select value={form.category} onChange={e=>setForm({...form,category:e.target.value,problem:''})} required><option value="">Select Service Category</option>{visibleCategories.map(([id,[label]])=><option key={id} value={id}>{label}</option>)}</select>{form.category && <select value={form.problem} onChange={e=>setForm({...form,problem:e.target.value})} required><option value="">Select Specific Problem</option>{problems.map(p=><option key={p} value={p}>{p}</option>)}</select>}<select value={form.priority} onChange={e=>setForm({...form,priority:e.target.value})} required><option value="">Select Priority</option><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option><option value="urgent">Urgent</option></select><textarea placeholder="Additional Details (Optional)" value={form.description} onChange={e=>setForm({...form,description:e.target.value})} rows="4" /><small className="muted">Admin service radius: {maxRadiusKm} km</small><button disabled={loading || !form.problem || form.latitude == null}>{loading ? 'Submitting…' : 'Raise Complaint'}</button></form>}{message && isRaiseComplaint && <p className="muted">{message}</p>}</section>
 }
