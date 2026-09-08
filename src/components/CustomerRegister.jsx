@@ -1,72 +1,9 @@
-import { useState } from 'react'
-import { signUp, verifyCustomerOtp } from '../lib/auth'
+import {useState} from 'react'
+import {supabase} from '../lib/supabase'
 
-export default function CustomerRegister({ onBack }) {
-  const [form, setForm] = useState({ name:'', company_name:'', mobile:'', email:'', address:'', password:'', confirmPassword:'' })
-  const [otp, setOtp] = useState('')
-  const [step, setStep] = useState('details')
-  const [message, setMessage] = useState('')
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
-  const change = (key,value) => setForm(prev => ({...prev,[key]:value}))
-
-  async function sendOtp(e){
-    e.preventDefault(); setMessage(''); setError('')
-    if(form.password.length < 6) return setError('Password must be at least 6 characters.')
-    if(form.password !== form.confirmPassword) return setError('Passwords do not match.')
-    setLoading(true)
-    try {
-      await signUp(form)
-      setStep('otp')
-      setMessage(`OTP sent to ${form.mobile}. Enter the 6-digit OTP to complete registration.`)
-    } catch(err){ setError(err.message || 'Unable to send OTP.') }
-    finally { setLoading(false) }
-  }
-
-  async function verifyOtp(e){
-    e.preventDefault(); setMessage(''); setError('')
-    if(!/^\d{6}$/.test(otp.trim())) return setError('Please enter the 6-digit OTP.')
-    setLoading(true)
-    try {
-      const data = await verifyCustomerOtp({ ...form, token: otp })
-      if(data.session) setMessage('Mobile number verified. Registration successful. Please sign in with your email and password.')
-      else setMessage('Mobile number verified. Registration successful. Please sign in.')
-      setStep('done')
-    } catch(err){ setError(err.message || 'Invalid or expired OTP.') }
-    finally { setLoading(false) }
-  }
-
-  return <main className='auth-shell'>
-    <form className='login-card' onSubmit={step==='details' ? sendOtp : verifyOtp}>
-      <p className='eyebrow'>UNIQUE MARKET • CUSTOMER</p>
-      <h1>{step==='details' ? 'Create Customer Account' : step==='otp' ? 'Verify Mobile Number' : 'Registration Complete'}</h1>
-      {step==='details' && <>
-        <p className='muted'>Registration is required before raising a service complaint.</p>
-        <label>Full Name <span>*</span><input value={form.name} onChange={e=>change('name',e.target.value)} required autoComplete='name' /></label>
-        <label>Company Name <small>(Optional)</small><input value={form.company_name} onChange={e=>change('company_name',e.target.value)} /></label>
-        <label>Mobile Number <span>*</span><input type='tel' value={form.mobile} onChange={e=>change('mobile',e.target.value)} required autoComplete='tel' placeholder='10-digit mobile number' /></label>
-        <label>Email ID <span>*</span><input type='email' value={form.email} onChange={e=>change('email',e.target.value)} required autoComplete='email' /></label>
-        <label>Address <span>*</span><textarea value={form.address} onChange={e=>change('address',e.target.value)} rows='3' required autoComplete='street-address' /></label>
-        <label>Password <span>*</span><input type='password' value={form.password} onChange={e=>change('password',e.target.value)} required autoComplete='new-password' minLength='6' /></label>
-        <label>Confirm Password <span>*</span><input type='password' value={form.confirmPassword} onChange={e=>change('confirmPassword',e.target.value)} required autoComplete='new-password' minLength='6' /></label>
-        {error && <div className='error'>{error}</div>}
-        <button disabled={loading}>{loading ? 'Sending OTP…' : 'Send OTP to Mobile'}</button>
-        <button type='button' className='secondary' onClick={onBack}>← Back to Sign in</button>
-      </>}
-
-      {step==='otp' && <>
-        <p className='muted'>We sent a 6-digit OTP to <strong>{form.mobile}</strong>.</p>
-        <label>Mobile OTP <span>*</span><input inputMode='numeric' pattern='[0-9]{6}' maxLength='6' value={otp} onChange={e=>setOtp(e.target.value.replace(/\D/g,''))} autoComplete='one-time-code' required autoFocus placeholder='Enter 6-digit OTP' /></label>
-        {error && <div className='error'>{error}</div>}
-        {message && <p className='muted'>{message}</p>}
-        <button disabled={loading}>{loading ? 'Verifying…' : 'Verify OTP & Create Account'}</button>
-        <button type='button' className='secondary' disabled={loading} onClick={()=>{setStep('details');setOtp('');setError('');setMessage('')}}>← Change details</button>
-      </>}
-
-      {step==='done' && <>
-        {message && <p className='muted'>{message}</p>}
-        <button type='button' onClick={onBack}>Go to Sign in</button>
-      </>}
-    </form>
-  </main>
+export default function AdminAccountManager({onBack}){
+ const [role,setRole]=useState('customer'),[form,setForm]=useState({name:'',mobile:'',email:'',secret:'',company_name:'',address:''}),[saving,setSaving]=useState(false),[message,setMessage]=useState('')
+ const change=e=>setForm({...form,[e.target.name]:e.target.value})
+ async function save(e){e.preventDefault();setSaving(true);setMessage('');const {data,error}=await supabase.functions.invoke('admin-create-account',{body:{name:form.name,mobile:form.mobile,email:form.email,password:form.secret,company_name:form.company_name,address:form.address,role}});if(error||!data?.ok)setMessage(error?.message||data?.error||'Account creation failed');else{setMessage('Account created successfully.');setForm({name:'',mobile:'',email:'',secret:'',company_name:'',address:''})}setSaving(false)}
+ return <section className='admin-panel'><div className='panel-heading'><div><span className='badge'>ADMIN • ACCOUNT MANAGEMENT</span><h2>Create Customer / Technician</h2><p>Only Admin can create login accounts. Public registration remains disabled.</p></div><button className='secondary' onClick={onBack}>← Dashboard</button></div>{message&&<p className={message.includes('successfully')?'muted':'error'}>{message}</p>}<div className='admin-actions'><button className={role==='customer'?'':'secondary'} onClick={()=>setRole('customer')}>＋ Customer Account</button><button className={role==='technician'?'':'secondary'} onClick={()=>setRole('technician')}>＋ Technician Account</button></div><form className='admin-form' onSubmit={save}><label>Full Name<input name='name' value={form.name} onChange={change} required/></label><label>Mobile<input name='mobile' value={form.mobile} onChange={change} required/></label><label>Email<input type='email' name='email' value={form.email} onChange={change} required/></label><label>Login Password<input type='password' name='secret' value={form.secret} onChange={change} minLength='6' required/></label>{role==='customer'&&<label>Company Name <span className='muted'>(Optional)</span><input name='company_name' value={form.company_name} onChange={change}/></label>}<label>Address <span className='muted'>(Optional)</span><input name='address' value={form.address} onChange={change}/></label><button disabled={saving}>{saving?'Creating…':`Create ${role==='customer'?'Customer':'Technician'} Account`}</button></form></section>
 }
