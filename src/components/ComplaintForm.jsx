@@ -26,7 +26,7 @@ export default function ComplaintForm({ userId, onCreated }) {
         .single()
       if (error) throw error
       setForm({ title: '', description: '', category: 'cctv', priority: 'normal', address: '' })
-      setMessage(`Complaint created: ${data.id.slice(0, 8)}`)
+      setMessage(`Complaint created: ${data.ticket_no || 'Ticket assigned'}`)
       onCreated?.(data)
     } catch (error) { setMessage(error.message || 'Unable to create complaint') }
     finally { setLoading(false) }
