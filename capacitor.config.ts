@@ -1,8 +1,8 @@
 import type { CapacitorConfig } from '@capacitor/cli'
 
 const config: CapacitorConfig = {
-  appId: 'com.uniquemarket.service',
-  appName: 'Unique Market',
+  appId: 'com.uniquemarket.instantservices',
+  appName: 'Instant Services for Your Security',
   webDir: 'dist',
   server: {
     androidScheme: 'https'
