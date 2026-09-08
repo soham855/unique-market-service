@@ -1,7 +1,8 @@
-import React,{useEffect} from 'react'
+import React,{useEffect,useState} from 'react'
 
 const PHONE='8554887026'
 const ADDRESS='Station Road, Hotel Rajdoot, Ichalkaranji, Maharashtra'
+const WHATSAPP_TEXT='मला सीसीटीव्ही/सर्व्हिस कोटेशन हवे आहे'
 const localPages=[
  ['/cctv-camera-dealer-ichalkaranji','CCTV Camera Dealer in Ichalkaranji'],
  ['/cctv-installation-ichalkaranji','CCTV Installation in Ichalkaranji'],
@@ -21,12 +22,14 @@ const products=['CCTV Cameras','DVR / NVR','Surveillance HDD','PoE Switches','Ca
 const areas=['Ichalkaranji','Kolhapur','Sangli','Jaysingpur','Hatkanangale','Goa']
 
 export default function CompanyLandingPage(){
+ const [contactPopup,setContactPopup]=useState(true)
  useEffect(()=>{
   document.title='CCTV Camera Dealer in Ichalkaranji | Unique Market'
   const setMeta=(name,content)=>{let m=document.querySelector(`meta[name="${name}"]`);if(!m){m=document.createElement('meta');m.name=name;document.head.appendChild(m)}m.content=content}
   setMeta('description','Unique Market provides CCTV cameras, installation, service, AMC, computer and networking solutions in Ichalkaranji, Maharashtra.')
   let c=document.querySelector('link[rel="canonical"]');if(!c){c=document.createElement('link');c.rel='canonical';document.head.appendChild(c)}c.href='https://www.salesuniquemarket.com/'
  },[])
+ const whatsappUrl=`https://wa.me/91${PHONE}?text=${encodeURIComponent(WHATSAPP_TEXT)}`
  return <main className='company-site'>
   <nav className='company-nav'><a className='company-logo' href='/'>UNIQUE <span>MARKET</span></a><div className='company-navlinks'><a href='#services'>Services</a><a href='#products'>Products</a><a href='#about'>About</a><a href='#contact'>Contact</a></div><a className='nav-portal' href='/login'>Service Portal</a></nav>
   <section className='company-hero'><div className='hero-copy'><div className='company-kicker'>CCTV • SECURITY • COMPUTER • NETWORKING</div><h1>CCTV Camera Dealer & Security Solutions in Ichalkaranji.</h1><p>Unique Market is a local CCTV and IT solutions provider in Ichalkaranji, supplying CCTV cameras, professional installation, repair, AMC, computer and networking solutions for homes, shops, offices, factories and commercial properties.</p><div className='company-ctas'><a className='cta-primary' href='#contact'>Get a Free Consultation</a><a className='cta-secondary' href='#services'>Explore Services →</a></div><div className='hero-trust'><span>✓ Professional Installation</span><span>✓ Service & AMC Support</span><span>✓ Business IT Solutions</span></div></div><div className='hero-panel'><div className='panel-top'>UNIQUE MARKET <span>ICHALKARANJI</span></div><div className='camera-visual'><div className='camera-ring'></div><div className='camera-lens'></div></div><h3>Security that works.<br/>Support you can trust.</h3><p>End-to-end solutions from product selection to installation and after-sales service.</p></div></section>
@@ -36,7 +39,8 @@ export default function CompanyLandingPage(){
   <section className='company-section'><div className='section-head'><div><span className='section-label'>LOCAL SERVICES</span><h2>Find the right CCTV service in Ichalkaranji.</h2></div><p>Dedicated service pages help customers quickly find the exact solution they need.</p></div><div className='area-list'>{localPages.map(([url,label])=><a key={url} href={url}>{label}</a>)}</div></section>
   <section id='about' className='company-section about-section'><div className='about-card'><div><span className='section-label'>ABOUT UNIQUE MARKET</span><h2>Your local technology & security partner.</h2></div><div><p>Unique Market is a CCTV, security and IT solutions business serving customers with product supply, professional installation, troubleshooting and ongoing maintenance from Ichalkaranji.</p><p>Our focus is simple: understand the site, recommend the right equipment, install it properly and remain available when support is needed.</p><div className='about-points'><span>01 — Site Assessment</span><span>02 — Right Product</span><span>03 — Professional Installation</span><span>04 — After-Sales Support</span></div></div></div></section>
   <section className='company-section areas-section'><div className='section-head'><div><span className='section-label'>SERVICE AREA</span><h2>Serving Ichalkaranji and nearby areas.</h2></div><p>Based in Ichalkaranji and supporting customers across nearby commercial and industrial areas.</p></div><div className='area-list'>{areas.map(a=><span key={a}>● {a}</span>)}</div></section>
-  <section id='contact' className='contact-section'><div><span className='section-label'>LET'S TALK</span><h2>Need CCTV, IT or security support?</h2><p>Tell us what you need. Our team can help with product selection, site requirements, installation, service and AMC.</p></div><div className='contact-card'><strong>UNIQUE MARKET</strong><p>CCTV & Security Solutions<br/>Computer & IT Services<br/><a href={`tel:+91${PHONE}`}>+91 {PHONE}</a><br/>{ADDRESS}</p><div className='contact-links'><a href={`https://wa.me/91${PHONE}`}>WhatsApp Us →</a><a href='/login'>Raise a Service Request →</a></div></div></section>
+  <section id='contact' className='contact-section'><div><span className='section-label'>LET'S TALK</span><h2>Need CCTV, IT or security support?</h2><p>Tell us what you need. Our team can help with product selection, site requirements, installation, service and AMC.</p></div><div className='contact-card'><strong>UNIQUE MARKET</strong><p>CCTV & Security Solutions<br/>Computer & IT Services<br/><a href={`tel:+91${PHONE}`}>+91 {PHONE}</a><br/>{ADDRESS}</p><div className='contact-links'><a href={whatsappUrl}>WhatsApp Us →</a><a href={`tel:+91${PHONE}`}>Call Now →</a><a href='/login'>Raise a Service Request →</a></div></div></section>
+  {contactPopup&&<div className='contact-popup' role='dialog' aria-label='Contact Unique Market'><button className='contact-popup-close' onClick={()=>setContactPopup(false)} aria-label='Close'>×</button><div className='contact-popup-title'>Need CCTV / Service?</div><div className='contact-popup-text'>Talk to Unique Market now</div><div className='contact-popup-actions'><a className='contact-popup-whatsapp' href={whatsappUrl}>💬 WhatsApp</a><a className='contact-popup-call' href={`tel:+91${PHONE}`}>📞 Call Now</a></div></div>}
   <footer className='company-footer'><div><a className='company-logo' href='/'>UNIQUE <span>MARKET</span></a><p>CCTV & Security Solutions • Computer & IT Services in Ichalkaranji</p></div><div><strong>QUICK LINKS</strong><a href='#services'>Services</a><a href='#products'>Products</a><a href='#contact'>Contact</a></div><div><strong>ONLINE SERVICE</strong><a href='/login'>Customer Portal</a><a href='/login'>Technician Portal</a></div><div><strong>CONTACT & LOCATION</strong><a href={`tel:+91${PHONE}`}>+91 {PHONE}</a><p>{ADDRESS}</p></div></footer>
   <div className='copyright'>© {new Date().getFullYear()} Unique Market. All rights reserved.</div>
  </main>
