@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 900">
+<rect width="900" height="900" fill="#fff"/>
+<g transform="translate(70 55)">
+<circle cx="380" cy="330" r="260" fill="none" stroke="#123b78" stroke-width="18"/>
+<path d="M185 190h210v38H223v245h172v42H185z" fill="#123b78"/>
+<path d="M455 205h170v38H493v270H455z" fill="#123b78"/>
+<path d="M500 210l130-40 75 35-132 45z" fill="#171a1e"/>
+<path d="M565 245h100v62H565z" fill="#171a1e"/>
+<circle cx="615" cy="275" r="25" fill="#123b78" stroke="#fff" stroke-width="8"/>
+<path d="M570 310l-40 95 42 10 40-92z" fill="#171a1e"/>
+<path d="M520 402h55v115h-55z" fill="#171a1e"/>
+<path d="M535 455l-55 55 35 35 65-55z" fill="#171a1e"/>
+<path d="M425 360v150l-70-60v-90" fill="none" stroke="#123b78" stroke-width="13"/>
+<circle cx="355" cy="360" r="11" fill="#fff" stroke="#123b78" stroke-width="7"/><circle cx="420" cy="395" r="11" fill="#fff" stroke="#123b78" stroke-width="7"/><circle cx="300" cy="405" r="11" fill="#fff" stroke="#123b78" stroke-width="7"/>
+</g>
+<text x="450" y="690" text-anchor="middle" font-family="Arial,sans-serif" font-size="74" font-weight="900" letter-spacing="4" fill="#123b78">UNIQUE</text>
+<text x="700" y="690" text-anchor="middle" font-family="Arial,sans-serif" font-size="74" font-weight="900" letter-spacing="4" fill="#171a1e">MARKET</text>
+<text x="450" y="745" text-anchor="middle" font-family="Arial,sans-serif" font-size="26" font-weight="800" letter-spacing="12" fill="#123b78">CCTV | IT | SERVICE</text>
+<line x1="95" y1="755" x2="300" y2="755" stroke="#123b78" stroke-width="3"/><line x1="600" y1="755" x2="805" y2="755" stroke="#123b78" stroke-width="3"/>
+<text x="450" y="790" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" letter-spacing="6" fill="#222">PROFESSIONAL SOLUTIONS, RELIABLE SECURITY</text>
+</svg>
