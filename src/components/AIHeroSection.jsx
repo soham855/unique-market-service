@@ -23,19 +23,10 @@ export default function AIHeroSection() {
       video.src = VIDEO_SRC
       video.addEventListener('loadedmetadata', play)
     }
-    return () => {
-      hls?.destroy()
-      video.removeEventListener('loadedmetadata', play)
-    }
+    return () => { hls?.destroy(); video.removeEventListener('loadedmetadata', play) }
   }, [])
-
   return <section className="ai-hero">
-    <div className="ai-hero-video-wrap" aria-hidden="true">
-      <video ref={videoRef} className="ai-hero-video" muted loop playsInline poster={POSTER} />
-      <div className="ai-hero-video-overlay" />
-      <div className="ai-hero-gradient ai-hero-gradient-top" />
-      <div className="ai-hero-gradient ai-hero-gradient-bottom" />
-    </div>
+    <div className="ai-hero-video-wrap" aria-hidden="true"><video ref={videoRef} className="ai-hero-video" muted loop playsInline poster={POSTER} /><div className="ai-hero-video-overlay" /><div className="ai-hero-gradient ai-hero-gradient-top" /><div className="ai-hero-gradient ai-hero-gradient-bottom" /></div>
     <nav className="ai-hero-nav">
       <a href="/home" className="ai-sunburst" aria-label="Unique Market home"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 1.5l1.1 5.2L16 2.6l.2 5.4 4.4-3.2-2.1 5 5-.2-4.3 3.2 4.3 3.2-5-.2 2.1 5-4.4-3.2-.2 5.4-2.9-4.1-1.1 5.2-1.1-5.2L8 21.4l-.2-5.4-4.4 3.2 2.1-5-5 .2 4.3-3.2-4.3-3.2 5 .2-2.1-5 4.4 3.2L8 2.6l2.9 4.1L12 1.5Z" fill="currentColor" /></svg></a>
       <div className="ai-hero-nav-center"><a href="#products">Products <ChevronDown size={15} /></a><a href="#customers">Customer Stories</a><a href="#resources">Resources</a><a href="#pricing">Pricing</a></div>
