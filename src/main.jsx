@@ -27,10 +27,11 @@ import AdminAccountManager from './components/CustomerRegister'
 import LocalSeoPage,{pages as localSeoPages} from './components/LocalSeoPage'
 import CompanyLandingPage from './components/CompanyLandingPage'
 import WhyChooseUniqueMarket from './components/WhyChooseUniqueMarket'
+import NextGenSecuritySystems from './components/NextGenSecuritySystems'
 const publicSeoPaths=Object.keys(localSeoPages)
 function App(){
  const pathname=window.location.pathname.replace(/\/$/,'')
- if(pathname===''||pathname==='/home') return <><CompanyLandingPage/><WhyChooseUniqueMarket/></>
+ if(pathname===''||pathname==='/home') return <><CompanyLandingPage/><WhyChooseUniqueMarket/><NextGenSecuritySystems/></>
  if(publicSeoPaths.includes(pathname)) return <LocalSeoPage/>
  const[session,setSession]=useState(undefined),[profile,setProfile]=useState(null),[profileError,setProfileError]=useState(''),[activeModule,setActiveModule]=useState(null)
  useEffect(()=>{let listener;CapacitorApp.addListener('backButton',({canGoBack})=>{if(activeModule){setActiveModule(null);return}if(canGoBack&&window.history.length>1){window.history.back();return}CapacitorApp.exitApp()}).then(v=>{listener=v});return()=>{listener?.remove()}},[activeModule])
