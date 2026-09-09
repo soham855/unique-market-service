@@ -41,22 +41,27 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Decode release keystore
-        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
-        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/release.keystore
+      - name: Decode release keystore when configured
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/release.keystore
+          fi
 
       - name: Build release AAB
         env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           cd android
           chmod +x gradlew
-          if [ -n "$ANDROID_KEYSTORE_PASSWORD" ] && [ -n "$ANDROID_KEY_ALIAS" ] && [ -n "$ANDROID_KEY_PASSWORD" ] && [ -f app/release.keystore ]; then
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ] && [ -n "$ANDROID_KEYSTORE_PASSWORD" ] && [ -n "$ANDROID_KEY_ALIAS" ] && [ -n "$ANDROID_KEY_PASSWORD" ] && [ -f app/release.keystore ]; then
             ./gradlew bundleRelease -Pandroid.injected.signing.store.file="$GITHUB_WORKSPACE/android/app/release.keystore" -Pandroid.injected.signing.store.password="$ANDROID_KEYSTORE_PASSWORD" -Pandroid.injected.signing.key.alias="$ANDROID_KEY_ALIAS" -Pandroid.injected.signing.key.password="$ANDROID_KEY_PASSWORD"
           else
-            echo "Release signing secrets are not configured. Building unsigned release AAB."
+            echo "Release signing secrets are not configured. Building unsigned release AAB for testing only."
             ./gradlew bundleRelease
           fi
 
