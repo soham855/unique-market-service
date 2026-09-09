@@ -1,9 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { signIn } from '../lib/auth'
 
 export default function ServicePortalAnimation() {
   const [animating, setAnimating] = useState(false)
   const [showCamera, setShowCamera] = useState(false)
   const [showSignin, setShowSignin] = useState(false)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
   const [technician, setTechnician] = useState({ bottom: 0, left: 70 })
   const timers = useRef([])
 
@@ -20,6 +25,7 @@ export default function ServicePortalAnimation() {
     setAnimating(true)
     setShowCamera(false)
     setShowSignin(false)
+    setError('')
     setTechnician({ bottom: 0, left: 70 })
 
     timers.current.push(setTimeout(() => setTechnician({ bottom: 125, left: 80 }), 100))
@@ -30,6 +36,20 @@ export default function ServicePortalAnimation() {
       setShowSignin(true)
       setAnimating(false)
     }, 4300))
+  }
+
+  const submit = async (event) => {
+    event.preventDefault()
+    setError('')
+    setLoading(true)
+    try {
+      await signIn(email.trim(), password)
+      window.location.href = '/service'
+    } catch (err) {
+      setError(err.message || 'Unable to sign in')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return <section className='service-portal-section'>
@@ -57,12 +77,17 @@ export default function ServicePortalAnimation() {
       .service-body{position:absolute;top:21px;left:12px;width:38px;height:53px;background:#2563eb;border-radius:8px}
       .service-legs{position:absolute;top:74px;left:16px;width:30px;height:51px;background:#1e3a8a;border-radius:4px}
       .service-hand-camera{position:absolute;top:36px;left:37px;width:20px;height:13px;background:#e2e8f0;border-radius:3px;transition:.25s}
-      .service-signin{position:absolute;right:25px;bottom:25px;width:170px;background:rgba(15,23,42,.94);border:1px solid #38bdf8;padding:18px;border-radius:12px;box-shadow:0 12px 28px rgba(0,0,0,.55);transform:scale(0);opacity:0;transition:.4s cubic-bezier(.34,1.56,.64,1)}
-      .service-signin.show{transform:scale(1);opacity:1}
-      .service-signin h3{font-size:14px;margin:0 0 12px}
-      .service-input{height:9px;background:#334155;border-radius:5px;margin-bottom:9px}
-      .service-mini-btn{height:20px;background:#38bdf8;border-radius:5px}
-      @media(max-width:760px){.service-portal-section{padding:60px 16px}.service-portal-wrap{grid-template-columns:1fr;gap:28px}.service-scene{height:330px}.service-ladder{left:48px}.service-camera-mount{left:110px}.service-camera-body{left:121px}.service-camera-lens{left:146px}.service-tech{left:43px}.service-signin{right:16px;bottom:16px}}
+      .service-signin{position:absolute;right:25px;bottom:25px;width:230px;background:rgba(15,23,42,.96);border:1px solid rgba(56,189,248,.75);padding:18px;border-radius:14px;box-shadow:0 12px 35px rgba(0,0,0,.65),0 0 25px rgba(56,189,248,.12);transform:scale(0) rotateX(18deg);transform-origin:center;opacity:0;transition:.5s cubic-bezier(.34,1.56,.64,1);z-index:5;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+      .service-signin.show{transform:scale(1) rotateX(0);opacity:1}
+      .service-signin h3{font-size:18px;margin:0 0 4px;background:linear-gradient(90deg,#38bdf8,#818cf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+      .service-signin-sub{font-size:11px;color:#94a3b8;margin:0 0 12px}
+      .service-field{width:100%;box-sizing:border-box;background:rgba(30,41,59,.9);border:1px solid rgba(148,163,184,.22);color:#f8fafc;border-radius:8px;padding:9px 10px;margin-bottom:9px;outline:none;font-size:12px;transition:.2s}
+      .service-field:focus{border-color:#38bdf8;box-shadow:0 0 0 2px rgba(56,189,248,.1)}
+      .service-mini-btn{width:100%;border:0;padding:9px;border-radius:8px;background:linear-gradient(135deg,#06b6d4,#2563eb);color:white;font-size:12px;font-weight:800;cursor:pointer;box-shadow:0 6px 16px rgba(37,99,235,.28);transition:.2s}
+      .service-mini-btn:hover{transform:translateY(-1px);filter:brightness(1.08)}
+      .service-mini-btn:disabled{opacity:.65;cursor:wait;transform:none}
+      .service-error{font-size:10px;line-height:1.4;color:#fca5a5;background:rgba(127,29,29,.2);border:1px solid rgba(248,113,113,.25);border-radius:7px;padding:7px;margin:-2px 0 9px}
+      @media(max-width:760px){.service-portal-section{padding:60px 16px}.service-portal-wrap{grid-template-columns:1fr;gap:28px}.service-scene{height:330px}.service-ladder{left:48px}.service-camera-mount{left:110px}.service-camera-body{left:121px}.service-camera-lens{left:146px}.service-tech{left:43px}.service-signin{right:12px;left:12px;bottom:12px;width:auto}}
     `}</style>
 
     <div className='service-portal-wrap'>
@@ -88,12 +113,15 @@ export default function ServicePortalAnimation() {
           <div className='service-legs' />
           {!showCamera && <div className='service-hand-camera' />}
         </div>
-        <div className={`service-signin ${showSignin ? 'show' : ''}`}>
-          <h3>Quick Sign In</h3>
-          <div className='service-input' />
-          <div className='service-input' style={{width:'70%'}} />
-          <div className='service-mini-btn' />
-        </div>
+
+        <form className={`service-signin ${showSignin ? 'show' : ''}`} onSubmit={submit}>
+          <h3>Service Portal Login</h3>
+          <p className='service-signin-sub'>Secure access to your dashboard</p>
+          <input className='service-field' type='email' placeholder='Email address' value={email} onChange={e=>setEmail(e.target.value)} required autoComplete='email' />
+          <input className='service-field' type='password' placeholder='Password' value={password} onChange={e=>setPassword(e.target.value)} required autoComplete='current-password' />
+          {error && <div className='service-error'>{error}</div>}
+          <button className='service-mini-btn' type='submit' disabled={loading}>{loading ? 'Signing in…' : 'Sign In →'}</button>
+        </form>
       </div>
     </div>
   </section>
