@@ -12,6 +12,7 @@ import ComplaintModule from './components/ComplaintModule'
 import CustomerComplaintModule from './components/CustomerComplaintModule'
 import CustomerServiceHistory from './components/CustomerServiceHistory'
 import TechnicianServiceHistory from './components/TechnicianServiceHistory'
+import TechnicianRequest from './components/TechnicianRequest'
 import CustomerProfile from './components/CustomerProfile'
 import ComplaintSearch from './components/ComplaintSearch'
 import AdminModule from './components/AdminModule'
@@ -41,12 +42,13 @@ function App(){
  useEffect(()=>{let mounted=true;getSession().then(async v=>{if(!mounted)return;setSession(v);if(v){try{const p=await getMyProfile();if(!p?.role||!['admin','technician','customer'].includes(p.role))throw new Error('Invalid account role.');setProfile(p)}catch(e){setProfileError(e.message||'Unable to load profile')}}});const{data}=onAuthStateChange((_e,n)=>{setSession(n);if(n)loadProfile();else{setProfile(null);setActiveModule(null)}});return()=>{mounted=false;data.subscription.unsubscribe()}},[])
  if(session===undefined)return <main className='auth-shell'><div className='login-card'><p className='eyebrow'>UNIQUE MARKET</p><h1>Loading…</h1></div></main>
  if(!session)return <Login onLogin={setSession}/>
- if(profileError)return <main className='auth-shell'><div className='login-card'><p className='eyebrow'>UNIQUE MARKET</p><h1>Profile setup required</h1><p className='error'>{profileError}</p><button onClick={signOut}>Sign out</button></div></main>
+ if(profileError)return <main className='auth-shell'><div className='login-card'><p className='eyebrow'>UNIQUE MARKET</p><h1>Profile setup required</h1><p className='error'>{profileError}</p><button type='button' onClick={signOut}>Sign out</button></div></main>
  if(!profile)return <main className='auth-shell'><div className='login-card'><p className='eyebrow'>UNIQUE MARKET</p><h1>Loading profile…</h1></div></main>
- const admin=profile.role==='admin',technician=profile.role==='technician',customer=profile.role==='customer',selected=String(activeModule||'').trim(),isMyComplaints=customer&&(selected==='__MY_COMPLAINTS__'||selected.toLowerCase()==='my complaints'),isRaiseComplaint=customer&&selected.toLowerCase()==='raise complaint',isServiceHistory=selected.toLowerCase()==='service history',isCustomerProfile=(customer||technician)&&selected.toLowerCase()==='my profile',isCustomerAmc=customer&&selected.toLowerCase()==='amc details',isFindComplaint=(admin||technician)&&selected==='Find Complaint',isTodayVisits=technician&&selected==="Today's Visits",isTechnicianServiceHistory=technician&&selected==='Service History',isTechnicianComplaints=technician&&(selected==='My Assigned Complaints'||selected==='Find Complaint'||isTodayVisits),complaint=selected==='Complaints'||isRaiseComplaint||isMyComplaints
+ const admin=profile.role==='admin',technician=profile.role==='technician',customer=profile.role==='customer',selected=String(activeModule||'').trim(),isMyComplaints=customer&&(selected==='__MY_COMPLAINTS__'||selected.toLowerCase()==='my complaints'),isRaiseComplaint=customer&&selected.toLowerCase()==='raise complaint',isServiceHistory=selected.toLowerCase()==='service history',isCustomerProfile=(customer||technician)&&selected.toLowerCase()==='my profile',isCustomerAmc=customer&&selected.toLowerCase()==='amc details',isFindComplaint=(admin||technician)&&selected==='Find Complaint',isTodayVisits=technician&&selected==="Today's Visits",isTechnicianServiceHistory=technician&&selected==='Service History',isTechnicianRequest=technician&&selected==='Raise Request',isTechnicianComplaints=technician&&(selected==='My Assigned Complaints'||selected==='Find Complaint'||isTodayVisits),complaint=selected==='Complaints'||isRaiseComplaint||isMyComplaints
  let content
  if(!activeModule){content=<RoleDashboard profile={profile} onSelectModule={setActiveModule}/>}
  else if(admin&&selected==='User Accounts'){content=<AdminAccountManager onBack={()=>setActiveModule(null)}/>}
+ else if(isTechnicianRequest){content=<TechnicianRequest profile={profile} onBack={()=>setActiveModule(null)}/>}
  else if(isTechnicianServiceHistory){content=<TechnicianServiceHistory profile={profile} onBack={()=>setActiveModule(null)}/>}
  else if(isTechnicianComplaints){content=<TechnicianModule profile={profile} mode={isTodayVisits?'today':selected==='Find Complaint'?'find':'assigned'} onBack={()=>setActiveModule(null)}/>}
  else if(isFindComplaint){content=<ComplaintSearch profile={profile} onBack={()=>setActiveModule(null)}/>}
