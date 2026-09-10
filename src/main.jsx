@@ -29,6 +29,7 @@ import CompanyLandingPage from './components/CompanyLandingPage'
 import WhyChooseUniqueMarket from './components/WhyChooseUniqueMarket'
 import NextGenSecuritySystems from './components/NextGenSecuritySystems'
 import ServicePortalAnimation from './components/ServicePortalAnimation'
+import CustomerAmcDetails from './components/CustomerAmcDetails'
 const publicSeoPaths=Object.keys(localSeoPages)
 function App(){
  const pathname=window.location.pathname.replace(/\/$/,'')
@@ -42,13 +43,14 @@ function App(){
  if(!session)return <Login onLogin={setSession}/>
  if(profileError)return <main className='auth-shell'><div className='login-card'><p className='eyebrow'>UNIQUE MARKET</p><h1>Profile setup required</h1><p className='error'>{profileError}</p><button onClick={signOut}>Sign out</button></div></main>
  if(!profile)return <main className='auth-shell'><div className='login-card'><p className='eyebrow'>UNIQUE MARKET</p><h1>Loading profile…</h1></div></main>
- const admin=profile.role==='admin',technician=profile.role==='technician',customer=profile.role==='customer',selected=String(activeModule||'').trim(),isMyComplaints=customer&&(selected==='__MY_COMPLAINTS__'||selected.toLowerCase()==='my complaints'),isRaiseComplaint=customer&&selected.toLowerCase()==='raise complaint',isServiceHistory=selected.toLowerCase()==='service history',isCustomerProfile=customer&&selected.toLowerCase()==='my profile',isFindComplaint=(admin||technician)&&selected==='Find Complaint',isTodayVisits=technician&&selected==="Today's Visits",isTechnicianServiceHistory=technician&&selected==='Service History',isTechnicianComplaints=technician&&(selected==='My Assigned Complaints'||selected==='Find Complaint'||isTodayVisits),complaint=selected==='Complaints'||isRaiseComplaint||isMyComplaints
+ const admin=profile.role==='admin',technician=profile.role==='technician',customer=profile.role==='customer',selected=String(activeModule||'').trim(),isMyComplaints=customer&&(selected==='__MY_COMPLAINTS__'||selected.toLowerCase()==='my complaints'),isRaiseComplaint=customer&&selected.toLowerCase()==='raise complaint',isServiceHistory=selected.toLowerCase()==='service history',isCustomerProfile=(customer||technician)&&selected.toLowerCase()==='my profile',isCustomerAmc=customer&&selected.toLowerCase()==='amc details',isFindComplaint=(admin||technician)&&selected==='Find Complaint',isTodayVisits=technician&&selected==="Today's Visits",isTechnicianServiceHistory=technician&&selected==='Service History',isTechnicianComplaints=technician&&(selected==='My Assigned Complaints'||selected==='Find Complaint'||isTodayVisits),complaint=selected==='Complaints'||isRaiseComplaint||isMyComplaints
  let content
  if(!activeModule){content=<RoleDashboard profile={profile} onSelectModule={setActiveModule}/>}
  else if(admin&&selected==='User Accounts'){content=<AdminAccountManager onBack={()=>setActiveModule(null)}/>}
  else if(isTechnicianServiceHistory){content=<TechnicianServiceHistory profile={profile} onBack={()=>setActiveModule(null)}/>}
  else if(isTechnicianComplaints){content=<TechnicianModule profile={profile} mode={isTodayVisits?'today':selected==='Find Complaint'?'find':'assigned'} onBack={()=>setActiveModule(null)}/>}
  else if(isFindComplaint){content=<ComplaintSearch profile={profile} onBack={()=>setActiveModule(null)}/>}
+ else if(isCustomerAmc){content=<CustomerAmcDetails profile={profile} onBack={()=>setActiveModule(null)}/>}
  else if(isCustomerProfile){content=<CustomerProfile profile={profile} onBack={()=>setActiveModule(null)} onSaved={setProfile}/>}
  else if(isServiceHistory&&customer){content=<section className='role-dashboard'><button className='secondary' type='button' onClick={()=>setActiveModule(null)}>← Back to Dashboard</button><CustomerServiceHistory profile={profile}/></section>}
  else if(isMyComplaints){content=<section className='role-dashboard'><button className='secondary' type='button' onClick={()=>setActiveModule(null)}>← Back to Dashboard</button><CustomerComplaintModule profile={profile} activeModule='My Complaints' onSubmitted={()=>setActiveModule('__MY_COMPLAINTS__')}/></section>}
@@ -61,7 +63,7 @@ function App(){
  else if(customer&&selected==='Payments'){content=<CustomerPayment profile={profile} onBack={()=>setActiveModule(null)}/>}
  else if(complaint){content=<section className='role-dashboard'><button className='secondary' type='button' onClick={()=>setActiveModule(null)}>← Back to Dashboard</button>{customer?<CustomerComplaintModule profile={profile} activeModule={selected} onSubmitted={()=>setActiveModule('__MY_COMPLAINTS__')}/>:<ComplaintModule profile={profile}/>}</section>}
  else if(admin){content=<AdminModule module={selected} onBack={()=>setActiveModule(null)}/>}
- else{content=<section className='role-dashboard'><button className='secondary' type='button' onClick={()=>setActiveModule(null)}>← Back to Dashboard</button><div className='modules'><article className='module-card'><span>●</span><h3>{selected}</h3><p>Module will use the live service database.</p></article></div></section>}
- return <main className='app-shell'><header className='topbar'><div><p className='eyebrow'>UNIQUE MARKET</p><h1>Instant Services for Your Security</h1></div><div className='top-actions'><span className='status'>{profile.role.toUpperCase()}</span><NotificationBell userId={session.user.id}/><button className='secondary' onClick={signOut}>Sign out</button></div></header>{content}{supabase&&<footer className='footer'>Signed in as {session.user.email}</footer>}</main>
+ else{content=<section className='role-dashboard'><button className='secondary' type='button' onClick={()=>setActiveModule(null)}>← Back to Dashboard</button><div className='modules'><article className='module-card'><span>●</span><h3>{selected}</h3><p>This module is not available yet. Please use a supported dashboard action.</p></article></div></section>}
+ return <main className='app-shell'><header className='topbar'><div><p className='eyebrow'>UNIQUE MARKET</p><h1>Instant Services for Your Security</h1></div><div className='top-actions'><span className='status'>{profile.role.toUpperCase()}</span><NotificationBell userId={session.user.id}/><button className='secondary' type='button' onClick={signOut}>Sign out</button></div></header>{content}{supabase&&<footer className='footer'>Signed in as {session.user.email}</footer>}</main>
 }
 createRoot(document.getElementById('root')).render(<React.StrictMode><App/></React.StrictMode>)
