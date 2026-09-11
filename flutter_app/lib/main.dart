@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -239,6 +241,7 @@ class RoleHome extends StatelessWidget {
             ]),
           ),
           const SizedBox(height: 18),
+          _ActionCard(icon: Icons.confirmation_number_outlined, title: 'Live Service Requests', subtitle: 'View and track live service requests', onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LiveServiceRequestsPage()))),
           _ActionCard(icon: Icons.confirmation_number_outlined, title: 'Complaints', subtitle: 'Raise and track service complaints'),
           _ActionCard(icon: Icons.payments_outlined, title: 'Payments', subtitle: 'View payment and UTR status'),
           _ActionCard(icon: Icons.person_outline, title: 'Profile', subtitle: 'View your account details'),
@@ -252,16 +255,160 @@ class _ActionCard extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
-  const _ActionCard({required this.icon, required this.title, required this.subtitle});
+  final VoidCallback? onTap;
+  const _ActionCard({required this.icon, required this.title, required this.subtitle, this.onTap});
   @override
   Widget build(BuildContext context) {
     return Card(
       color: const Color(0xFF0D131C),
-      child: ListTile(
-        contentPadding: const EdgeInsets.all(10),
-        leading: CircleAvatar(backgroundColor: const Color(0xFF12313B), child: Icon(icon, color: const Color(0xFF67E8F9))),
-        title: Text(tr(context, title), style: const TextStyle(fontWeight: FontWeight.w800)),
-        subtitle: Text(tr(context, subtitle), style: const TextStyle(color: Colors.white54)),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CircleAvatar(backgroundColor: const Color(0xFF12313B), child: Icon(icon, color: const Color(0xFF67E8F9))),
+              const SizedBox(width: 12),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(tr(context, title), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800)),
+                const SizedBox(height: 4),
+                Text(tr(context, subtitle), maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white54)),
+              ])),
+              if (onTap != null) const Padding(padding: EdgeInsets.only(left: 8, top: 6), child: Icon(Icons.chevron_right, color: Colors.white38)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class LiveServiceRequestsPage extends StatefulWidget {
+  const LiveServiceRequestsPage({super.key});
+  @override
+  State<LiveServiceRequestsPage> createState() => _LiveServiceRequestsPageState();
+}
+
+class _LiveServiceRequestsPageState extends State<LiveServiceRequestsPage> {
+  List<Map<String, dynamic>> requests = [];
+  bool loading = true;
+  String? error;
+  Timer? timer;
+
+  @override
+  void initState() {
+    super.initState();
+    load();
+    timer = Timer.periodic(const Duration(seconds: 10), (_) => load(silent: true));
+  }
+
+  Future<void> load({bool silent = false}) async {
+    if (!silent && mounted) setState(() { loading = true; error = null; });
+    try {
+      final response = await Supabase.instance.client
+          .from('complaints')
+          .select('id,complaint_no,ticket_no,customer_id,category,description,priority,status,technician_id,scheduled_visit_date,service_type,location_text,created_at')
+          .order('created_at', ascending: false)
+          .limit(100);
+      if (mounted) setState(() { requests = List<Map<String, dynamic>>.from(response); loading = false; });
+    } catch (e) {
+      if (mounted) setState(() { error = e.toString().replaceFirst('Exception: ', ''); loading = false; });
+    }
+  }
+
+  @override
+  void dispose() { timer?.cancel(); super.dispose(); }
+
+  Color statusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'complete':
+      case 'completed':
+      case 'closed':
+        return Colors.greenAccent;
+      case 'in_progress':
+      case 'in progress':
+      case 'assigned':
+        return Colors.amberAccent;
+      default:
+        return const Color(0xFF67E8F9);
+    }
+  }
+
+  Widget meta(String label, String value) {
+    if (value.trim().isEmpty) return const SizedBox.shrink();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
+      decoration: BoxDecoration(color: Colors.white.withOpacity(.045), borderRadius: BorderRadius.circular(10)),
+      child: Text('$label: $value', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: Colors.white70)),
+    );
+  }
+
+  Widget requestCard(Map<String, dynamic> r) {
+    final number = (r['complaint_no'] ?? r['ticket_no'] ?? r['id'] ?? '').toString();
+    final status = (r['status'] ?? 'open').toString();
+    final priority = (r['priority'] ?? '').toString();
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      color: const Color(0xFF0D131C),
+      clipBehavior: Clip.antiAlias,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(border: Border(left: BorderSide(color: statusColor(status), width: 3))),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Expanded(child: Text(number, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900))),
+            const SizedBox(width: 8),
+            Flexible(child: Align(alignment: Alignment.topRight, child: Container(padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5), decoration: BoxDecoration(color: statusColor(status).withOpacity(.12), borderRadius: BorderRadius.circular(20)), child: Text(status.toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: statusColor(status))))))
+          ]),
+          if ((r['description'] ?? '').toString().trim().isNotEmpty) ...[
+            const SizedBox(height: 9),
+            Text(r['description'].toString(), maxLines: 4, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, height: 1.35)),
+          ],
+          const SizedBox(height: 11),
+          Wrap(spacing: 7, runSpacing: 7, children: [
+            meta('Type', (r['service_type'] ?? r['category'] ?? '').toString()),
+            meta('Priority', priority),
+            meta('Visit', (r['scheduled_visit_date'] ?? '').toString()),
+            meta('Location', (r['location_text'] ?? '').toString()),
+          ]),
+        ]),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(tr(context, 'Live Service Requests'), style: const TextStyle(fontWeight: FontWeight.w800)),
+        actions: [IconButton(onPressed: load, tooltip: 'Refresh', icon: const Icon(Icons.refresh))],
+      ),
+      body: RefreshIndicator(
+        onRefresh: load,
+        child: loading
+            ? const Center(child: CircularProgressIndicator())
+            : ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(14, 14, 14, 28),
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    margin: const EdgeInsets.only(bottom: 14),
+                    decoration: BoxDecoration(color: const Color(0xFF102A38), borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white10)),
+                    child: Row(children: [
+                      const Icon(Icons.sync_rounded, color: Color(0xFF67E8F9)),
+                      const SizedBox(width: 10),
+                      Expanded(child: Text(tr(context, 'Live requests refresh automatically every 10 seconds.'), style: const TextStyle(color: Colors.white70))),
+                    ]),
+                  ),
+                  if (error != null) Padding(padding: const EdgeInsets.all(12), child: Text(error!, style: const TextStyle(color: Colors.redAccent))),
+                  if (requests.isEmpty && error == null) Padding(padding: const EdgeInsets.all(30), child: Center(child: Text(tr(context, 'No live service requests found.'), textAlign: TextAlign.center, style: const TextStyle(color: Colors.white54)))),
+                  ...requests.map(requestCard),
+                ],
+              ),
       ),
     );
   }
