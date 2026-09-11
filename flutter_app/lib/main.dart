@@ -8,7 +8,7 @@ Future<void> main() async {
   if (SupabaseConfig.isConfigured) {
     await Supabase.initialize(
       url: SupabaseConfig.url,
-      publishableKey: SupabaseConfig.anonKey,
+      publishableKey: SupabaseConfig.publishableKey,
     );
   }
   runApp(const InstantServicesApp());
@@ -67,7 +67,7 @@ class _LoginPageState extends State<LoginPage> {
     });
     try {
       if (!SupabaseConfig.isConfigured) {
-        throw Exception('Supabase is not configured. Build with SUPABASE_ANON_KEY.');
+        throw Exception('Supabase is not configured.');
       }
       await AuthService(Supabase.instance.client).signIn(
         email: email.text,
@@ -85,6 +85,13 @@ class _LoginPageState extends State<LoginPage> {
     } finally {
       if (mounted) setState(() => loading = false);
     }
+  }
+
+  @override
+  void dispose() {
+    email.dispose();
+    password.dispose();
+    super.dispose();
   }
 
   @override
@@ -184,7 +191,16 @@ class _RoleGateState extends State<RoleGate> {
 
   @override
   Widget build(BuildContext context) {
-    if (error != null) return Scaffold(body: Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(error!))));
+    if (error != null) {
+      return Scaffold(
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(error!),
+          ),
+        ),
+      );
+    }
     if (role == null) return const Scaffold(body: Center(child: CircularProgressIndicator()));
     if (role == 'admin') return const RoleHome(title: 'Admin Dashboard', icon: Icons.admin_panel_settings_rounded);
     if (role == 'technician') return const RoleHome(title: 'Technician Portal', icon: Icons.engineering_rounded);
