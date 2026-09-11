@@ -62,3 +62,5 @@ jobs:
             workspace-reminder/build/app/outputs/flutter-apk/app-debug.apk
             workspace-reminder/build/app/outputs/flutter-apk/app-release.apk
             workspace-reminder/build/app/outputs/bundle/release/app-release.aab
+
+# Build trigger refresh: core library desugaring is enabled above.
