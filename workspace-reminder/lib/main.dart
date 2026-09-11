@@ -69,7 +69,7 @@ class ReminderService {
 
   static Future<void> init() async {
     const android = AndroidInitializationSettings('@mipmap/ic_launcher');
-    await notifications.initialize(const InitializationSettings(android: android));
+    await notifications.initialize(settings: const InitializationSettings(android: android));
     await notifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()?.requestNotificationsPermission();
     await geo.initialize();
     try {
@@ -131,7 +131,7 @@ class ReminderService {
     return next;
   }
 
-  static Future<void> cancel(String id) => notifications.cancel(id.hashCode.abs());
+  static Future<void> cancel(String id) => notifications.cancel(id: id.hashCode.abs());
 }
 
 class WorkspaceReminderApp extends StatelessWidget {
