@@ -16,6 +16,7 @@ import TechnicianRequest from './components/TechnicianRequest'
 import CustomerProfile from './components/CustomerProfile'
 import ComplaintSearch from './components/ComplaintSearch'
 import AdminModule from './components/AdminModule'
+import TechnicianAdmin from './components/TechnicianAdmin'
 import AdminComplaintKanban from './components/AdminComplaintKanban'
 import AdminReports from './components/AdminReports'
 import AdminSettings from './components/AdminSettings'
@@ -48,6 +49,7 @@ function App(){
  let content
  if(!activeModule){content=<RoleDashboard profile={profile} onSelectModule={setActiveModule}/>}
  else if(admin&&selected==='User Accounts'){content=<AdminAccountManager onBack={()=>setActiveModule(null)}/>}
+ else if(admin&&selected==='Technicians'){content=<TechnicianAdmin onBack={()=>setActiveModule(null)}/>}
  else if(isTechnicianRequest){content=<TechnicianRequest profile={profile} onBack={()=>setActiveModule(null)}/>}
  else if(isTechnicianServiceHistory){content=<TechnicianServiceHistory profile={profile} onBack={()=>setActiveModule(null)}/>}
  else if(isTechnicianComplaints){content=<TechnicianModule profile={profile} mode={isTodayVisits?'today':selected==='Find Complaint'?'find':'assigned'} onBack={()=>setActiveModule(null)}/>}
