@@ -5,7 +5,7 @@ import './styles.css'
 import './premium-portal.css'
 import './unique-ui.css'
 import './fix-responsive.css'
-import {LanguageProvider,LanguageSwitcher} from './lib/i18n'
+import {LanguageProvider} from './lib/i18n'
 import {supabase} from './lib/supabase'
 import {getSession,onAuthStateChange,signOut} from './lib/auth'
 import {getMyProfile} from './lib/profile'
@@ -73,5 +73,5 @@ function App(){
  else{content=<section className='role-dashboard'><button className='secondary' type='button' onClick={()=>setActiveModule(null)}>← Back to Dashboard</button><div className='modules'><article className='module-card'><span>●</span><h3>{selected}</h3><p>This module is not available yet. Please use a supported dashboard action.</p></article></div></section>}
  return <main className='app-shell'><header className='topbar'><div><p className='eyebrow'>UNIQUE MARKET</p><h1>Instant Services for Your Security</h1></div><div className='top-actions'><span className='status'>{profile.role.toUpperCase()}</span><NotificationBell userId={session.user.id}/><button className='secondary' type='button' onClick={signOut}>Sign out</button></div></header>{content}{supabase&&<footer className='footer'>Signed in as {session.user.email}</footer>}</main>
 }
-function Root(){return <LanguageProvider><App/><LanguageSwitcher/></LanguageProvider>}
+function Root(){return <LanguageProvider><App/></LanguageProvider>}
 createRoot(document.getElementById('root')).render(<React.StrictMode><Root/></React.StrictMode>)
