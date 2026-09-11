@@ -30,6 +30,9 @@ jobs:
           if [ ! -d android ]; then
             flutter create --project-name instant_services --org com.uniquemarket --platforms android .
           fi
+          # Keep the mobile package ID stable for the Play Store app.
+          sed -i 's/applicationId = "com.uniquemarket.instant_services"/applicationId = "com.uniquemarket.instantservices"/' android/app/build.gradle.kts
+          sed -i 's/namespace = "com.uniquemarket.instant_services"/namespace = "com.uniquemarket.instantservices"/' android/app/build.gradle.kts
 
       - name: Get packages
         run: flutter pub get
@@ -37,15 +40,14 @@ jobs:
       - name: Analyze
         run: flutter analyze
 
-      # Re-triggered after the Flutter syntax fix in main.dart.
       - name: Build debug APK
-        run: flutter build apk --debug --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+        run: flutter build apk --debug --dart-define=SUPABASE_URL=https://tfscvycomllamoubtlcf.supabase.co --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_VeJIjcsILLniCHf2HjA20A_xlMydma0
 
       - name: Build release APK
-        run: flutter build apk --release --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+        run: flutter build apk --release --dart-define=SUPABASE_URL=https://tfscvycomllamoubtlcf.supabase.co --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_VeJIjcsILLniCHf2HjA20A_xlMydma0
 
       - name: Build release AAB
-        run: flutter build appbundle --release --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+        run: flutter build appbundle --release --dart-define=SUPABASE_URL=https://tfscvycomllamoubtlcf.supabase.co --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_VeJIjcsILLniCHf2HjA20A_xlMydma0
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
