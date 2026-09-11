@@ -37,6 +37,7 @@ jobs:
       - name: Analyze
         run: flutter analyze
 
+      # Re-triggered after the Flutter syntax fix in main.dart.
       - name: Build debug APK
         run: flutter build apk --debug --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
 
