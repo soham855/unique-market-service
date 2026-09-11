@@ -23,18 +23,26 @@ jobs:
           cache: true
       - name: Generate Android project
         run: flutter create . --project-name workspace_reminder --org com.workspacereminder --platforms android
-      - name: Configure Android permissions
+      - name: Configure Android permissions and desugaring
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          p = Path('android/app/src/main/AndroidManifest.xml')
-          s = p.read_text()
+          manifest = Path('android/app/src/main/AndroidManifest.xml')
+          s = manifest.read_text()
           perms = '''\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />\n'''
           marker = '<manifest '
           i = s.find('>', s.find(marker))
           if i >= 0 and 'ACCESS_BACKGROUND_LOCATION' not in s:
               s = s[:i+1] + perms + s[i+1:]
-          p.write_text(s)
+          manifest.write_text(s)
+
+          gradle = Path('android/app/build.gradle.kts')
+          g = gradle.read_text()
+          if 'isCoreLibraryDesugaringEnabled = true' not in g:
+              g = g.replace('android {', 'android {\n    compileOptions {\n        isCoreLibraryDesugaringEnabled = true\n        sourceCompatibility = JavaVersion.VERSION_11\n        targetCompatibility = JavaVersion.VERSION_11\n    }', 1)
+          if 'coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")' not in g:
+              g = g.replace('dependencies {', 'dependencies {\n    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")', 1)
+          gradle.write_text(g)
           PY
       - name: Get packages
         run: flutter pub get
