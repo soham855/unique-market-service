@@ -5,6 +5,7 @@ import './styles.css'
 import './premium-portal.css'
 import './unique-ui.css'
 import './fix-responsive.css'
+import './network-ai.css'
 import {LanguageProvider} from './lib/i18n'
 import {supabase} from './lib/supabase'
 import {getSession,onAuthStateChange,signOut} from './lib/auth'
@@ -35,10 +36,12 @@ import WhyChooseUniqueMarket from './components/WhyChooseUniqueMarket'
 import NextGenSecuritySystems from './components/NextGenSecuritySystems'
 import ServicePortalAnimation from './components/ServicePortalAnimation'
 import CustomerAmcDetails from './components/CustomerAmcDetails'
+import NetworkAITool from './components/NetworkAITool'
 const publicSeoPaths=Object.keys(localSeoPages)
 function App(){
  const pathname=window.location.pathname.replace(/\/$/,'')
  if(pathname===''||pathname==='/home') return <><CompanyLandingPage/><WhyChooseUniqueMarket/><NextGenSecuritySystems/><ServicePortalAnimation/></>
+ if(pathname==='/network-ai') return <NetworkAITool onBack={()=>{window.location.href='/'}}/>
  if(publicSeoPaths.includes(pathname)) return <LocalSeoPage/>
  const[session,setSession]=useState(undefined),[profile,setProfile]=useState(null),[profileError,setProfileError]=useState(''),[activeModule,setActiveModule]=useState(null)
  useEffect(()=>{let listener;CapacitorApp.addListener('backButton',({canGoBack})=>{if(activeModule){setActiveModule(null);return}if(canGoBack&&window.history.length>1){window.history.back();return}CapacitorApp.exitApp()}).then(v=>{listener=v});return()=>{listener?.remove()}},[activeModule])
