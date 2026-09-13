@@ -1,8 +1,8 @@
 {
   "name":"unique-market-network-agent",
   "private":true,
-  "version":"0.1.0",
+  "version":"0.2.0",
   "type":"module",
   "scripts":{"start":"node agent.js"},
-  "dependencies":{"cors":"^2.8.5","express":"^5.1.0"}
+  "dependencies":{"cors":"^2.8.5","express":"^5.1.0","dgram":"^1.0.1"}
 }
