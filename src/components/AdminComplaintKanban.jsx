@@ -1,7 +1,7 @@
 import {useEffect,useState} from 'react'
 import {supabase} from '../lib/supabase'
-const stages=['open','assigned','in_progress','resolved','closed']
-const labels={open:'New',assigned:'Assigned',in_progress:'In Progress',resolved:'Resolved',closed:'Closed'}
+const stages=['open','assigned','technician_on_way','in_progress','resolved','closed']
+const labels={open:'Raised',assigned:'Assigned',technician_on_way:'Technician On Way',in_progress:'In Progress',resolved:'Completed',closed:'Closed'}
 export default function AdminComplaintKanban({onBack}){const [items,setItems]=useState([]),[technicians,setTechnicians]=useState([]),[loading,setLoading]=useState(true),[error,setError]=useState('')
 async function load(){setLoading(true);setError('');const [{data,error},{data:techs,error:te}] = await Promise.all([supabase.from('complaints').select('*').order('created_at',{ascending:false}).limit(300),supabase.from('profiles').select('id,full_name,phone').eq('role','technician').order('full_name')]);if(error)setError(error.message);else setItems(data||[]);if(te)setError(te.message);else setTechnicians(techs||[]);setLoading(false)}
 useEffect(()=>{load()},[])
