@@ -37,10 +37,12 @@ import NextGenSecuritySystems from './components/NextGenSecuritySystems'
 import ServicePortalAnimation from './components/ServicePortalAnimation'
 import CustomerAmcDetails from './components/CustomerAmcDetails'
 import NetworkAITool from './components/NetworkAITool'
+import TrackService from './components/TrackService'
 const publicSeoPaths=Object.keys(localSeoPages)
 function App(){
  const pathname=window.location.pathname.replace(/\/$/,'')
  if(pathname===''||pathname==='/home') return <><CompanyLandingPage/><WhyChooseUniqueMarket/><NextGenSecuritySystems/><ServicePortalAnimation/></>
+ if(pathname==='/track-service') return <TrackService/>
  if(pathname==='/network-ai') return <NetworkAITool onBack={()=>{window.location.href='/'}}/>
  if(publicSeoPaths.includes(pathname)) return <LocalSeoPage/>
  const[session,setSession]=useState(undefined),[profile,setProfile]=useState(null),[profileError,setProfileError]=useState(''),[activeModule,setActiveModule]=useState(null)
