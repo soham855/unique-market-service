@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import './TrackService.css'
 
 const steps = [
   { key: 'open', label: 'Raised' },
