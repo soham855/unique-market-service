@@ -107,7 +107,7 @@ async function signOut(){await supabase.auth.signOut()}
   {editingAccount.account_type==='upi'&&<><input placeholder="UPI ID (example@upi)" value={editingAccount.upi_id||''} onChange={e=>setEditingAccount({...editingAccount,upi_id:e.target.value})}/><input placeholder="Payment app (GPay / PhonePe / Paytm)" value={editingAccount.payment_app||''} onChange={e=>setEditingAccount({...editingAccount,payment_app:e.target.value})}/></>}
   <input type="number" step="0.01" placeholder="Opening balance ₹" value={editingAccount.opening_balance??0} onChange={e=>setEditingAccount({...editingAccount,opening_balance:e.target.value})}/>
   <div className="button-row"><button disabled={busy}>Save changes</button><button type="button" className="ghost" onClick={()=>setEditingAccount(null)}>Cancel</button></div>
- </form></section>
+ </form></section>}
   <div className="grid">
    <section className="card"><h2>Add transaction</h2><form onSubmit={addTx} className="form">
     <select value={form.type} onChange={e=>setForm({...form,type:e.target.value,category:e.target.value==='income'?'Sales':'Expense'})}><option value="expense">Expense</option><option value="income">Sale / Income</option></select>
