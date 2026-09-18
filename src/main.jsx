@@ -38,6 +38,7 @@ import ServicePortalAnimation from './components/ServicePortalAnimation'
 import CustomerAmcDetails from './components/CustomerAmcDetails'
 import NetworkAITool from './components/NetworkAITool'
 import TrackService from './components/TrackService'
+import ExpenseManager from './components/ExpenseManager'
 const publicSeoPaths=Object.keys(localSeoPages)
 function App(){
  const pathname=window.location.pathname.replace(/\/$/,'')
@@ -58,6 +59,7 @@ function App(){
  if(!activeModule){content=<RoleDashboard profile={profile} onSelectModule={setActiveModule}/>}
  else if(admin&&selected==='User Accounts'){content=<AdminAccountManager onBack={()=>setActiveModule(null)}/>}
  else if(admin&&selected==='Technicians'){content=<TechnicianAdmin onBack={()=>setActiveModule(null)}/>}
+ else if(admin&&selected==='Expenses'){content=<ExpenseManager profile={profile} onBack={()=>setActiveModule(null)}/>}
  else if(isTechnicianRequest){content=<TechnicianRequest profile={profile} onBack={()=>setActiveModule(null)}/>}
  else if(isTechnicianServiceHistory){content=<TechnicianServiceHistory profile={profile} onBack={()=>setActiveModule(null)}/>}
  else if(isTechnicianComplaints){content=<TechnicianModule profile={profile} mode={isTodayVisits?'today':selected==='Find Complaint'?'find':'assigned'} onBack={()=>setActiveModule(null)}/>}
@@ -66,7 +68,7 @@ function App(){
  else if(isCustomerProfile){content=<CustomerProfile profile={profile} onBack={()=>setActiveModule(null)} onSaved={setProfile}/>}
  else if(isServiceHistory&&customer){content=<section className='role-dashboard'><button className='secondary' type='button' onClick={()=>setActiveModule(null)}>← Back to Dashboard</button><CustomerServiceHistory profile={profile}/></section>}
  else if(isMyComplaints){content=<section className='role-dashboard'><button className='secondary' type='button' onClick={()=>setActiveModule(null)}>← Back to Dashboard</button><CustomerComplaintModule profile={profile} activeModule='My Complaints' onSubmitted={()=>setActiveModule('__MY_COMPLAINTS__')}/></section>}
- else if(isRaiseComplaint){content=<section className='role-dashboard'><button className='secondary' type='button' onClick={()=>setActiveModule(null)}>← Back to Dashboard</button><CustomerComplaintModule profile={profile} activeModule='Raise Complaint' onSubmitted={()=>setActiveModule('__MY_COMPLAINTS__')}/></section>}
+ else if(isRaiseComplaint){content=<section className='role-dashboard'><button className='secondary' type='button' onClick={()=>setActiveModule('__MY_COMPLAINTS__')}/>}
  else if(admin&&selected==='Complaints'){content=<AdminComplaintKanban onBack={()=>setActiveModule(null)}/>}
  else if(admin&&selected==='Reports'){content=<AdminReports onBack={()=>setActiveModule(null)}/>}
  else if(admin&&selected==='Settings'){content=<AdminSettings onBack={()=>setActiveModule(null)}/>}
