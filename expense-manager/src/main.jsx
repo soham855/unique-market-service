@@ -85,8 +85,7 @@ async function saveCategory(e){
 }
 async function addCategory(e){
  e.preventDefault();const name=newCategory.trim();if(!name)return;setBusy(true);setError('');
- const type=newCategory.type||'expense';
- const {error}=await supabase.from('expense_categories').insert({owner_id:session.user.id,name,category_type:type,is_active:true});
+ const {error}=await supabase.from('expense_categories').insert({owner_id:session.user.id,name,category_type:'expense',is_active:true});
  if(error)setError(error.message);else{setNewCategory('');await load()}setBusy(false)
 }
 async function deactivateCategory(id){
