@@ -68,7 +68,7 @@ function App(){
  else if(isCustomerProfile){content=<CustomerProfile profile={profile} onBack={()=>setActiveModule(null)} onSaved={setProfile}/>}
  else if(isServiceHistory&&customer){content=<section className='role-dashboard'><button className='secondary' type='button' onClick={()=>setActiveModule(null)}>← Back to Dashboard</button><CustomerServiceHistory profile={profile}/></section>}
  else if(isMyComplaints){content=<section className='role-dashboard'><button className='secondary' type='button' onClick={()=>setActiveModule(null)}>← Back to Dashboard</button><CustomerComplaintModule profile={profile} activeModule='My Complaints' onSubmitted={()=>setActiveModule('__MY_COMPLAINTS__')}/></section>}
- else if(isRaiseComplaint){content=<section className='role-dashboard'><button className='secondary' type='button' onClick={()=>setActiveModule('__MY_COMPLAINTS__')}/>}
+ else if(isRaiseComplaint){content=<section className='role-dashboard'><button className='secondary' type='button' onClick={()=>setActiveModule(null)}>← Back to Dashboard</button><CustomerComplaintModule profile={profile} activeModule='Raise Complaint' onSubmitted={()=>setActiveModule('__MY_COMPLAINTS__')}/></section>}
  else if(admin&&selected==='Complaints'){content=<AdminComplaintKanban onBack={()=>setActiveModule(null)}/>}
  else if(admin&&selected==='Reports'){content=<AdminReports onBack={()=>setActiveModule(null)}/>}
  else if(admin&&selected==='Settings'){content=<AdminSettings onBack={()=>setActiveModule(null)}/>}
