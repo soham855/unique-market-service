@@ -14,7 +14,7 @@ function Login({onLogin}){
 }
 
 function App(){
- const[session,setSession]=useState(undefined),[accounts,setAccounts]=useState([]),[tx,setTx]=useState([]),[categories,setCategories]=useState([]),[form,setForm]=useState({type:'expense',account:'',category:'Expense',amount:'',date:today(),description:'',vendor:''}),[busy,setBusy]=useState(false),[error,setError]=useState(''),[month,setMonth]=useState(today().slice(0,7)),[transfer,setTransfer]=useState({from:'',to:'',amount:'',date:today(),description:''})
+ const[session,setSession]=useState(undefined),[accounts,setAccounts]=useState([]),[tx,setTx]=useState([]),[categories,setCategories]=useState([]),[form,setForm]=useState({type:'expense',account:'',category:'Expense',amount:'',date:today(),description:'',vendor:''}),[busy,setBusy]=useState(false),[error,setError]=useState(''),[month,setMonth]=useState(today().slice(0,7)),[transfer,setTransfer]=useState({from:'',to:'',amount:'',date:today(),description:''}),[editingAccount,setEditingAccount]=useState(null),[editingCategory,setEditingCategory]=useState(null),[newCategory,setNewCategory]=useState('')
  useEffect(()=>{supabase.auth.getSession().then(({data})=>setSession(data.session));const{data}=supabase.auth.onAuthStateChange((_e,s)=>setSession(s));return()=>data.subscription.unsubscribe()},[])
  useEffect(()=>{if(session)load()},[session])
  async function load(){
@@ -32,7 +32,7 @@ function App(){
     {name:'Bank Account 4',account_type:'bank',bank_name:'Bank 4'},
     {name:'Bank Account 5',account_type:'bank',bank_name:'Bank 5'},
     {name:'Cash',account_type:'cash',bank_name:null},
-    {name:'UPI',account_type:'upi',bank_name:null}
+    {name:'UPI',account_type:'upi',bank_name:null,upi_id:null,payment_app:null}
    ].map(x=>({...x,owner_id:uid,opening_balance:0,is_active:true}))
    const {error}=await supabase.from('expense_accounts').insert(starterAccounts)
    if(error){setError(error.message);return}
@@ -66,14 +66,49 @@ function App(){
  const profit=sales-expenses
  async function addTx(e){e.preventDefault();setBusy(true);setError('');const uid=session.user.id;const cat=categories.find(c=>c.name.toLowerCase()===form.category.toLowerCase());const{error}=await supabase.from('expense_transactions').insert({owner_id:uid,account_id:form.account,category_id:cat?.id?.startsWith('local-')?null:cat?.id,transaction_type:form.type,amount:Number(form.amount),transaction_date:form.date,description:form.description,vendor_name:form.vendor,status:'confirmed',created_by:uid});if(error)setError(error.message);else{setForm(x=>({...x,amount:'',description:'',vendor:''}));await load()}setBusy(false)}
  async function doTransfer(e){e.preventDefault();if(transfer.from===transfer.to){setError('Select two different accounts.');return}setBusy(true);const uid=session.user.id;const id=crypto.randomUUID();const{error}=await supabase.from('expense_transactions').insert([{owner_id:uid,account_id:transfer.from,transaction_type:'transfer',amount:Number(transfer.amount),transaction_date:transfer.date,description:transfer.description||'Account transfer',transfer_id:id,transfer_account_id:transfer.to,status:'confirmed',created_by:uid},{owner_id:uid,account_id:transfer.to,transaction_type:'income',amount:Number(transfer.amount),transaction_date:transfer.date,description:transfer.description||'Account transfer',transfer_id:id,transfer_account_id:transfer.from,status:'confirmed',created_by:uid}]);if(error)setError(error.message);else{setTransfer({from:'',to:'',amount:'',date:today(),description:''});await load()}setBusy(false)}
- async function signOut(){await supabase.auth.signOut()}
+ async function saveAccount(e){
+ e.preventDefault();setBusy(true);setError('');
+ const {error}=await supabase.from('expense_accounts').update({
+  name:editingAccount.name,bank_name:editingAccount.account_type==='bank'?editingAccount.bank_name:null,
+  account_last4:editingAccount.account_last4||null,opening_balance:Number(editingAccount.opening_balance)||0,
+  upi_id:editingAccount.account_type==='upi'?editingAccount.upi_id||null:null,
+  payment_app:editingAccount.account_type==='upi'?editingAccount.payment_app||null:null
+ }).eq('id',editingAccount.id).eq('owner_id',session.user.id);
+ if(error)setError(error.message);else{setEditingAccount(null);await load()}setBusy(false)
+}
+async function saveCategory(e){
+ e.preventDefault();setBusy(true);setError('');
+ const name=editingCategory.name.trim();
+ if(!name){setError('Category name is required.');setBusy(false);return}
+ const {error}=await supabase.from('expense_categories').update({name}).eq('id',editingCategory.id).eq('owner_id',session.user.id);
+ if(error)setError(error.message);else{setEditingCategory(null);await load()}setBusy(false)
+}
+async function addCategory(e){
+ e.preventDefault();const name=newCategory.trim();if(!name)return;setBusy(true);setError('');
+ const type=newCategory.type||'expense';
+ const {error}=await supabase.from('expense_categories').insert({owner_id:session.user.id,name,category_type:type,is_active:true});
+ if(error)setError(error.message);else{setNewCategory('');await load()}setBusy(false)
+}
+async function deactivateCategory(id){
+ setBusy(true);setError('');
+ const {error}=await supabase.from('expense_categories').update({is_active:false}).eq('id',id).eq('owner_id',session.user.id);
+ if(error)setError(error.message);else await load();setBusy(false)
+}
+async function signOut(){await supabase.auth.signOut()}
  if(session===undefined)return <div className="auth"><div className="card">Loading…</div></div>
  if(!session)return <Login onLogin={setSession}/>
  return <main className="app">
   <header><div><div className="brand">UNIQUE MARKET</div><h1>Expense Manager</h1><p>Independent finance tool</p></div><button className="ghost" onClick={signOut}>Sign out</button></header>
   {error&&<div className="error banner">{error}</div>}
   <section className="stats"><div><span>Sales</span><strong>{money(sales)}</strong></div><div><span>Total Expenses</span><strong>{money(expenses)}</strong></div><div><span>Labour Payment</span><strong>{money(labour)}</strong></div><div><span>Profit</span><strong>{money(profit)}</strong></div></section>
-  <section className="accounts">{accounts.map(a=><article className="account card" key={a.id}><span>{a.account_type.toUpperCase()}</span><h3>{a.name}</h3><strong>{money(balances[a.id])}</strong><small>{a.bank_name||'Account'}</small></article>)}</section>
+  <section className="accounts">{accounts.map(a=><article className="account card" key={a.id}><span>{a.account_type.toUpperCase()}</span><h3>{a.name}</h3><strong>{money(balances[a.id])}</strong><small>{a.account_type==='upi'?(a.upi_id||'UPI ID not set'):(a.bank_name||'Account')}</small>{a.account_type==='upi'&&a.payment_app&&<small>{a.payment_app}</small>}<button className="small-btn" onClick={()=>setEditingAccount({...a})}>Edit</button></article>)}</section>
+ {editingAccount&&<section className="card edit-panel"><h2>Edit {editingAccount.account_type==='upi'?'UPI':'Bank/Cash'} account</h2><form onSubmit={saveAccount} className="form">
+  <input placeholder="Account name" value={editingAccount.name||''} onChange={e=>setEditingAccount({...editingAccount,name:e.target.value})} required/>
+  {editingAccount.account_type==='bank'&&<><input placeholder="Bank name" value={editingAccount.bank_name||''} onChange={e=>setEditingAccount({...editingAccount,bank_name:e.target.value})}/><input placeholder="Last 4 account digits" maxLength="4" value={editingAccount.account_last4||''} onChange={e=>setEditingAccount({...editingAccount,account_last4:e.target.value.replace(/\D/g,'').slice(0,4)})}/></>}
+  {editingAccount.account_type==='upi'&&<><input placeholder="UPI ID (example@upi)" value={editingAccount.upi_id||''} onChange={e=>setEditingAccount({...editingAccount,upi_id:e.target.value})}/><input placeholder="Payment app (GPay / PhonePe / Paytm)" value={editingAccount.payment_app||''} onChange={e=>setEditingAccount({...editingAccount,payment_app:e.target.value})}/></>}
+  <input type="number" step="0.01" placeholder="Opening balance ₹" value={editingAccount.opening_balance??0} onChange={e=>setEditingAccount({...editingAccount,opening_balance:e.target.value})}/>
+  <div className="button-row"><button disabled={busy}>Save changes</button><button type="button" className="ghost" onClick={()=>setEditingAccount(null)}>Cancel</button></div>
+ </form></section>
   <div className="grid">
    <section className="card"><h2>Add transaction</h2><form onSubmit={addTx} className="form">
     <select value={form.type} onChange={e=>setForm({...form,type:e.target.value,category:e.target.value==='income'?'Sales':'Expense'})}><option value="expense">Expense</option><option value="income">Sale / Income</option></select>
@@ -94,6 +129,7 @@ function App(){
     <button disabled={busy}>Transfer</button>
    </form><p className="hint">Transfers are excluded from profit and expense calculations.</p></section>
   </div>
+  <section className="card category-manager"><h2>Expense categories</h2><div className="category-add"><input placeholder="New expense category" value={newCategory} onChange={e=>setNewCategory(e.target.value)}/><button onClick={addCategory} disabled={busy}>Add</button></div><div className="category-list">{categories.filter(c=>c.category_type==='expense').map(c=><div className="category-row" key={c.id}><span>{c.name}</span><div><button className="small-btn" onClick={()=>setEditingCategory({...c})}>Edit</button><button className="danger-btn" onClick={()=>deactivateCategory(c.id)} disabled={busy}>Hide</button></div></div>)}</div>{editingCategory&&<form onSubmit={saveCategory} className="form category-edit"><input value={editingCategory.name} onChange={e=>setEditingCategory({...editingCategory,name:e.target.value})} required/><div className="button-row"><button disabled={busy}>Save category</button><button type="button" className="ghost" onClick={()=>setEditingCategory(null)}>Cancel</button></div></form>}</section>
   <section className="card"><div className="section-head"><h2>Monthly profit report</h2><input type="month" value={month} onChange={e=>setMonth(e.target.value)}/></div><div className="report"><div><span>Sales</span><b>{money(sales)}</b></div><div><span>Expenses</span><b>{money(expenses)}</b></div><div><span>Labour</span><b>{money(labour)}</b></div><div><span>Profit</span><b>{money(profit)}</b></div></div></section>
   <section className="card"><div className="section-head"><h2>Recent transactions</h2></div><div className="table-wrap"><table><thead><tr><th>Date</th><th>Type</th><th>Category</th><th>Description</th><th>Party</th><th>Amount</th></tr></thead><tbody>{tx.slice(0,30).map(t=><tr key={t.id}><td>{t.transaction_date}</td><td>{t.transaction_type}</td><td>{categories.find(c=>c.id===t.category_id)?.name||'Transfer'}</td><td>{t.description||'—'}</td><td>{t.vendor_name||'—'}</td><td>{money(t.amount)}</td></tr>)}</tbody></table></div></section>
  </main>
