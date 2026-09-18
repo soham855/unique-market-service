@@ -20,6 +20,35 @@ function App(){
  async function load(){
   setError('')
   const uid=session.user.id
+
+  // First-login setup: create the user's own 5 bank accounts + Cash + UPI and default categories.
+  const {data:existingAccounts,error:accountCheckError}=await supabase.from('expense_accounts').select('id').eq('owner_id',uid).limit(1)
+  if(accountCheckError){setError(accountCheckError.message);return}
+  if(!existingAccounts?.length){
+   const starterAccounts=[
+    {name:'Bank Account 1',account_type:'bank',bank_name:'Bank 1'},
+    {name:'Bank Account 2',account_type:'bank',bank_name:'Bank 2'},
+    {name:'Bank Account 3',account_type:'bank',bank_name:'Bank 3'},
+    {name:'Bank Account 4',account_type:'bank',bank_name:'Bank 4'},
+    {name:'Bank Account 5',account_type:'bank',bank_name:'Bank 5'},
+    {name:'Cash',account_type:'cash',bank_name:null},
+    {name:'UPI',account_type:'upi',bank_name:null}
+   ].map(x=>({...x,owner_id:uid,opening_balance:0,is_active:true}))
+   const {error}=await supabase.from('expense_accounts').insert(starterAccounts)
+   if(error){setError(error.message);return}
+  }
+
+  const {data:existingCategories,error:categoryCheckError}=await supabase.from('expense_categories').select('name').eq('owner_id',uid)
+  if(categoryCheckError){setError(categoryCheckError.message);return}
+  const existingNames=new Set((existingCategories||[]).map(x=>x.name.toLowerCase()))
+  const starterCategories=defaultCategories.filter(name=>!existingNames.has(name.toLowerCase())).map(name=>({
+   owner_id:uid,name,category_type:['Sales','Other Income'].includes(name)?'income':'expense',is_active:true
+  }))
+  if(starterCategories.length){
+   const {error}=await supabase.from('expense_categories').insert(starterCategories)
+   if(error){setError(error.message);return}
+  }
+
   const [{data:a,error:ae},{data:t,error:te},{data:c,error:ce}]=await Promise.all([
    supabase.from('expense_accounts').select('*').eq('owner_id',uid).eq('is_active',true).order('created_at'),
    supabase.from('expense_transactions').select('*').eq('owner_id',uid).neq('status','cancelled').order('transaction_date',{ascending:false}),
