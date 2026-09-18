@@ -38,7 +38,6 @@ import ServicePortalAnimation from './components/ServicePortalAnimation'
 import CustomerAmcDetails from './components/CustomerAmcDetails'
 import NetworkAITool from './components/NetworkAITool'
 import TrackService from './components/TrackService'
-import ExpenseManager from './components/ExpenseManager'
 const publicSeoPaths=Object.keys(localSeoPages)
 function App(){
  const pathname=window.location.pathname.replace(/\/$/,'')
@@ -59,7 +58,6 @@ function App(){
  if(!activeModule){content=<RoleDashboard profile={profile} onSelectModule={setActiveModule}/>}
  else if(admin&&selected==='User Accounts'){content=<AdminAccountManager onBack={()=>setActiveModule(null)}/>}
  else if(admin&&selected==='Technicians'){content=<TechnicianAdmin onBack={()=>setActiveModule(null)}/>}
- else if(admin&&selected==='Expenses'){content=<ExpenseManager profile={profile} onBack={()=>setActiveModule(null)}/>}
  else if(isTechnicianRequest){content=<TechnicianRequest profile={profile} onBack={()=>setActiveModule(null)}/>}
  else if(isTechnicianServiceHistory){content=<TechnicianServiceHistory profile={profile} onBack={()=>setActiveModule(null)}/>}
  else if(isTechnicianComplaints){content=<TechnicianModule profile={profile} mode={isTodayVisits?'today':selected==='Find Complaint'?'find':'assigned'} onBack={()=>setActiveModule(null)}/>}
