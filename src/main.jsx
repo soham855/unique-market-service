@@ -36,7 +36,7 @@ import CompanyLandingPage from './components/CompanyLandingPage'
 import WhyChooseUniqueMarket from './components/WhyChooseUniqueMarket'
 import NextGenSecuritySystems from './components/NextGenSecuritySystems'
 import ServicePortalAnimation from './components/ServicePortalAnimation'
-import CustomerAmcDetails from './components/CustomerAmcDetails'
+import CustomerAmcDetails from './components/CustomerAmcDetails'\nimport CustomerAIAssistant from './components/CustomerAIAssistant'
 import NetworkAITool from './components/NetworkAITool'
 import TrackService from './components/TrackService'
 const publicSeoPaths=Object.keys(localSeoPages)
@@ -65,7 +65,7 @@ function App(){
  else if(isTechnicianServiceHistory){content=<TechnicianServiceHistory profile={profile} onBack={()=>setActiveModule(null)}/>}
  else if(isTechnicianComplaints){content=<TechnicianModule profile={profile} mode={isTodayVisits?'today':selected==='Find Complaint'?'find':'assigned'} onBack={()=>setActiveModule(null)}/>}
  else if(isFindComplaint){content=<ComplaintSearch profile={profile} onBack={()=>setActiveModule(null)}/>}
- else if(isCustomerAmc){content=<CustomerAmcDetails profile={profile} onBack={()=>setActiveModule(null)}/>}
+ else if(isCustomerAIAssistant){content=<CustomerAIAssistant profile={profile} onBack={()=>setActiveModule(null)}/>}\n else if(isCustomerAmc){content=<CustomerAmcDetails profile={profile} onBack={()=>setActiveModule(null)}/>}
  else if(isCustomerProfile){content=<CustomerProfile profile={profile} onBack={()=>setActiveModule(null)} onSaved={setProfile}/>}
  else if(isServiceHistory&&customer){content=<section className='role-dashboard'><button className='secondary' type='button' onClick={()=>setActiveModule(null)}>← Back to Dashboard</button><CustomerServiceHistory profile={profile}/></section>}
  else if(isMyComplaints){content=<section className='role-dashboard'><button className='secondary' type='button' onClick={()=>setActiveModule(null)}>← Back to Dashboard</button><CustomerComplaintModule profile={profile} activeModule='My Complaints' onSubmitted={()=>setActiveModule('__MY_COMPLAINTS__')}/></section>}
