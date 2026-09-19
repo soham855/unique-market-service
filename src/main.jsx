@@ -38,6 +38,8 @@ import NextGenSecuritySystems from './components/NextGenSecuritySystems'
 import ServicePortalAnimation from './components/ServicePortalAnimation'
 import CustomerAmcDetails from './components/CustomerAmcDetails'
 import CustomerAIAssistant from './components/CustomerAIAssistant'
+import ServiceReportModule from './components/ServiceReportModule'
+import CustomerReferral from './components/CustomerReferral'
 import NetworkAITool from './components/NetworkAITool'
 import TrackService from './components/TrackService'
 const publicSeoPaths=Object.keys(localSeoPages)
@@ -57,7 +59,7 @@ function App(){
  if(!session)return <Login onLogin={setSession}/>
  if(profileError)return <main className='auth-shell'><div className='login-card'><p className='eyebrow'>UNIQUE MARKET</p><h1>Profile setup required</h1><p className='error'>{profileError}</p><button type='button' onClick={signOut}>Sign out</button></div></main>
  if(!profile)return <main className='auth-shell'><div className='login-card'><p className='eyebrow'>UNIQUE MARKET</p><h1>Loading profile…</h1></div></main>
- const admin=profile.role==='admin',technician=profile.role==='technician',customer=profile.role==='customer',selected=String(activeModule||'').trim(),isMyComplaints=customer&&(selected==='__MY_COMPLAINTS__'||selected.toLowerCase()==='my complaints'),isRaiseComplaint=customer&&selected.toLowerCase()==='raise complaint',isServiceHistory=selected.toLowerCase()==='service history',isCustomerProfile=(customer||technician)&&selected.toLowerCase()==='my profile',isCustomerAmc=customer&&selected.toLowerCase()==='amc details',isCustomerAIAssistant=customer&&selected.toLowerCase()==='ai service assistant',isFindComplaint=(admin||technician)&&selected==='Find Complaint',isTodayVisits=technician&&selected==="Today's Visits",isTechnicianServiceHistory=technician&&selected==='Service History',isTechnicianRequest=technician&&selected==='Raise Request',isTechnicianComplaints=technician&&(selected==='My Assigned Complaints'||selected==='Find Complaint'||isTodayVisits),complaint=selected==='Complaints'||isRaiseComplaint||isMyComplaints
+ const admin=profile.role==='admin',technician=profile.role==='technician',customer=profile.role==='customer',selected=String(activeModule||'').trim(),isMyComplaints=customer&&(selected==='__MY_COMPLAINTS__'||selected.toLowerCase()==='my complaints'),isRaiseComplaint=customer&&selected.toLowerCase()==='raise complaint',isServiceHistory=selected.toLowerCase()==='service history',isCustomerProfile=(customer||technician)&&selected.toLowerCase()==='my profile',isCustomerAmc=customer&&selected.toLowerCase()==='amc details',isCustomerAIAssistant=customer&&selected.toLowerCase()==='ai service assistant',isServiceReport=technician&&selected==='Complete Service Report',isReferral=customer&&selected==='Referral System',isFindComplaint=(admin||technician)&&selected==='Find Complaint',isTodayVisits=technician&&selected==="Today's Visits",isTechnicianServiceHistory=technician&&selected==='Service History',isTechnicianRequest=technician&&selected==='Raise Request',isTechnicianComplaints=technician&&(selected==='My Assigned Complaints'||selected==='Find Complaint'||isTodayVisits),complaint=selected==='Complaints'||isRaiseComplaint||isMyComplaints
  let content
  if(!activeModule){content=<RoleDashboard profile={profile} onSelectModule={setActiveModule}/>}
  else if(admin&&selected==='User Accounts'){content=<AdminAccountManager onBack={()=>setActiveModule(null)}/>}
@@ -66,7 +68,7 @@ function App(){
  else if(isTechnicianServiceHistory){content=<TechnicianServiceHistory profile={profile} onBack={()=>setActiveModule(null)}/>}
  else if(isTechnicianComplaints){content=<TechnicianModule profile={profile} mode={isTodayVisits?'today':selected==='Find Complaint'?'find':'assigned'} onBack={()=>setActiveModule(null)}/>}
  else if(isFindComplaint){content=<ComplaintSearch profile={profile} onBack={()=>setActiveModule(null)}/>}
- else if(isCustomerAIAssistant){content=<CustomerAIAssistant profile={profile} onBack={()=>setActiveModule(null)}/>}
+ else if(isCustomerAIAssistant){content=<CustomerAIAssistant profile={profile} onBack={()=>setActiveModule(null)}/>}\n else if(isServiceReport){content=<ServiceReportModule profile={profile} onBack={()=>setActiveModule(null)}/>}\n else if(isReferral){content=<CustomerReferral profile={profile} onBack={()=>setActiveModule(null)}/>} 
  else if(isCustomerAmc){content=<CustomerAmcDetails profile={profile} onBack={()=>setActiveModule(null)}/>}
  else if(isCustomerProfile){content=<CustomerProfile profile={profile} onBack={()=>setActiveModule(null)} onSaved={setProfile}/>}
  else if(isServiceHistory&&customer){content=<section className='role-dashboard'><button className='secondary' type='button' onClick={()=>setActiveModule(null)}>← Back to Dashboard</button><CustomerServiceHistory profile={profile}/></section>}
