@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'\nimport { Capacitor } from '@capacitor/core'\nimport { Geolocation } from '@capacitor/geolocation'
 import { jsPDF } from 'jspdf'
 import { supabase } from '../lib/supabase'
 
@@ -118,13 +118,129 @@ export default function CustomerComplaintModule({ profile, activeModule = 'Compl
 
   async function reverseGeocode(latitude, longitude) { const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&addressdetails=1`; const response = await fetch(url, { headers:{ Accept:'application/json', 'Accept-Language':'en-IN' } }); if (!response.ok) throw new Error('Address lookup failed'); const data = await response.json(); const address = data.display_name || `${latitude.toFixed(7)}, ${longitude.toFixed(7)}`; const pincode = data.address?.postcode ? `, Pincode: ${data.address.postcode}` : ''; return `${address}${pincode}` }
   async function useMyLocation() {
-    if (!navigator.geolocation) return setMessage('Precise GPS location is not supported by this browser.')
-    if (!window.isSecureContext) return setMessage('Precise GPS requires HTTPS. Please open the website using the secure HTTPS address.')
-    setLocating(true); setMessage('Getting precise GPS location… Keep Location/GPS ON and wait a few seconds.'); bestPositionRef.current = null; if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current)
-    const finish = async (position, reason = '') => { if (!position) { setLocating(false); return }; const { latitude, longitude, accuracy } = position.coords; const accuracyM = Number(accuracy); if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || !Number.isFinite(accuracyM)) { setLocating(false); setMessage('Unable to read valid GPS coordinates. Please try again.'); return }; try { const address = await reverseGeocode(latitude, longitude); setForm(f => ({ ...f, location_text:address, latitude, longitude, gps_accuracy_m:accuracyM, location_captured_at:new Date().toISOString() })); const quality = accuracyM <= 10 ? 'Excellent' : accuracyM <= 25 ? 'Good' : accuracyM <= 50 ? 'Fair' : 'Approximate'; setMessage(`GPS locked: ${latitude.toFixed(7)}, ${longitude.toFixed(7)} • Accuracy ±${Math.round(accuracyM)} m • ${quality}${reason ? ` • ${reason}` : ''}`) } catch { setForm(f => ({ ...f, location_text:`${latitude.toFixed(7)}, ${longitude.toFixed(7)}`, latitude, longitude, gps_accuracy_m:accuracyM, location_captured_at:new Date().toISOString() })); setMessage(`GPS locked: ${latitude.toFixed(7)}, ${longitude.toFixed(7)} • Accuracy ±${Math.round(accuracyM)} m. Address lookup unavailable.`) } finally { setLocating(false) } }
-    const handlePosition = position => { const accuracy = Number(position.coords.accuracy); if (!bestPositionRef.current || accuracy < bestPositionRef.current.coords.accuracy) bestPositionRef.current = position; if (accuracy <= 20) { if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; finish(bestPositionRef.current) } }
-    const handleError = error => { if (error.code === 1) { setLocating(false); setMessage('Location permission denied. Allow Location permission for this website and try again.'); return } if (error.code === 2 && !bestPositionRef.current) { setLocating(false); setMessage('GPS signal unavailable. Turn ON device Location/GPS and try again outdoors or near a window.'); return } }
-    watchIdRef.current = navigator.geolocation.watchPosition(handlePosition, handleError, { enableHighAccuracy:true, timeout:30000, maximumAge:0 }); setTimeout(() => { if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; if (bestPositionRef.current) finish(bestPositionRef.current, 'Best reading after GPS scan'); else { setLocating(false); setMessage('Could not obtain a GPS fix. Turn ON precise device location and try again.') } }, 20000)
+    setLocating(true)
+    setMessage('📡 Getting precise device GPS location… Keep Location/GPS ON.')
+
+    // Android/iOS: use Capacitor's native GPS API instead of WebView geolocation.
+    if(Capacitor.isNativePlatform()){
+      try{
+        const permission=await Geolocation.requestPermissions()
+        const locationPermission=permission?.location
+        if(locationPermission && locationPermission!=='granted'){
+          setLocating(false)
+          setMessage('Location permission denied. Allow Precise Location for Instant Services in Android Settings and try again.')
+          return
+        }
+
+        const position=await Geolocation.getCurrentPosition({
+          enableHighAccuracy:true,
+          timeout:30000,
+          maximumAge:0
+        })
+
+        const {latitude,longitude,accuracy}=position.coords
+        const accuracyM=Number(accuracy)
+        if(!Number.isFinite(latitude)||!Number.isFinite(longitude)){
+          throw new Error('Invalid GPS coordinates received.')
+        }
+
+        let address=`${latitude.toFixed(7)}, ${longitude.toFixed(7)}`
+        try{
+          address=await reverseGeocode(latitude,longitude)
+        }catch{}
+
+        setForm(f=>({
+          ...f,
+          location_text:address,
+          latitude,
+          longitude,
+          gps_accuracy_m:Number.isFinite(accuracyM)?accuracyM:null,
+          location_captured_at:new Date().toISOString()
+        }))
+
+        const quality=accuracyM<=10?'Excellent':accuracyM<=25?'Good':accuracyM<=50?'Fair':'Approximate'
+        setMessage(`GPS locked: ${latitude.toFixed(7)}, ${longitude.toFixed(7)} • Accuracy ±${Number.isFinite(accuracyM)?Math.round(accuracyM):'—'} m • ${quality}`)
+      }catch(error){
+        const code=String(error?.code||'').toLowerCase()
+        const msg=String(error?.message||'').toLowerCase()
+        if(code.includes('permission')||msg.includes('permission')){
+          setMessage('Location permission denied. Allow Precise Location for Instant Services and try again.')
+        }else if(msg.includes('location')||msg.includes('timeout')){
+          setMessage('GPS fix not available. Turn ON device Location/GPS and try again outdoors or near a window.')
+        }else{
+          setMessage('Unable to fetch device GPS. Turn ON Location and try again.')
+        }
+      }finally{
+        setLocating(false)
+      }
+      return
+    }
+
+    // Browser/Vercel fallback.
+    if(!navigator.geolocation){
+      setLocating(false)
+      setMessage('Precise GPS location is not supported by this browser.')
+      return
+    }
+    if(!window.isSecureContext){
+      setLocating(false)
+      setMessage('Precise GPS requires HTTPS. Please open the secure HTTPS address.')
+      return
+    }
+
+    bestPositionRef.current=null
+    if(watchIdRef.current!==null) navigator.geolocation.clearWatch(watchIdRef.current)
+
+    const finish=async(position,reason='')=>{
+      if(!position){setLocating(false);return}
+      const {latitude,longitude,accuracy}=position.coords
+      const accuracyM=Number(accuracy)
+      if(!Number.isFinite(latitude)||!Number.isFinite(longitude)||!Number.isFinite(accuracyM)){
+        setLocating(false)
+        setMessage('Unable to read valid GPS coordinates. Please try again.')
+        return
+      }
+      try{
+        const address=await reverseGeocode(latitude,longitude)
+        setForm(f=>({...f,location_text:address,latitude,longitude,gps_accuracy_m:accuracyM,location_captured_at:new Date().toISOString()}))
+        const quality=accuracyM<=10?'Excellent':accuracyM<=25?'Good':accuracyM<=50?'Fair':'Approximate'
+        setMessage(`GPS locked: ${latitude.toFixed(7)}, ${longitude.toFixed(7)} • Accuracy ±${Math.round(accuracyM)} m • ${quality}${reason?` • ${reason}`:''}`)
+      }catch{
+        setForm(f=>({...f,location_text:`${latitude.toFixed(7)}, ${longitude.toFixed(7)}`,latitude,longitude,gps_accuracy_m:accuracyM,location_captured_at:new Date().toISOString()}))
+        setMessage(`GPS locked: ${latitude.toFixed(7)}, ${longitude.toFixed(7)} • Accuracy ±${Math.round(accuracyM)} m`)
+      }finally{setLocating(false)}
+    }
+
+    const handlePosition=position=>{
+      const accuracy=Number(position.coords.accuracy)
+      if(!bestPositionRef.current||accuracy<Number(bestPositionRef.current.coords.accuracy)) bestPositionRef.current=position
+      if(accuracy<=20){
+        if(watchIdRef.current!==null) navigator.geolocation.clearWatch(watchIdRef.current)
+        watchIdRef.current=null
+        finish(bestPositionRef.current)
+      }
+    }
+
+    const handleError=error=>{
+      if(error.code===1){
+        setLocating(false)
+        setMessage('Location permission denied. Allow location access and try again.')
+      }else if(error.code===2&&!bestPositionRef.current){
+        setLocating(false)
+        setMessage('GPS signal unavailable. Turn ON device Location/GPS and try again outdoors or near a window.')
+      }
+    }
+
+    watchIdRef.current=navigator.geolocation.watchPosition(handlePosition,handleError,{enableHighAccuracy:true,timeout:30000,maximumAge:0})
+    setTimeout(()=>{
+      if(watchIdRef.current!==null) navigator.geolocation.clearWatch(watchIdRef.current)
+      watchIdRef.current=null
+      if(bestPositionRef.current) finish(bestPositionRef.current,'Best reading after GPS scan')
+      else{
+        setLocating(false)
+        setMessage('Could not obtain a GPS fix. Turn ON precise device location and try again.')
+      }
+    },20000)
   }
   async function createComplaint(e) {
     e.preventDefault(); setMessage(''); setLoading(true)
