@@ -21,7 +21,8 @@
     "@capacitor/haptics": "^8.0.0",
     "@capacitor/keyboard": "^8.0.0",
     "@capacitor/status-bar": "^8.0.0",
-    "@capacitor/splash-screen": "^8.0.0"
+    "@capacitor/splash-screen": "^8.0.0",
+    "jspdf": "^3.0.3"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
