@@ -43,49 +43,125 @@ export default function CustomerAIAssistant({profile,onBack}){
 
   async function toggleVoice(){
     if(typeof window === 'undefined') return
+
     if(listening){
-      try{ await SpeechRecognition.stop() }catch{}
+      try{ await SpeechRecognition.forceStop({timeout:1500}) }catch{}
       setListening(false)
       return
     }
+
     if(Capacitor.isNativePlatform()){
+      let partialListener=null
+      let segmentListener=null
+      let errorListener=null
+      let stateListener=null
+      let timer=null
+      let finished=false
+
+      const cleanup=async()=>{
+        if(timer) clearTimeout(timer)
+        for(const listener of [partialListener,segmentListener,errorListener,stateListener]){
+          try{ await listener?.remove() }catch{}
+        }
+        partialListener=segmentListener=errorListener=stateListener=null
+        setListening(false)
+      }
+
+      const acceptText=async(value)=>{
+        const clean=String(value||'').trim()
+        if(!clean || finished) return
+        finished=true
+        await cleanup()
+        analyseText(clean)
+        try{ await SpeechRecognition.forceStop({timeout:800}) }catch{}
+      }
+
       try{
         const permission=await SpeechRecognition.requestPermissions()
         if(permission?.speechRecognition!=='granted'){
           setMessage('Microphone permission is required. Please allow Microphone permission and try again.')
           return
         }
+
         const {available}=await SpeechRecognition.available()
         if(!available){
           setMessage('Speech recognition is not available on this device. Please use Type.')
           return
         }
+
         setMessage('🎙️ Listening… Marathi/English मध्ये problem सांगा.')
         setListening(true)
-        let latestText=''
-        const listener=await SpeechRecognition.addListener('partialResults',event=>{
+
+        partialListener=await SpeechRecognition.addListener('partialResults',event=>{
           const value=(event?.matches||[])[0] || event?.accumulatedText || ''
-          if(value){ latestText=value; setText(value) }
-        })
-        try{
-          const result=await SpeechRecognition.start({language:'mr-IN',maxResults:3,partialResults:true,popup:false})
-          const value=(result?.matches||[])[0] || latestText || ''
-          if(value){
-            analyseText(value)
-          }else{
-            setMessage('No speech detected. Please speak clearly and try again.')
+          if(value) {
+            setText(value)
+            acceptText(value)
           }
-        }finally{
-          await listener.remove()
-          setListening(false)
-        }
+        })
+
+        segmentListener=await SpeechRecognition.addListener('segmentResults',event=>{
+          const value=(event?.matches||[])[0] || ''
+          if(value) acceptText(value)
+        })
+
+        errorListener=await SpeechRecognition.addListener('recognitionError',event=>{
+          if(finished) return
+          const code=String(event?.error||event?.message||'').toLowerCase()
+          if(code.includes('timeout') || code.includes('no match')){
+            setMessage('No speech detected. Please speak clearly and try again.')
+          }else{
+            setMessage('Voice input failed. Please try again or use Type.')
+          }
+          cleanup()
+        })
+
+        stateListener=await SpeechRecognition.addListener('listeningState',event=>{
+          if(event?.status==='stopped' && !finished){
+            setTimeout(async()=>{
+              if(finished) return
+              const last=await SpeechRecognition.getLastPartialResult().catch(()=>({available:false}))
+              const value=last?.matches?.[0] || last?.text || ''
+              if(value) acceptText(value)
+              else{
+                setMessage('No speech detected. Please speak clearly and try again.')
+                cleanup()
+              }
+            },250)
+          }
+        })
+
+        timer=setTimeout(async()=>{
+          if(finished) return
+          const last=await SpeechRecognition.getLastPartialResult().catch(()=>({available:false}))
+          const value=last?.matches?.[0] || last?.text || ''
+          if(value) acceptText(value)
+          else{
+            setMessage('No speech detected. Please speak clearly and try again.')
+            await cleanup()
+            try{ await SpeechRecognition.forceStop({timeout:800}) }catch{}
+          }
+        },12000)
+
+        // IMPORTANT: with partialResults=true, start() resolves immediately.
+        // The transcript arrives through the listeners above.
+        await SpeechRecognition.start({
+          language:'mr-IN',
+          maxResults:3,
+          partialResults:true,
+          popup:false,
+          allowForSilence:4000
+        })
       }catch(error){
-        setListening(false)
-        const msg=String(error?.message||'')
-        setMessage(msg.includes('permission')?'Microphone permission is required. Please allow Microphone permission and try again.':'Voice input failed. Please try again or use Type.')
+        await cleanup()
+        const msg=String(error?.message||'').toLowerCase()
+        setMessage(msg.includes('permission')
+          ? 'Microphone permission is required. Please allow Microphone permission and try again.'
+          : 'Voice input failed. Please try again or use Type.')
       }
       return
     }
+
     const Recognition=window.SpeechRecognition || window.webkitSpeechRecognition
     if(!Recognition){
       setMessage('Voice input is not supported on this browser. Please use Type.')
