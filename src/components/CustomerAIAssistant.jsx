@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Capacitor } from '@capacitor/core'
 import { SpeechRecognition } from '@capgo/capacitor-speech-recognition'
 import { supabase } from '../lib/supabase'
@@ -45,7 +45,11 @@ export default function CustomerAIAssistant({profile,onBack}){
     if(typeof window === 'undefined') return
 
     if(listening){
-      try{ await SpeechRecognition.forceStop({timeout:1500}) }catch{}
+      if(Capacitor.isNativePlatform()){
+        try{ await SpeechRecognition.forceStop({timeout:1500}) }catch{}
+      }else{
+        try{ window.__umSpeechRecognition?.stop?.() }catch{}
+      }
       setListening(false)
       return
     }
@@ -57,6 +61,24 @@ export default function CustomerAIAssistant({profile,onBack}){
       let stateListener=null
       let timer=null
       let finished=false
+      let transcript=''
+
+      const mergeTranscript=(value)=>{
+        const clean=String(value||'').trim()
+        if(!clean) return transcript
+        if(!transcript) transcript=clean
+        else if(clean===transcript || transcript.includes(clean)) {
+          // Keep the already accumulated transcript.
+        }else if(clean.startsWith(transcript)) {
+          transcript=clean
+        }else if(transcript.startsWith(clean)) {
+          // Keep the longer existing value.
+        }else{
+          transcript=(transcript+' '+clean).replace(/\\s+/g,' ').trim()
+        }
+        setText(transcript)
+        return transcript
+      }
 
       const cleanup=async()=>{
         if(timer) clearTimeout(timer)
@@ -67,13 +89,18 @@ export default function CustomerAIAssistant({profile,onBack}){
         setListening(false)
       }
 
-      const acceptText=async(value)=>{
-        const clean=String(value||'').trim()
-        if(!clean || finished) return
+      const finishRecognition=async(fallback='')=>{
+        if(finished) return
+        const value=mergeTranscript(fallback).trim()
+        if(!value){
+          const last=await SpeechRecognition.getLastPartialResult().catch(()=>({}))
+          mergeTranscript(last?.accumulatedText||last?.text||last?.matches?.[0]||'')
+        }
+        const finalText=transcript.trim()
+        if(!finalText) return
         finished=true
         await cleanup()
-        analyseText(clean)
-        try{ await SpeechRecognition.forceStop({timeout:800}) }catch{}
+        analyseText(finalText)
       }
 
       try{
@@ -89,20 +116,19 @@ export default function CustomerAIAssistant({profile,onBack}){
           return
         }
 
-        setMessage('🎙️ Listening… Marathi/English मध्ये problem सांगा.')
+        transcript=''
+        setText('')
+        setMessage('🎙️ Listening… Marathi/English मध्ये पूर्ण problem सांगा.')
         setListening(true)
 
         partialListener=await SpeechRecognition.addListener('partialResults',event=>{
-          const value=(event?.matches||[])[0] || event?.accumulatedText || ''
-          if(value) {
-            setText(value)
-            acceptText(value)
-          }
+          const value=event?.accumulatedText || event?.matches?.[0] || ''
+          if(value) mergeTranscript(value)
         })
 
         segmentListener=await SpeechRecognition.addListener('segmentResults',event=>{
-          const value=(event?.matches||[])[0] || ''
-          if(value) acceptText(value)
+          const value=event?.accumulatedText || event?.matches?.[0] || ''
+          if(value) mergeTranscript(value)
         })
 
         errorListener=await SpeechRecognition.addListener('recognitionError',event=>{
@@ -116,41 +142,28 @@ export default function CustomerAIAssistant({profile,onBack}){
           cleanup()
         })
 
-        stateListener=await SpeechRecognition.addListener('listeningState',event=>{
+        stateListener=await SpeechRecognition.addListener('listeningState',async event=>{
           if(event?.status==='stopped' && !finished){
-            setTimeout(async()=>{
-              if(finished) return
-              const last=await SpeechRecognition.getLastPartialResult().catch(()=>({available:false}))
-              const value=last?.matches?.[0] || last?.text || ''
-              if(value) acceptText(value)
-              else{
-                setMessage('No speech detected. Please speak clearly and try again.')
-                cleanup()
-              }
-            },250)
+            await finishRecognition()
           }
         })
 
         timer=setTimeout(async()=>{
           if(finished) return
-          const last=await SpeechRecognition.getLastPartialResult().catch(()=>({available:false}))
-          const value=last?.matches?.[0] || last?.text || ''
-          if(value) acceptText(value)
-          else{
-            setMessage('No speech detected. Please speak clearly and try again.')
+          try{ await SpeechRecognition.forceStop({timeout:1000}) }catch{}
+          await finishRecognition()
+          if(!finished && !transcript.trim()){
             await cleanup()
-            try{ await SpeechRecognition.forceStop({timeout:800}) }catch{}
+            setMessage('No speech detected. Please speak clearly and try again.')
           }
-        },12000)
+        },30000)
 
-        // IMPORTANT: with partialResults=true, start() resolves immediately.
-        // The transcript arrives through the listeners above.
         await SpeechRecognition.start({
           language:'mr-IN',
           maxResults:3,
           partialResults:true,
           popup:false,
-          allowForSilence:4000
+          allowForSilence:2500
         })
       }catch(error){
         await cleanup()
@@ -167,19 +180,48 @@ export default function CustomerAIAssistant({profile,onBack}){
       setMessage('Voice input is not supported on this browser. Please use Type.')
       return
     }
+
     const recognition=new Recognition()
+    let transcript=''
+    const mergeBrowser=(value)=>{
+      const clean=String(value||'').trim()
+      if(!clean) return
+      if(!transcript) transcript=clean
+      else if(clean===transcript || transcript.includes(clean)){}
+      else if(clean.startsWith(transcript)) transcript=clean
+      else if(transcript.startsWith(clean)){}
+      else transcript=(transcript+' '+clean).replace(/\\s+/g,' ').trim()
+      setText(transcript)
+    }
+
+    window.__umSpeechRecognition=recognition
     recognition.lang='mr-IN'
     recognition.interimResults=true
-    recognition.continuous=false
-    recognition.onstart=()=>{setListening(true);setMessage('🎙️ Listening… Marathi/English मध्ये problem सांगा.')}
-    recognition.onresult=e=>{
-      let value=''
-      for(let i=e.resultIndex;i<e.results.length;i++) value+=e.results[i][0].transcript
-      if(value.trim()) analyseText(value)
+    recognition.continuous=true
+    recognition.onstart=()=>{
+      setListening(true)
+      setMessage('🎙️ Listening… Marathi/English मध्ये पूर्ण problem सांगा.')
     }
-    recognition.onerror=()=>{setListening(false);setMessage('Voice input failed. Please try again or use Type.')}
-    recognition.onend=()=>setListening(false)
-    try{recognition.start()}catch{setListening(false);setMessage('Voice input failed. Please try again or use Type.')}
+    recognition.onresult=e=>{
+      for(let i=e.resultIndex;i<e.results.length;i++) mergeBrowser(e.results[i][0].transcript)
+    }
+    recognition.onerror=()=>{
+      setListening(false)
+      setMessage('Voice input failed. Please try again or use Type.')
+    }
+    recognition.onend=()=>{
+      setListening(false)
+      const finalText=transcript.trim()
+      if(finalText) analyseText(finalText)
+      else setMessage('No speech detected. Please speak clearly and try again.')
+      if(window.__umSpeechRecognition===recognition) delete window.__umSpeechRecognition
+    }
+    try{
+      recognition.start()
+    }catch{
+      setListening(false)
+      setMessage('Voice input failed. Please try again or use Type.')
+    }
   }
 
   const diagnosis=useMemo(()=>classify(text),[text])
