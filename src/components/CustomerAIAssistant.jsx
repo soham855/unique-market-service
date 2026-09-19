@@ -20,7 +20,7 @@ export default function CustomerAIAssistant({profile,onBack}){
   const [conversation,setConversation]=useState([])
   const [result,setResult]=useState(null)
   const [loading,setLoading]=useState(false)
-  const [message,setMessage]=useState('')
+  const [message,setMessage]=useState('')\n  const [listening,setListening]=useState(false)\n  const [speechSupported,setSpeechSupported]=useState(false)\n\n  useState(()=>{ setSpeechSupported(typeof window !== 'undefined' && ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) })\n\n  function toggleVoice(){\n    if(typeof window === 'undefined') return\n    const Recognition=window.SpeechRecognition || window.webkitSpeechRecognition\n    if(!Recognition){ setMessage('Voice input is not supported on this device/browser. Please use Type.') ; return }\n    if(listening){ setListening(false); return }\n    const recognition=new Recognition()\n    recognition.lang='mr-IN'\n    recognition.interimResults=true\n    recognition.continuous=false\n    recognition.onstart=()=>{setListening(true);setMessage('🎙️ Listening… Marathi/English मध्ये problem सांगा.')}\n    recognition.onresult=e=>{let value='';for(let i=e.resultIndex;i<e.results.length;i++) value+=e.results[i][0].transcript;setText(value)}\n    recognition.onerror=e=>{setListening(false);setMessage('Voice input failed. Please try again or use Type.')}\n    recognition.onend=()=>setListening(false)\n    recognition.start()\n  }
 
   const diagnosis=useMemo(()=>classify(text),[text])
 
