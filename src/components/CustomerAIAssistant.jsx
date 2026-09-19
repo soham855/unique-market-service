@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Capacitor } from '@capacitor/core'
+import { SpeechRecognition } from '@capgo/capacitor-speech-recognition'
 import { supabase } from '../lib/supabase'
 
 const rules = [
@@ -25,18 +27,63 @@ export default function CustomerAIAssistant({profile,onBack}){
   const [speechSupported,setSpeechSupported]=useState(false)
 
   useEffect(()=>{
-    setSpeechSupported(typeof window !== 'undefined' && ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window))
+    let mounted=true
+    ;(async()=>{
+      try{
+        if(Capacitor.isNativePlatform()){
+          const {available}=await SpeechRecognition.available()
+          if(mounted) setSpeechSupported(Boolean(available))
+        }else{
+          if(mounted) setSpeechSupported(typeof window !== 'undefined' && ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window))
+        }
+      }catch{ if(mounted) setSpeechSupported(false) }
+    })()
+    return()=>{mounted=false}
   },[])
 
-  function toggleVoice(){
+  async function toggleVoice(){
     if(typeof window === 'undefined') return
-    const Recognition=window.SpeechRecognition || window.webkitSpeechRecognition
-    if(!Recognition){
-      setMessage('Voice input is not supported on this device/browser. Please use Type.')
+    if(listening){
+      try{ await SpeechRecognition.stop() }catch{}
+      setListening(false)
       return
     }
-    if(listening){
-      setListening(false)
+    if(Capacitor.isNativePlatform()){
+      try{
+        const permission=await SpeechRecognition.requestPermissions()
+        if(permission?.speechRecognition!=='granted'){
+          setMessage('Microphone permission is required. Please allow Microphone permission and try again.')
+          return
+        }
+        const {available}=await SpeechRecognition.available()
+        if(!available){
+          setMessage('Speech recognition is not available on this device. Please use Type.')
+          return
+        }
+        setMessage('🎙️ Listening… Marathi/English मध्ये problem सांगा.')
+        setListening(true)
+        const listener=await SpeechRecognition.addListener('partialResults',event=>{
+          const value=(event?.matches||[])[0] || event?.accumulatedText || ''
+          if(value) setText(value)
+        })
+        try{
+          const result=await SpeechRecognition.start({language:'mr-IN',maxResults:3,partialResults:true,popup:false})
+          const value=(result?.matches||[])[0]
+          if(value) setText(value)
+        }finally{
+          await listener.remove()
+          setListening(false)
+        }
+      }catch(error){
+        setListening(false)
+        const msg=String(error?.message||'')
+        setMessage(msg.includes('permission')?'Microphone permission is required. Please allow Microphone permission and try again.':'Voice input failed. Please try again or use Type.')
+      }
+      return
+    }
+    const Recognition=window.SpeechRecognition || window.webkitSpeechRecognition
+    if(!Recognition){
+      setMessage('Voice input is not supported on this browser. Please use Type.')
       return
     }
     const recognition=new Recognition()
@@ -51,7 +98,7 @@ export default function CustomerAIAssistant({profile,onBack}){
     }
     recognition.onerror=()=>{setListening(false);setMessage('Voice input failed. Please try again or use Type.')}
     recognition.onend=()=>setListening(false)
-    recognition.start()
+    try{recognition.start()}catch{setListening(false);setMessage('Voice input failed. Please try again or use Type.')}
   }
 
   const diagnosis=useMemo(()=>classify(text),[text])
