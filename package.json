@@ -22,7 +22,8 @@
     "@capacitor/keyboard": "^8.0.0",
     "@capacitor/status-bar": "^8.0.0",
     "@capacitor/splash-screen": "^8.0.0",
-    "jspdf": "^3.0.3"
+    "jspdf": "^3.0.3",
+    "@capgo/capacitor-speech-recognition": "^8.0.0"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
