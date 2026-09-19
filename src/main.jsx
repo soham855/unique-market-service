@@ -68,7 +68,9 @@ function App(){
  else if(isTechnicianServiceHistory){content=<TechnicianServiceHistory profile={profile} onBack={()=>setActiveModule(null)}/>}
  else if(isTechnicianComplaints){content=<TechnicianModule profile={profile} mode={isTodayVisits?'today':selected==='Find Complaint'?'find':'assigned'} onBack={()=>setActiveModule(null)}/>}
  else if(isFindComplaint){content=<ComplaintSearch profile={profile} onBack={()=>setActiveModule(null)}/>}
- else if(isCustomerAIAssistant){content=<CustomerAIAssistant profile={profile} onBack={()=>setActiveModule(null)}/>}\n else if(isServiceReport){content=<ServiceReportModule profile={profile} onBack={()=>setActiveModule(null)}/>}\n else if(isReferral){content=<CustomerReferral profile={profile} onBack={()=>setActiveModule(null)}/>} 
+ else if(isCustomerAIAssistant){content=<CustomerAIAssistant profile={profile} onBack={()=>setActiveModule(null)}/>}
+ else if(isServiceReport){content=<ServiceReportModule profile={profile} onBack={()=>setActiveModule(null)}/>}
+ else if(isReferral){content=<CustomerReferral profile={profile} onBack={()=>setActiveModule(null)}/>} 
  else if(isCustomerAmc){content=<CustomerAmcDetails profile={profile} onBack={()=>setActiveModule(null)}/>}
  else if(isCustomerProfile){content=<CustomerProfile profile={profile} onBack={()=>setActiveModule(null)} onSaved={setProfile}/>}
  else if(isServiceHistory&&customer){content=<section className='role-dashboard'><button className='secondary' type='button' onClick={()=>setActiveModule(null)}>← Back to Dashboard</button><CustomerServiceHistory profile={profile}/></section>}
