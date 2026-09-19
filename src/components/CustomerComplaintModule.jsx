@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from 'react'\nimport { Capacitor } from '@capacitor/core'\nimport { Geolocation } from '@capacitor/geolocation'
+import { useEffect, useRef, useState } from 'react'
+import { Capacitor } from '@capacitor/core'
+import { Geolocation } from '@capacitor/geolocation'
 import { jsPDF } from 'jspdf'
 import { supabase } from '../lib/supabase'
 
