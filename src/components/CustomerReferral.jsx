@@ -25,7 +25,7 @@ export default function CustomerReferral({profile,onBack}){
   const {data:admins}=await supabase.from('profiles').select('id').eq('role','admin')
   if(admins?.length){
     const message=`${customer?.name||'Customer'} referred ${name.trim()} (${mobile.trim()})${company.trim()?' • '+company.trim():''}. Reward: ${payload.reward_text}.`
-    await supabase.from('notifications').insert(admins.map(a=>({user_id:a.id,title:'🎁 New Customer Referral',message,type:'customer_referral',referral_id:referral?.id||null})))
+    await supabase.from('notifications').insert(admins.map(a=>({user_id:a.id,title:'🎁 New Customer Referral',message,type:'customer_referral'})))
   }
   setName('');setMobile('');setCompany('');setMessage('Referral submitted successfully. Admin has been notified.');await load()
  }
