@@ -1,0 +1,13 @@
+.referral-panel{position:relative}
+.referral-hero-card,.referral-submit-card,.referral-code-card{border:1px solid rgba(148,163,184,.16);background:linear-gradient(145deg,rgba(30,41,59,.82),rgba(15,23,42,.76));box-shadow:inset 0 1px 0 rgba(255,255,255,.045),0 18px 45px rgba(0,0,0,.18);backdrop-filter:blur(18px);border-radius:22px}
+.referral-hero-card{display:flex;align-items:center;gap:16px;padding:20px;margin:18px 0}
+.referral-hero-icon{width:54px;height:54px;display:grid;place-items:center;border-radius:16px;background:rgba(214,179,106,.12);border:1px solid rgba(214,179,106,.28);font-size:27px}
+.referral-eyebrow{font-size:10px;letter-spacing:.16em;font-weight:900;color:#d6b36a}
+.referral-hero-card h3{margin:4px 0 3px;color:#f8fafc;font-size:20px}.referral-hero-card p{margin:0;color:#94a3b8;font-size:12px}
+.referral-code-card{display:flex;justify-content:space-between;align-items:center;gap:15px;padding:16px 18px;margin:16px 0}
+.referral-code-card span,.referral-code-card strong{display:block}.referral-code-card span{font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.12em}.referral-code-card strong{font-size:24px;color:#d6b36a;letter-spacing:.08em;margin-top:3px}
+.referral-submit-card{padding:20px;margin:18px 0}.referral-card-title{display:flex;align-items:center;gap:12px;margin-bottom:18px}.referral-card-title>span{width:40px;height:40px;display:grid;place-items:center;border-radius:12px;background:rgba(34,211,238,.09);font-size:19px}.referral-card-title strong,.referral-card-title small{display:block}.referral-card-title strong{color:#f8fafc;font-size:15px}.referral-card-title small{color:#7f8da3;font-size:11px;margin-top:3px}
+.referral-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px}.referral-grid label{color:#cbd5e1;font-size:11px;font-weight:800}.referral-grid label em{font-style:normal;color:#64748b;font-weight:600;margin-left:4px}.referral-grid input{width:100%;box-sizing:border-box;margin-top:7px;padding:12px 13px;border-radius:12px;border:1px solid rgba(148,163,184,.18);background:rgba(2,6,23,.42);color:#f8fafc;outline:none}.referral-grid input:focus{border-color:rgba(34,211,238,.55);box-shadow:0 0 0 3px rgba(34,211,238,.08)}
+.referral-submit-btn{margin-top:17px!important;width:100%;display:flex;justify-content:center;align-items:center;gap:10px;font-weight:900}.referral-submit-btn span{font-size:18px}
+.referral-panel .referral-rules,.referral-panel .referral-history{display:grid;gap:12px}
+@media(max-width:700px){.referral-grid{grid-template-columns:1fr}.referral-hero-card{align-items:flex-start}.referral-code-card{align-items:flex-start}.referral-code-card button{white-space:nowrap}}
