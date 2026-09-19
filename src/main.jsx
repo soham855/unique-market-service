@@ -1,6 +1,7 @@
 import React,{useEffect,useState} from 'react'
 import {createRoot} from 'react-dom/client'
 import {App as CapacitorApp} from '@capacitor/app'
+import {Capacitor} from '@capacitor/core'
 import './styles.css'
 import './premium-portal.css'
 import './unique-ui.css'
@@ -41,7 +42,9 @@ import TrackService from './components/TrackService'
 const publicSeoPaths=Object.keys(localSeoPages)
 function App(){
  const pathname=window.location.pathname.replace(/\/$/,'')
- if(pathname===''||pathname==='/home') return <><CompanyLandingPage/><WhyChooseUniqueMarket/><NextGenSecuritySystems/><ServicePortalAnimation/><a href="/track-service" style={{position:'fixed',right:18,bottom:18,zIndex:9999,padding:'13px 18px',borderRadius:999,background:'linear-gradient(135deg,#67e8f9,#22d3ee)',color:'#031018',fontWeight:900,fontSize:12,textDecoration:'none',boxShadow:'0 10px 35px rgba(34,211,238,.25)'}}>Track Service</a></>
+ const isNativeApp=Capacitor.isNativePlatform()
+ // Keep the public landing page on the website, but make the Android/iOS app open directly on the login portal.
+ if(!isNativeApp && (pathname===''||pathname==='/home')) return <><CompanyLandingPage/><WhyChooseUniqueMarket/><NextGenSecuritySystems/><ServicePortalAnimation/><a href="/track-service" style={{position:'fixed',right:18,bottom:18,zIndex:9999,padding:'13px 18px',borderRadius:999,background:'linear-gradient(135deg,#67e8f9,#22d3ee)',color:'#031018',fontWeight:900,fontSize:12,textDecoration:'none',boxShadow:'0 10px 35px rgba(34,211,238,.25)'}}>Track Service</a></>
  if(pathname==='/track-service') return <TrackService/>
  if(pathname==='/network-ai') return <NetworkAITool onBack={()=>{window.location.href='/'}}/>
  if(publicSeoPaths.includes(pathname)) return <LocalSeoPage/>
