@@ -62,14 +62,19 @@ export default function CustomerAIAssistant({profile,onBack}){
         }
         setMessage('🎙️ Listening… Marathi/English मध्ये problem सांगा.')
         setListening(true)
+        let latestText=''
         const listener=await SpeechRecognition.addListener('partialResults',event=>{
           const value=(event?.matches||[])[0] || event?.accumulatedText || ''
-          if(value) setText(value)
+          if(value){ latestText=value; setText(value) }
         })
         try{
           const result=await SpeechRecognition.start({language:'mr-IN',maxResults:3,partialResults:true,popup:false})
-          const value=(result?.matches||[])[0]
-          if(value) setText(value)
+          const value=(result?.matches||[])[0] || latestText || ''
+          if(value){
+            analyseText(value)
+          }else{
+            setMessage('No speech detected. Please speak clearly and try again.')
+          }
         }finally{
           await listener.remove()
           setListening(false)
@@ -94,7 +99,7 @@ export default function CustomerAIAssistant({profile,onBack}){
     recognition.onresult=e=>{
       let value=''
       for(let i=e.resultIndex;i<e.results.length;i++) value+=e.results[i][0].transcript
-      setText(value)
+      if(value.trim()) analyseText(value)
     }
     recognition.onerror=()=>{setListening(false);setMessage('Voice input failed. Please try again or use Type.')}
     recognition.onend=()=>setListening(false)
@@ -103,16 +108,20 @@ export default function CustomerAIAssistant({profile,onBack}){
 
   const diagnosis=useMemo(()=>classify(text),[text])
 
-  function analyse(){
-    if(!text.trim()) return
-    const r=classify(text)
+  function analyseText(value){
+    const clean=String(value||'').trim()
+    if(!clean) return
+    const r=classify(clean)
+    setText(clean)
     setResult(r)
     setConversation(c=>[...c,
-      {from:'customer',text:text.trim()},
+      {from:'customer',text:clean},
       {from:'ai',text:r?'I understood this as: '+r.title+'. I will guide you through a few safe checks first.':'I could not confidently identify the issue. I can create a service complaint for a technician to check it.'}
     ])
     setMessage('')
   }
+
+  function analyse(){ analyseText(text) }
 
   async function createComplaint(){
     setLoading(true)
