@@ -10,37 +10,30 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-
       - name: Install dependencies
         run: npm install
-
       - name: Build web app
         run: npm run build
-
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '21'
-
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
-
       - name: Add Android platform
         run: npx cap add android
-
       - name: Sync Capacitor
         run: npx cap sync android
-
+      - name: Ensure precise Android location permissions
+        run: node scripts/ensure-android-location.mjs
       - name: Decode release keystore when configured
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -48,7 +41,6 @@ jobs:
           if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
             echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/release.keystore
           fi
-
       - name: Build release AAB
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -64,14 +56,12 @@ jobs:
             echo "Release signing secrets are not configured. Building unsigned release AAB for testing only."
             ./gradlew bundleRelease
           fi
-
       - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:
           name: instant-services-release-aab
           path: android/app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
-
       - name: Upload mapping file if generated
         uses: actions/upload-artifact@v4
         with:
