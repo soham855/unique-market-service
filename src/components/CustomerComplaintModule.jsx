@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { jsPDF } from 'jspdf'
 import { supabase } from '../lib/supabase'
 
 const categories = {
@@ -18,6 +19,61 @@ const categories = {
 }
 const defaultActive = Object.keys(categories)
 
+const COMPANY_WHATSAPP = '918554887026'
+
+function buildComplaintMessage(complaint) {
+  return [
+    '🚨 UNIQUE MARKET — NEW SERVICE COMPLAINT', '',
+    'Complaint ID: ' + (complaint.ticket_no || complaint.complaint_no || complaint.id || 'Pending'),
+    'Customer: ' + (complaint.customer_name || '—'),
+    'Mobile: ' + (complaint.customer_phone || '—'),
+    'Company: ' + (complaint.company_name || '—'),
+    'Service: ' + (complaint.title || complaint.problem || '—'),
+    'Category: ' + (complaint.category || '—'),
+    'Priority: ' + String(complaint.priority || 'normal').toUpperCase(),
+    'Address: ' + (complaint.location_text || '—'),
+    'Description: ' + (complaint.description || '—'),
+    'Date: ' + new Date(complaint.created_at || Date.now()).toLocaleString('en-IN'), '',
+    'Status: OPEN', 'Unique Market — CCTV & IT Service', '8554887026'
+  ].join('\\n')
+}
+
+function openWhatsApp(phone, message) {
+  const digits = String(phone || '').replace(/\\D/g, '')
+  const url = digits ? 'https://wa.me/' + digits + '?text=' + encodeURIComponent(message) : 'https://wa.me/?text=' + encodeURIComponent(message)
+  window.open(url, '_blank', 'noopener,noreferrer')
+}
+
+function createComplaintReceipt(complaint) {
+  const doc = new jsPDF({ unit:'mm', format:'a4' })
+  const ticket = complaint.ticket_no || complaint.complaint_no || complaint.id || 'Pending'
+  doc.setFontSize(18); doc.text('UNIQUE MARKET', 20, 22)
+  doc.setFontSize(10); doc.text('CCTV & IT Service | 8554887026', 20, 29)
+  doc.setFontSize(15); doc.text('SERVICE COMPLAINT RECEIPT', 20, 43)
+  doc.setFontSize(10)
+  const rows = [
+    ['Complaint ID', ticket], ['Date & Time', new Date(complaint.created_at || Date.now()).toLocaleString('en-IN')],
+    ['Customer', complaint.customer_name || '—'], ['Mobile', complaint.customer_phone || '—'],
+    ['Company', complaint.company_name || '—'], ['Service / Problem', complaint.title || complaint.problem || '—'],
+    ['Category', complaint.category || '—'], ['Priority', String(complaint.priority || 'normal').toUpperCase()],
+    ['Address', complaint.location_text || '—'], ['Status', 'OPEN']
+  ]
+  let y=56
+  for (const [label,value] of rows) {
+    doc.setFont('helvetica','bold'); doc.text(label + ':', 20, y)
+    doc.setFont('helvetica','normal'); const lines=doc.splitTextToSize(String(value), 125); doc.text(lines, 65, y)
+    y += Math.max(7, lines.length*5)
+  }
+  if (complaint.description) {
+    doc.setFont('helvetica','bold'); doc.text('Description:',20,y+3)
+    doc.setFont('helvetica','normal'); doc.text(doc.splitTextToSize(String(complaint.description),150),20,y+10)
+  }
+  doc.setFontSize(8); doc.text('Complaint registered successfully. This is a service complaint receipt.',20,280)
+  doc.text('Unique Market, Station Road, Hotel Rajdoot, Ichalkaranji',20,286)
+  return doc
+}
+
+
 export default function CustomerComplaintModule({ profile, activeModule = 'Complaints', onSubmitted }) {
   const [items, setItems] = useState([])
   const [customerId, setCustomerId] = useState(null)
@@ -28,6 +84,7 @@ export default function CustomerComplaintModule({ profile, activeModule = 'Compl
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
   const [locating, setLocating] = useState(false)
+  const [lastReceipt, setLastReceipt] = useState(null)
   const watchIdRef = useRef(null)
   const bestPositionRef = useRef(null)
   const moduleKey = String(activeModule || '').trim().toLowerCase()
@@ -75,12 +132,15 @@ export default function CustomerComplaintModule({ profile, activeModule = 'Compl
       const customer = await resolveCustomer()
       if (!form.customer_name.trim()) throw new Error('Customer Name is required.'); if (!form.customer_phone.trim()) throw new Error('Mobile Number is required.'); if (!form.location_text.trim()) throw new Error('Service Address is required.'); if (!form.category || !activeCategories.includes(form.category)) throw new Error('Please select an available service category.'); if (!form.problem) throw new Error('Problem is required.'); if (!form.priority) throw new Error('Priority is required.'); if (form.latitude == null || form.longitude == null) throw new Error('Please tap “📍 Get Precise GPS Location” and wait for GPS accuracy before raising the complaint.')
       const title = `${categories[form.category][0].replace(/^\S+\s/,'')} - ${form.problem}`
-      const { error } = await supabase.from('complaints').insert({ customer_id:customer.id, customer_name:form.customer_name.trim(), customer_phone:form.customer_phone.trim(), company_name:form.company_name.trim() || null, title, description:form.description.trim() || form.problem, category:form.category, priority:form.priority, location_text:form.location_text.trim(), latitude:form.latitude, longitude:form.longitude, gps_accuracy_m:form.gps_accuracy_m, location_captured_at:form.location_captured_at })
+      const { data:createdComplaint, error } = await supabase.from('complaints').insert({ customer_id:customer.id, customer_name:form.customer_name.trim(), customer_phone:form.customer_phone.trim(), company_name:form.company_name.trim() || null, title, description:form.description.trim() || form.problem, category:form.category, priority:form.priority, location_text:form.location_text.trim(), latitude:form.latitude, longitude:form.longitude, gps_accuracy_m:form.gps_accuracy_m, location_captured_at:form.location_captured_at }).select('*').single()
       if (error) throw error
-      await load(); setForm(f=>({ ...f, category:'', problem:'', priority:'normal', description:'', latitude:null, longitude:null, gps_accuracy_m:null, location_captured_at:null })); setMessage('Complaint raised successfully with precise GPS location.'); if (onSubmitted) onSubmitted()
+      const receipt = createdComplaint || { ...form, title, description:form.description.trim() || form.problem, customer_id:customer.id, created_at:new Date().toISOString() }
+      setLastReceipt(receipt)
+      createComplaintReceipt(receipt).save('Unique-Market-' + (receipt.ticket_no || receipt.id || 'Complaint') + '-Receipt.pdf')
+      await load(); setForm(f=>({ ...f, category:'', problem:'', priority:'normal', description:'', latitude:null, longitude:null, gps_accuracy_m:null, location_captured_at:null })); setMessage('Complaint raised successfully. Receipt PDF saved. WhatsApp buttons are ready.'); if (onSubmitted) onSubmitted()
     } catch (error) { setMessage(error.message || 'Unable to submit complaint') } finally { setLoading(false) }
   }
   const visibleCategories = Object.entries(categories).filter(([id]) => activeCategories.includes(id)); const problems = form.category ? categories[form.category]?.[1] || [] : []
   if (isMyComplaints) return <section className="complaints-panel"><div className="panel-heading"><div><span className="badge">SERVICE DESK</span><h2>My Complaints</h2><p>Track your complaints, assigned technician and service status.</p></div><button type="button" className="secondary" onClick={load}>Refresh</button></div><div className="complaint-list">{items.length === 0 ? <p className="muted">No complaints found.</p> : items.map(item=><article className="complaint-card" key={item.id}><div><h3>{item.complaint_no || item.ticket_no || item.title || 'Service Complaint'}</h3><p>{item.description || 'No additional details provided.'}</p><small>{item.customer_name || ''}{item.customer_phone ? ` · ${item.customer_phone}` : ''}{item.company_name ? ` · ${item.company_name}` : ''}{item.category ? ` · ${item.category}` : ''}{item.priority ? ` · ${item.priority}` : ''}{item.created_at ? ` · ${new Date(item.created_at).toLocaleString()}` : ''}</small><p><strong>Status:</strong> {item.status?.replaceAll('_',' ') || 'New'}</p><p><strong>Assigned Technician:</strong> {item.technician_id ? (technicianNames[item.technician_id] || 'Assigned technician') : 'Not assigned yet'}</p></div></article>)}</div></section>
-  return <section className="complaints-panel"><div className="panel-heading"><div><span className="badge">SERVICE DESK</span><h2>{isRaiseComplaint ? 'Raise Complaint' : 'Complaint Management'}</h2><p>{isRaiseComplaint ? 'Select a service category, then choose the exact problem.' : 'View your complaints and their current service status.'}</p></div><button type="button" className="secondary" onClick={()=>{load();loadAccess()}}>Refresh</button></div>{isRaiseComplaint && <form className="complaint-form" onSubmit={createComplaint}><input placeholder="Customer Name" value={form.customer_name} onChange={e=>setForm({...form,customer_name:e.target.value})} required /><input type="tel" placeholder="Mobile Number" value={form.customer_phone} onChange={e=>setForm({...form,customer_phone:e.target.value})} required /><input placeholder="Company Name (Optional)" value={form.company_name} onChange={e=>setForm({...form,company_name:e.target.value})} /><div><label>Service Address</label><input placeholder="Service Address" value={form.location_text} onChange={e=>setForm({...form,location_text:e.target.value})} required /><button type="button" className="secondary" onClick={useMyLocation} disabled={locating}>{locating ? '📡 Getting Precise GPS…' : '📍 Get Precise GPS Location'}</button></div>{form.latitude != null && <small className="muted">GPS: {form.latitude.toFixed(7)}, {form.longitude.toFixed(7)} • Accuracy ±{Math.round(form.gps_accuracy_m || 0)} m</small>}<select value={form.category} onChange={e=>setForm({...form,category:e.target.value,problem:''})} required><option value="">Select Service Category</option>{visibleCategories.map(([id,[label]])=><option key={id} value={id}>{label}</option>)}</select>{form.category && <select value={form.problem} onChange={e=>setForm({...form,problem:e.target.value})} required><option value="">Select Specific Problem</option>{problems.map(p=><option key={p} value={p}>{p}</option>)}</select>}<select value={form.priority} onChange={e=>setForm({...form,priority:e.target.value})} required><option value="">Select Priority</option><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option><option value="urgent">Urgent</option></select><textarea placeholder="Additional Details (Optional)" value={form.description} onChange={e=>setForm({...form,description:e.target.value})} rows="4" /><small className="muted">Admin service radius: {maxRadiusKm} km</small><button disabled={loading || !form.problem || form.latitude == null}>{loading ? 'Submitting…' : 'Raise Complaint'}</button></form>}{message && <p className={message.toLowerCase().includes('error') || message.toLowerCase().includes('unable') ? 'error' : 'muted'}>{message}</p>}</section>
+  return <section className="complaints-panel"><div className="panel-heading"><div><span className="badge">SERVICE DESK</span><h2>{isRaiseComplaint ? 'Raise Complaint' : 'Complaint Management'}</h2><p>{isRaiseComplaint ? 'Select a service category, then choose the exact problem.' : 'View your complaints and their current service status.'}</p></div><button type="button" className="secondary" onClick={()=>{load();loadAccess()}}>Refresh</button></div>{isRaiseComplaint && <form className="complaint-form" onSubmit={createComplaint}><input placeholder="Customer Name" value={form.customer_name} onChange={e=>setForm({...form,customer_name:e.target.value})} required /><input type="tel" placeholder="Mobile Number" value={form.customer_phone} onChange={e=>setForm({...form,customer_phone:e.target.value})} required /><input placeholder="Company Name (Optional)" value={form.company_name} onChange={e=>setForm({...form,company_name:e.target.value})} /><div><label>Service Address</label><input placeholder="Service Address" value={form.location_text} onChange={e=>setForm({...form,location_text:e.target.value})} required /><button type="button" className="secondary" onClick={useMyLocation} disabled={locating}>{locating ? '📡 Getting Precise GPS…' : '📍 Get Precise GPS Location'}</button></div>{form.latitude != null && <small className="muted">GPS: {form.latitude.toFixed(7)}, {form.longitude.toFixed(7)} • Accuracy ±{Math.round(form.gps_accuracy_m || 0)} m</small>}<select value={form.category} onChange={e=>setForm({...form,category:e.target.value,problem:''})} required><option value="">Select Service Category</option>{visibleCategories.map(([id,[label]])=><option key={id} value={id}>{label}</option>)}</select>{form.category && <select value={form.problem} onChange={e=>setForm({...form,problem:e.target.value})} required><option value="">Select Specific Problem</option>{problems.map(p=><option key={p} value={p}>{p}</option>)}</select>}<select value={form.priority} onChange={e=>setForm({...form,priority:e.target.value})} required><option value="">Select Priority</option><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option><option value="urgent">Urgent</option></select><textarea placeholder="Additional Details (Optional)" value={form.description} onChange={e=>setForm({...form,description:e.target.value})} rows="4" /><small className="muted">Admin service radius: {maxRadiusKm} km</small><button disabled={loading || !form.problem || form.latitude == null}>{loading ? 'Submitting…' : 'Raise Complaint'}</button></form>}{message && <p className={message.toLowerCase().includes('error') || message.toLowerCase().includes('unable') ? 'error' : 'muted'}>{message}</p>}{lastReceipt && <div className="complaint-receipt-actions"><strong>Complaint {lastReceipt.ticket_no || lastReceipt.complaint_no || lastReceipt.id}</strong><p className="muted">Receipt PDF saved. No WhatsApp API is used.</p><button type="button" className="secondary" onClick={()=>openWhatsApp(COMPANY_WHATSAPP,buildComplaintMessage(lastReceipt))}>📲 WhatsApp Admin</button><button type="button" className="secondary" onClick={()=>openWhatsApp('',buildComplaintMessage(lastReceipt))}>👥 WhatsApp Office Group</button><button type="button" className="secondary" onClick={()=>createComplaintReceipt(lastReceipt).save('Unique-Market-' + (lastReceipt.ticket_no || lastReceipt.id || 'Complaint') + '-Receipt.pdf')}>📄 Download Receipt Again</button></div>}</section>
 }
