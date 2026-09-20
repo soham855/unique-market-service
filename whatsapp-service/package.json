@@ -1,0 +1,18 @@
+{
+  "name": "unique-market-whatsapp",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@juzi/wechaty": "^1.0.166",
+    "@juzi/wechaty-puppet-whatsapp": "^1.0.94",
+    "express": "^5.1.0",
+    "qrcode": "^1.5.4"
+  }
+}
