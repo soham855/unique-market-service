@@ -1,6 +1,7 @@
 import 'dotenv/config'
 import express from 'express'
 import qrcodeTerminal from 'qrcode-terminal'
+import QRCode from 'qrcode'
 import { WechatyBuilder } from '@juzi/wechaty'
 import { PuppetWhatsapp } from '@juzi/wechaty-puppet-whatsapp'
 
@@ -11,6 +12,7 @@ const PORT = Number(process.env.PORT || 8787)
 const API_KEY = process.env.BOT_API_KEY
 let bot
 let ready = false
+let latestQrDataUrl = null
 
 function auth(req, res, next) {
   if (!API_KEY || req.get('x-api-key') !== API_KEY) return res.status(401).json({ ok: false, error: 'Unauthorized' })
@@ -31,6 +33,12 @@ async function sendWhatsApp(phone, text) {
   await contact.say(String(text))
   return { ok: true, phone: number }
 }
+
+app.get('/qr', (_req, res) => {
+  if (ready) return res.send('<h2>Unique Market WhatsApp Bot is already logged in.</h2>')
+  if (!latestQrDataUrl) return res.status(202).send('<h2>QR is not ready yet. Refresh in a few seconds.</h2>')
+  res.send('<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Unique Market WhatsApp QR</title></head><body style="font-family:Arial;text-align:center;padding:20px"><h2>Scan with WhatsApp</h2><img src="' + latestQrDataUrl + '" style="max-width:90vw;width:420px"><p>WhatsApp → Linked devices → Link a device</p><meta http-equiv="refresh" content="20"></body></html>')
+})
 
 app.get('/health', (_req, res) => {
   res.json({ ok: true, service: 'unique-market-whatsapp-bot', whatsappReady: ready })
@@ -86,10 +94,13 @@ bot
   .on('scan', (qrcode, status) => {
     console.log('WhatsApp login required. Scan this QR with the automation number.')
     console.log('Scan status:', status)
+    latestQrDataUrl = null
+    QRCode.toDataURL(qrcode).then(dataUrl => { latestQrDataUrl = dataUrl }).catch(console.error)
     qrcodeTerminal.generate(qrcode, { small: true })
   })
   .on('login', user => {
     ready = true
+    latestQrDataUrl = null
     console.log('WhatsApp logged in as:', user.name())
   })
   .on('logout', user => {
