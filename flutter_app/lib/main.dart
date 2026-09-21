@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'config/supabase_config.dart';
 import 'services/auth_service.dart';
 import 'app_localizations.dart';
+import 'notifications_page.dart';
 
 final ValueNotifier<Locale> appLocale = ValueNotifier(const Locale('en'));
 
@@ -224,7 +225,7 @@ class RoleHome extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(tr(context, title), style: const TextStyle(fontWeight: FontWeight.w800)),
-        actions: [const LanguageToggle(), IconButton(onPressed: () => logout(context), icon: const Icon(Icons.logout))],
+        actions: [IconButton(tooltip: tr(context, 'Notifications'), onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const NotificationsPage())), icon: const Icon(Icons.notifications_none_rounded)), const LanguageToggle(), IconButton(onPressed: () => logout(context), icon: const Icon(Icons.logout))],
       ),
       body: ListView(
         padding: const EdgeInsets.all(20),
