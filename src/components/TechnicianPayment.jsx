@@ -1,8 +1,6 @@
 import {useEffect,useMemo,useState} from 'react'
 import {supabase} from '../lib/supabase'
 
-const FALLBACK_UPI='sohammane855-8@okhdfcbank'
-
 export default function TechnicianPayment({profile,onBack}){
  const [customers,setCustomers]=useState([]),[customerId,setCustomerId]=useState(''),[challans,setChallans]=useState([]),[challanId,setChallanId]=useState(''),[amount,setAmount]=useState(''),[referenceNo,setReferenceNo]=useState(''),[notes,setNotes]=useState(''),[settings,setSettings]=useState(null),[saving,setSaving]=useState(false),[message,setMessage]=useState(''),[mode,setMode]=useState('Online')
  useEffect(()=>{(async()=>{const[{data:cs},{data:ps}]=await Promise.all([supabase.from('customers').select('id,name,mobile').order('name').limit(500),supabase.from('payment_settings').select('upi_id,account_name,qr_image_url,is_enabled').limit(1).maybeSingle()]);setCustomers(cs||[]);setSettings(ps||null)})()},[])
