@@ -8,7 +8,7 @@ export default function PaymentLedger({onBack}){
   async function updateStatus(id,status){
     setMessage('')
     const item=items.find(p=>p.id===id)
-    let payload={status}
+    let payload={status,payment_status:status==='confirmed'?'Confirmed':status==='rejected'?'Rejected':'Pending'}
     if(status==='confirmed'&&item?.amount==null){const amount=Number(amounts[id]);if(!Number.isFinite(amount)||amount<=0)return setMessage('Enter the verified payment amount before confirming this UPI payment.');payload.amount=amount}
     const {error}=await supabase.from('payments').update(payload).eq('id',id);if(error)setMessage(error.message);else{setAmounts(a=>{const n={...a};delete n[id];return n});load()}
   }
