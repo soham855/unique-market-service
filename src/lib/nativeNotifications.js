@@ -8,7 +8,10 @@ async function saveToken(token) {
   if (!token || !supabase) return
 
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return
+  if (!user) {
+    console.warn('FCM token received but no authenticated user is available')
+    return
+  }
 
   const { error } = await supabase.from('push_tokens').upsert({
     user_id: user.id,
@@ -29,8 +32,6 @@ export async function initNativePushNotifications() {
   initialized = true
 
   try {
-    // Register listeners BEFORE register(); otherwise Android can emit the
-    // registration event before the listener is attached and the token is lost.
     await PushNotifications.addListener('registration', async ({ value }) => {
       console.info('FCM registration token received')
       await saveToken(value)
@@ -49,6 +50,7 @@ export async function initNativePushNotifications() {
       const requested = await PushNotifications.requestPermissions()
       if (requested.receive !== 'granted') {
         console.warn('Push notification permission not granted:', requested.receive)
+        initialized = false
         return
       }
     }
