@@ -33,8 +33,28 @@ jobs:
       - name: Configure Firebase and notification permission
         run: |
           cp flutter_app/android/app/google-services.json android/app/google-services.json
-          node -e "const fs=require('fs'); const p='android/app/src/main/AndroidManifest.xml'; let x=fs.readFileSync(p,'utf8'); if(!x.includes('android.permission.POST_NOTIFICATIONS')) x=x.replace('<manifest', '<manifest\\n    <uses-permission android:name=\\\"android.permission.POST_NOTIFICATIONS\\\" />'); fs.writeFileSync(p,x)"
-          node -e "const fs=require('fs'); const p='android/app/build.gradle'; if(fs.existsSync(p)){let x=fs.readFileSync(p,'utf8'); if(!x.includes('com.google.gms.google-services')) x=x.replace('plugins {','plugins {\\n    id \\\'com.google.gms.google-services\\\''); fs.writeFileSync(p,x)}"
+          node - <<'NODE'
+          const fs=require('fs')
+          const manifest='android/app/src/main/AndroidManifest.xml'
+          let x=fs.readFileSync(manifest,'utf8')
+          if(!x.includes('android.permission.POST_NOTIFICATIONS')) x=x.replace('<manifest','<manifest\\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />')
+          fs.writeFileSync(manifest,x)
+          if(fs.existsSync('android/settings.gradle.kts')){
+            let s=fs.readFileSync('android/settings.gradle.kts','utf8')
+            if(!s.includes('com.google.gms.google-services')) s=s.replace('plugins {','plugins {\\n    id("com.google.gms.google-services") version "4.4.3" apply false')
+            fs.writeFileSync('android/settings.gradle.kts',s)
+            let a=fs.readFileSync('android/app/build.gradle.kts','utf8')
+            if(!a.includes('com.google.gms.google-services')) a=a.replace('plugins {','plugins {\\n    id("com.google.gms.google-services")')
+            fs.writeFileSync('android/app/build.gradle.kts',a)
+          } else {
+            let s=fs.readFileSync('android/settings.gradle','utf8')
+            if(!s.includes('com.google.gms.google-services')) s=s.replace('plugins {','plugins {\\n    id \'com.google.gms.google-services\' version \'4.4.3\' apply false')
+            fs.writeFileSync('android/settings.gradle',s)
+            let a=fs.readFileSync('android/app/build.gradle','utf8')
+            if(!a.includes('com.google.gms.google-services')) a=a.replace('plugins {','plugins {\\n    id \'com.google.gms.google-services\'')
+            fs.writeFileSync('android/app/build.gradle',a)
+          }
+          NODE
       - name: Sync Capacitor
         run: npx cap sync android
       - name: Ensure precise Android location permissions
