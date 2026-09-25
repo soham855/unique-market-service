@@ -134,10 +134,13 @@ async function startWhatsApp() {
       creds: state.creds,
       keys: makeCacheableSignalKeyStore(state.keys, logger)
     },
+    browser: ['Unique Market', 'Chrome', '1.0.0'],
     markOnlineOnConnect: false,
     syncFullHistory: false,
-    connectTimeoutMs: 60000,
-    qrTimeout: 120000
+    connectTimeoutMs: 120000,
+    defaultQueryTimeoutMs: 60000,
+    keepAliveIntervalMs: 25000,
+    qrTimeout: 180000
   })
 
   let saveCredsPromise = Promise.resolve()
