@@ -3,6 +3,7 @@ import makeWASocket, {
   DisconnectReason,
   makeCacheableSignalKeyStore,
   useMultiFileAuthState,
+  fetchLatestWaWebVersion,
 } from '@whiskeysockets/baileys'
 import { Boom } from '@hapi/boom'
 import pino from 'pino'
@@ -112,14 +113,20 @@ async function startWhatsApp() {
   pairingReady = false
   pairingRequestInFlight = null
 
+  const { version } = await fetchLatestWaWebVersion()
+  console.log(`WhatsApp Web version: ${version.join('.')} `)
+
   sock = makeWASocket({
+    version,
     logger,
     auth: {
       creds: state.creds,
       keys: makeCacheableSignalKeyStore(state.keys, logger)
     },
-    markOnlineOnConnect: true,
-    syncFullHistory: false
+    markOnlineOnConnect: false,
+    syncFullHistory: false,
+    connectTimeoutMs: 60000,
+    qrTimeout: 120000
   })
 
   let saveCredsPromise = Promise.resolve()
