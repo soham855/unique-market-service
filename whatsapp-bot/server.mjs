@@ -158,6 +158,9 @@ async function startWhatsApp() {
       pairingCode = null
       reconnecting = false
       startEventPoller()
+      // Process the existing outbox immediately after connection, then keep polling.
+      // This prevents pending Raise/Accept/Complete/Payment events from waiting for the next interval.
+      setTimeout(() => processNotificationEvents().catch(err => logger.error({ err }, 'initial event processing failed')), 500)
       console.log('WhatsApp connected')
     }
 
