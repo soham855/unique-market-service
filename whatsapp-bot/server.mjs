@@ -121,11 +121,15 @@ async function startWhatsApp() {
       creds: state.creds,
       keys: makeCacheableSignalKeyStore(state.keys, logger)
     },
-    markOnlineOnConnect: false,
+    markOnlineOnConnect: true,
     syncFullHistory: false
   })
 
-  sock.ev.on('creds.update', saveCreds)
+  let saveCredsPromise = Promise.resolve()
+  sock.ev.on('creds.update', () => {
+    saveCredsPromise = Promise.resolve(saveCreds()).catch(err => console.error('WhatsApp credential save failed:', err))
+    return saveCredsPromise
+  })
 
   sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
     if (connection === 'connecting' || qr) {
@@ -150,10 +154,14 @@ async function startWhatsApp() {
       const code = new Boom(lastDisconnect?.error)?.output?.statusCode
       if (code !== DisconnectReason.loggedOut && !reconnecting) {
         reconnecting = true
-        setTimeout(() => startWhatsApp().catch(err => {
+        try {
+          await saveCredsPromise
+          await startWhatsApp()
+        } catch (err) {
           console.error('WhatsApp reconnect failed', err)
           reconnecting = false
-        }), 3000)
+          setTimeout(() => startWhatsApp().catch(() => { reconnecting = false }), 3000)
+        }
       }
     }
   })
