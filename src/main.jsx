@@ -42,6 +42,7 @@ import ServiceReportModule from './components/ServiceReportModule'
 import CustomerReferral from './components/CustomerReferral'
 import NetworkAITool from './components/NetworkAITool'
 import TrackService from './components/TrackService'
+import {initNativePushNotifications} from './lib/nativeNotifications'
 const publicSeoPaths=Object.keys(localSeoPages)
 function App(){
  const pathname=window.location.pathname.replace(/\/$/,'')
@@ -54,7 +55,7 @@ function App(){
  const[session,setSession]=useState(undefined),[profile,setProfile]=useState(null),[profileError,setProfileError]=useState(''),[activeModule,setActiveModule]=useState(null)
  useEffect(()=>{let listener;CapacitorApp.addListener('backButton',({canGoBack})=>{if(activeModule){setActiveModule(null);return}if(canGoBack&&window.history.length>1){window.history.back();return}CapacitorApp.exitApp()}).then(v=>{listener=v});return()=>{listener?.remove()}},[activeModule])
  async function loadProfile(){try{setProfileError('');const p=await getMyProfile();if(!p?.role)throw new Error('Your account has no valid role assigned.');if(!['admin','technician','customer'].includes(p.role))throw new Error('Invalid account role.');setProfile(p);setActiveModule(null)}catch(e){setProfile(null);setProfileError(e.message||'Unable to load profile')}}
- useEffect(()=>{let mounted=true;getSession().then(async v=>{if(!mounted)return;setSession(v);if(v){try{const p=await getMyProfile();if(!p?.role||!['admin','technician','customer'].includes(p.role))throw new Error('Invalid account role.');setProfile(p)}catch(e){setProfileError(e.message||'Unable to load profile')}}});const{data}=onAuthStateChange((_e,n)=>{setSession(n);if(n)loadProfile();else{setProfile(null);setActiveModule(null)}});return()=>{mounted=false;data.subscription.unsubscribe()}},[])
+ useEffect(()=>{let mounted=true;getSession().then(async v=>{if(!mounted)return;setSession(v);if(v){await initNativePushNotifications();try{const p=await getMyProfile();if(!p?.role||!['admin','technician','customer'].includes(p.role))throw new Error('Invalid account role.');setProfile(p)}catch(e){setProfileError(e.message||'Unable to load profile')}}});const{data}=onAuthStateChange((_e,n)=>{setSession(n);if(n){initNativePushNotifications();loadProfile()}else{setProfile(null);setActiveModule(null)}});return()=>{mounted=false;data.subscription.unsubscribe()}},[])
  if(session===undefined)return <main className='auth-shell'><div className='login-card'><p className='eyebrow'>UNIQUE MARKET</p><h1>Loading…</h1></div></main>
  if(!session)return <Login onLogin={setSession}/>
  if(profileError)return <main className='auth-shell'><div className='login-card'><p className='eyebrow'>UNIQUE MARKET</p><h1>Profile setup required</h1><p className='error'>{profileError}</p><button type='button' onClick={signOut}>Sign out</button></div></main>
