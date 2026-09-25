@@ -28,7 +28,6 @@ const supabase = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
   ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
   : null
 
-const botStartedAt = new Date().toISOString()
 let sock = null
 let status = 'starting'
 let lastConnectionEvent = null
@@ -63,7 +62,6 @@ async function processNotificationEvents() {
     .from('whatsapp_notification_events')
     .select('id, phone, customer_phone, event_type, message, status, created_at')
     .eq('status', 'pending')
-    .gt('created_at', botStartedAt)
     .order('created_at', { ascending: true })
     .limit(10)
 
@@ -328,9 +326,9 @@ app.post('/pair', async (req, res) => {
 
 app.post('/send', async (req, res) => {
   if (!authorized(req)) return res.status(401).json({ ok: false, error: 'Unauthorized' })
-  const digits = String(req.body?.phone || '').replace(/\D/g, '')
+  const digits = String(req.body?.phone || req.body?.to || '').replace(/\D/g, '')
   const text = String(req.body?.message || '').trim()
-  if (!digits || !text) return res.status(400).json({ ok: false, error: 'phone and message are required' })
+  if (!digits || !text) return res.status(400).json({ ok: false, error: 'phone/to and message are required' })
   const jid = recipientJid(digits)
   if (!jid) return res.status(403).json({ ok: false, error: 'This WhatsApp recipient is blocked' })
   try {
