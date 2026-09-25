@@ -30,6 +30,11 @@ jobs:
           packages: platform-tools
       - name: Add Android platform
         run: npx cap add android
+      - name: Configure Firebase and notification permission
+        run: |
+          cp flutter_app/android/app/google-services.json android/app/google-services.json
+          node -e "const fs=require('fs'); const p='android/app/src/main/AndroidManifest.xml'; let x=fs.readFileSync(p,'utf8'); if(!x.includes('android.permission.POST_NOTIFICATIONS')) x=x.replace('<manifest', '<manifest\\n    <uses-permission android:name=\\\"android.permission.POST_NOTIFICATIONS\\\" />'); fs.writeFileSync(p,x)"
+          node -e "const fs=require('fs'); const p='android/app/build.gradle'; if(fs.existsSync(p)){let x=fs.readFileSync(p,'utf8'); if(!x.includes('com.google.gms.google-services')) x=x.replace('plugins {','plugins {\\n    id \\\'com.google.gms.google-services\\\''); fs.writeFileSync(p,x)}"
       - name: Sync Capacitor
         run: npx cap sync android
       - name: Ensure precise Android location permissions
