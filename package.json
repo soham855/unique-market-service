@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "whatsapp:bot": "node whatsapp-bot/server.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.0",
@@ -25,7 +26,10 @@
     "jspdf": "^3.0.3",
     "@capgo/capacitor-speech-recognition": "^8.0.0",
     "@capacitor/geolocation": "^8.0.0",
-    "@capacitor/push-notifications": "^8.0.0"
+    "@capacitor/push-notifications": "^8.0.0",
+    "@whiskeysockets/baileys": "7.0.0-rc14",
+    "express": "^5.1.0",
+    "pino": "^9.9.4"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
