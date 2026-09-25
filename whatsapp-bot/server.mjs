@@ -12,7 +12,7 @@ import path from 'node:path'
 
 const PORT = Number(process.env.PORT || 10000)
 const AUTH_DIR = process.env.WA_AUTH_DIR || path.resolve('whatsapp-bot/auth_info')
-const PHONE_NUMBER = String(process.env.WA_PHONE_NUMBER || '').replace(/\\D/g, '')
+const PHONE_NUMBER = String(process.env.WA_PHONE_NUMBER || '917350060071').replace(/\D/g, '')
 const logger = pino({ level: process.env.WA_LOG_LEVEL || 'silent' })
 const app = express()
 app.use(express.json({ limit: '256kb' }))
@@ -116,7 +116,7 @@ app.post('/pair', async (_req, res) => {
 
 app.post('/send', async (req, res) => {
   const { phone, message } = req.body || {}
-  const digits = String(phone || '').replace(/\\D/g, '')
+  const digits = String(phone || '').replace(/\D/g, '')
   const text = String(message || '').trim()
 
   if (status !== 'connected' || !sock) {
