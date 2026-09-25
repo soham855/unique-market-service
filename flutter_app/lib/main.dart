@@ -12,6 +12,7 @@ import 'app_localizations.dart';
 import 'notifications_page.dart';
 
 final ValueNotifier<Locale> appLocale = ValueNotifier(const Locale('en'));
+StreamSubscription<String>? _pushTokenRefreshSubscription;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,10 +26,22 @@ Future<void> main() async {
       url: SupabaseConfig.url,
       publishableKey: SupabaseConfig.publishableKey,
     );
+
+    Supabase.instance.client.auth.onAuthStateChange.listen((data) async {
+      if (data.session != null) {
+        await registerPushToken();
+      } else {
+        await _pushTokenRefreshSubscription?.cancel();
+        _pushTokenRefreshSubscription = null;
+      }
+    });
+
+    if (Supabase.instance.client.auth.currentSession != null) {
+      await registerPushToken();
+    }
   }
   runApp(const InstantServicesApp());
 }
-
 
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
@@ -51,15 +64,16 @@ Future<void> registerPushToken() async {
     'updated_at': DateTime.now().toUtc().toIso8601String(),
   }, onConflict: 'user_id,token');
 
-  FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
-    if (newToken.isEmpty) return;
+  await _pushTokenRefreshSubscription?.cancel();
+  _pushTokenRefreshSubscription = messaging.onTokenRefresh.listen((newToken) async {
+    final activeUser = Supabase.instance.client.auth.currentUser;
+    if (activeUser == null || newToken.isEmpty) return;
+
     await Supabase.instance.client.from('push_tokens').upsert({
-      'user_id': user.id,
+      'user_id': activeUser.id,
       'token': newToken,
       'platform': 'android',
       'updated_at': DateTime.now().toUtc().toIso8601String(),
     }, onConflict: 'user_id,token');
   });
 }
-
-
