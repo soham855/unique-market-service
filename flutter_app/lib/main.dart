@@ -62,18 +62,4 @@ Future<void> registerPushToken() async {
   });
 }
 
-final ValueNotifier<Locale> appLocale = ValueNotifier(const Locale('en'));
 
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  final prefs = await SharedPreferences.getInstance();
-  final savedLanguage = prefs.getString('language') ?? 'en';
-  appLocale.value = Locale(savedLanguage == 'mr' ? 'mr' : 'en');
-  if (SupabaseConfig.isConfigured) {
-    await Supabase.initialize(
-      url: SupabaseConfig.url,
-      publishableKey: SupabaseConfig.publishableKey,
-    );
-  }
-  runApp(const InstantServicesApp());
-}
