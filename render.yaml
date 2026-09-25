@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: unique-market-whatsapp
+    runtime: node
+    region: singapore
+    plan: free
+    buildCommand: npm install
+    startCommand: npm run whatsapp:bot
+    healthCheckPath: /health
+    envVars:
+      - key: WA_PHONE_NUMBER
+        value: "917350060071"
+      - key: WA_API_SECRET
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: WA_GROUP_JID
+        sync: false
+      - key: WA_EVENT_POLL_MS
+        value: "5000"
+      - key: WA_LOG_LEVEL
+        value: "silent"
