@@ -1,4 +1,4 @@
-import { supabase } from './supabase'
+import { supabase, REMEMBER_KEY } from './supabase'
 
 function normalizePhone(value) {
   const raw = String(value || '').trim()
@@ -72,12 +72,23 @@ export async function verifyCustomerOtp({ phone, token, email, password, name, c
 
 export async function signOut() {
   if (!supabase) return
+  localStorage.removeItem(REMEMBER_KEY)
+  localStorage.removeItem('unique-market-auth-token')
   const { error } = await supabase.auth.signOut({ scope: 'local' })
   if (error) throw error
 }
 
 export async function getSession() {
   if (!supabase) return null
+
+  const rememberUntil = Number(localStorage.getItem(REMEMBER_KEY) || 0)
+  if (rememberUntil && rememberUntil <= Date.now()) {
+    localStorage.removeItem(REMEMBER_KEY)
+    localStorage.removeItem('unique-market-auth-token')
+    await supabase.auth.signOut({ scope: 'local' })
+    return null
+  }
+
   const { data } = await supabase.auth.getSession()
   return data.session
 }
