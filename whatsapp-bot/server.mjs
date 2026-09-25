@@ -174,7 +174,7 @@ const pairingPage = (_req, res) => {
 <h2>Unique Market WhatsApp QR Pairing</h2>
 <p>WhatsApp number: <b>+91 7350060071</b></p>
 <input id="secret" type="password" placeholder="WA_API_SECRET" autocomplete="off">
-<button id="btn">Show QR Code</button>
+<button id="btn">Show QR Code</button><button id="reset" type="button">Reset & Generate Fresh QR</button>
 <p id="out" class="hint">Enter WA_API_SECRET and tap Show QR Code.</p>
 <img id="qr" class="qr" style="display:none" alt="WhatsApp QR code">
 <script>
@@ -195,7 +195,16 @@ async function refresh(){
     }
   }catch(e){out.textContent=String(e)}
 }
-document.getElementById('btn').onclick=async()=>{out.textContent='Starting QR...'; await refresh();};
+document.getElementById('btn').onclick=async()=>{out.textContent='Checking QR...'; await refresh();};
+document.getElementById('reset').onclick=async()=>{
+  out.textContent='Resetting WhatsApp session...';
+  try{
+    const r=await fetch('/reset',{method:'POST',headers:{'x-wa-api-key':secret()}});
+    const d=await r.json();
+    out.textContent=d.message||d.error||'Reset complete. Wait a few seconds.';
+    setTimeout(refresh,4000);
+  }catch(e){out.textContent=String(e)}
+};
 setInterval(refresh,3000);
 </script>
 </body></html>`)
@@ -206,6 +215,27 @@ app.get('/pair', pairingPage)
 
 /* QR_PAIRING_PAGE */
  
+app.post('/reset', async (req, res) => {
+  if (!authorized(req)) return res.status(401).json({ ok: false, error: 'Unauthorized' })
+  if (status === 'connected') return res.status(409).json({ ok: false, error: 'WhatsApp is already connected' })
+  try {
+    if (sock) {
+      try { sock.end(new Error('Reset requested')) } catch {}
+      sock = null
+    }
+    lastQr = null
+    pairingCode = null
+    pairingReady = false
+    reconnecting = false
+    fs.rmSync(AUTH_DIR, { recursive: true, force: true })
+    fs.mkdirSync(AUTH_DIR, { recursive: true })
+    await startWhatsApp()
+    return res.json({ ok: true, message: 'WhatsApp session reset. Wait a few seconds and request a new QR.' })
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: 'WhatsApp reset failed', detail: String(err?.message || err) })
+  }
+})
+
 app.get('/qr', async (req, res) => {
   if (!authorized(req)) return res.status(401).json({ ok: false, error: 'Unauthorized' })
   res.type('json')
