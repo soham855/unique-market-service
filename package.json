@@ -27,10 +27,11 @@
     "@capgo/capacitor-speech-recognition": "^8.0.0",
     "@capacitor/geolocation": "^8.0.0",
     "@capacitor/push-notifications": "^8.0.0",
-    "@whiskeysockets/baileys": "7.0.0-rc14",
+    "@whiskeysockets/baileys": "6.7.23",
     "express": "^5.1.0",
     "pino": "^9.9.4",
-    "@hapi/boom": "^10.0.1"
+    "@hapi/boom": "^10.0.1",
+    "qrcode": "^1.5.4"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
