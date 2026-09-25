@@ -1,7 +1,7 @@
 import express from 'express'
 import makeWASocket, {
   DisconnectReason,
-  fetchLatestBaileysVersion,
+  fetchLatestWaWebVersion,
   makeCacheableSignalKeyStore,
   useMultiFileAuthState,
   Browsers
@@ -110,7 +110,7 @@ function startEventPoller() {
 
 async function startWhatsApp() {
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR)
-  const { version } = await fetchLatestBaileysVersion()
+  const { version } = await fetchLatestWaWebVersion()
 
   pairingReady = false
   pairingRequestInFlight = null
