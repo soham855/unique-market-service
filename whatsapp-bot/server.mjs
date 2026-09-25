@@ -199,6 +199,8 @@ const out=document.getElementById('out');
 const qr=document.getElementById('qr');
 async function refresh(){
   try{
+    const dbg=await fetch('/debug',{headers:{'x-wa-api-key':secret()}}).then(x=>x.json()).catch(()=>null);
+    if(dbg) out.textContent='Status: '+dbg.status+' | Socket: '+dbg.socket+' | QR: '+dbg.hasQr+' | Pairing ready: '+dbg.pairingReady;
     const r=await fetch('/qr',{headers:{'x-wa-api-key':secret()}});
     const d=await r.json();
     if(d.qrDataUrl){
