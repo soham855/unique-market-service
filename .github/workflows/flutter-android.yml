@@ -6,6 +6,7 @@ on:
     paths:
       - 'flutter_app/**'
       - '.github/workflows/flutter-android.yml'
+      - 'supabase/migrations/**'
   workflow_dispatch:
 
 jobs:
@@ -27,12 +28,10 @@ jobs:
 
       - name: Create Android project shell
         run: |
-          # The repository intentionally keeps an empty android/ directory via .gitkeep.
-          # Check for the actual Gradle project instead of only checking directory existence.
           if [ ! -f android/app/build.gradle.kts ] && [ ! -f android/app/build.gradle ]; then
             flutter create --project-name instant_services --org com.uniquemarket --platforms android .
           fi
-          # Keep the mobile package ID stable for the Play Store app.
+
           if [ -f android/app/build.gradle.kts ]; then
             sed -i 's/applicationId = "com.uniquemarket.instant_services"/applicationId = "com.uniquemarket.instantservices"/' android/app/build.gradle.kts
             sed -i 's/namespace = "com.uniquemarket.instant_services"/namespace = "com.uniquemarket.instantservices"/' android/app/build.gradle.kts
@@ -43,6 +42,21 @@ jobs:
             echo "Android Gradle project was not generated."
             exit 1
           fi
+
+      - name: Configure Google Services plugin
+        run: |
+          if [ -f android/settings.gradle.kts ]; then
+            sed -i '/id("org.jetbrains.kotlin.android") version/a\    id("com.google.gms.google-services") version "4.4.3" apply false' android/settings.gradle.kts
+            sed -i '/id("dev.flutter.flutter-gradle-plugin")/a\    id("com.google.gms.google-services")' android/app/build.gradle.kts
+          elif [ -f android/settings.gradle ]; then
+            sed -i "/id 'org.jetbrains.kotlin.android' version/a\\    id 'com.google.gms.google-services' version '4.4.3' apply false" android/settings.gradle
+            sed -i "/id 'dev.flutter.flutter-gradle-plugin'/a\\    id 'com.google.gms.google-services'" android/app/build.gradle
+          fi
+
+      - name: Verify Firebase configuration
+        run: |
+          test -f android/app/google-services.json
+          grep -q '"package_name": "com.uniquemarket.instantservices"' android/app/google-services.json
 
       - name: Get packages
         run: flutter pub get
