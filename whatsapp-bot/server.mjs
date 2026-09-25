@@ -72,8 +72,16 @@ async function processNotificationEvents() {
 
   for (const event of data || []) {
     const targets = []
-    const jid = recipientJid(event.customer_phone || event.phone)
-    if (jid) targets.push(jid)
+    // Always notify the connected office WhatsApp first. The blocked business
+    // contact 8554887026 is never used by recipientJid().
+    const officeJid = recipientJid(PHONE_NUMBER)
+    if (officeJid) targets.push(officeJid)
+
+    // Also notify the customer when a valid WhatsApp number is available.
+    const customerJid = recipientJid(event.customer_phone || event.phone)
+    if (customerJid && !targets.includes(customerJid)) targets.push(customerJid)
+
+    // Optional WhatsApp group notification.
     if (WA_GROUP_JID && !targets.includes(WA_GROUP_JID)) targets.push(WA_GROUP_JID)
 
     if (!targets.length) {
