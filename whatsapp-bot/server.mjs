@@ -47,7 +47,7 @@ async function startWhatsApp() {
       lastQr = qr
       status = 'pairing_required'
 
-      if (PHONE_NUMBER && !sock.authState?.creds?.registered && !pairingCode) {
+      if (PHONE_NUMBER && !state.creds.registered && !pairingCode) {
         try {
           pairingCode = await sock.requestPairingCode(PHONE_NUMBER)
         } catch (err) {
