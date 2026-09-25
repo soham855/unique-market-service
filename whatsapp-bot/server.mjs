@@ -3,7 +3,8 @@ import makeWASocket, {
   DisconnectReason,
   fetchLatestBaileysVersion,
   makeCacheableSignalKeyStore,
-  useMultiFileAuthState
+  useMultiFileAuthState,
+  Browsers
 } from '@whiskeysockets/baileys'
 import { Boom } from '@hapi/boom'
 import pino from 'pino'
@@ -35,6 +36,8 @@ let lastQr = null
 let pairingCode = null
 let reconnecting = false
 let eventPollerStarted = false
+let pairingReady = false
+let pairingRequestInFlight = null
 
 fs.mkdirSync(AUTH_DIR, { recursive: true })
 
@@ -109,9 +112,13 @@ async function startWhatsApp() {
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR)
   const { version } = await fetchLatestBaileysVersion()
 
+  pairingReady = false
+  pairingRequestInFlight = null
+
   sock = makeWASocket({
     version,
     logger,
+    browser: Browsers.macOS('Chrome'),
     auth: {
       creds: state.creds,
       keys: makeCacheableSignalKeyStore(state.keys, logger)
@@ -123,12 +130,11 @@ async function startWhatsApp() {
   sock.ev.on('creds.update', saveCreds)
 
   sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
-    if (qr) {
-      lastQr = qr
-      status = 'pairing_required'
-      if (PHONE_NUMBER && !state.creds.registered && !pairingCode) {
-        try { pairingCode = await sock.requestPairingCode(PHONE_NUMBER) }
-        catch (err) { logger.error({ err }, 'pairing code request failed') }
+    if (connection === 'connecting' || qr) {
+      pairingReady = true
+      if (qr) {
+        lastQr = qr
+        status = 'pairing_required'
       }
     }
 
@@ -201,11 +207,40 @@ app.post('/pair', async (req, res) => {
   if (!authorized(req)) return res.status(401).json({ ok: false, error: 'Unauthorized' })
   if (!sock) return res.status(503).json({ ok: false, error: 'WhatsApp socket is not ready' })
   if (status === 'connected') return res.json({ ok: true, status: 'connected' })
+  if (!PHONE_NUMBER) return res.status(400).json({ ok: false, error: 'WhatsApp phone number is not configured' })
+
   try {
-    pairingCode = await sock.requestPairingCode(PHONE_NUMBER)
+    const deadline = Date.now() + 15000
+    while (!pairingReady && Date.now() < deadline && sock) {
+      await new Promise(resolve => setTimeout(resolve, 250))
+    }
+    if (!pairingReady) {
+      return res.status(503).json({
+        ok: false,
+        error: 'WhatsApp socket is still connecting. Wait 2 seconds and try again.'
+      })
+    }
+
+    if (pairingRequestInFlight) {
+      pairingCode = await pairingRequestInFlight
+    } else {
+      pairingRequestInFlight = sock.requestPairingCode(PHONE_NUMBER)
+      try {
+        pairingCode = await pairingRequestInFlight
+      } finally {
+        pairingRequestInFlight = null
+      }
+    }
+
     res.json({ ok: true, status: 'pairing_required', pairingCode })
   } catch (err) {
-    res.status(500).json({ ok: false, error: 'Pairing code request failed' })
+    console.error('Pairing code request failed:', err)
+    const message = String(err?.message || err)
+    res.status(500).json({
+      ok: false,
+      error: 'Pairing code request failed',
+      detail: message
+    })
   }
 })
 
