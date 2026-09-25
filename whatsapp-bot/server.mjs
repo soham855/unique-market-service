@@ -1,7 +1,6 @@
 import express from 'express'
 import makeWASocket, {
   DisconnectReason,
-  fetchLatestWaWebVersion,
   makeCacheableSignalKeyStore,
   useMultiFileAuthState,
 } from '@whiskeysockets/baileys'
@@ -109,13 +108,10 @@ function startEventPoller() {
 
 async function startWhatsApp() {
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR)
-  const { version } = await fetchLatestWaWebVersion()
-
   pairingReady = false
   pairingRequestInFlight = null
 
   sock = makeWASocket({
-    version,
     logger,
     auth: {
       creds: state.creds,
@@ -173,7 +169,7 @@ const pairingPage = (_req, res) => {
   res.type('html').send(`<!doctype html>
 <html>
 <head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Unique Market WhatsApp Pairing</title>
-<style>body{font-family:system-ui;max-width:520px;margin:40px auto;padding:20px}input,button{width:100%;padding:12px;margin:8px 0;box-sizing:border-box}button{cursor:pointer}.code{font-size:28px;font-weight:700;letter-spacing:3px}</style></head>
+<style>body{font-family:system-ui;max-width:520px;margin:40px auto;padding:20px}input,button{width:100%;padding:12px;margin:8px 0;box-sizing:border-box}button{cursor:pointer}.code{font-size:28px;font-weight:700;letter-spacing:3px}.qr{display:block;width:280px;height:280px;margin:18px auto}</style></head>
 <body>
 <h2>Unique Market WhatsApp Pairing</h2>
 <p>WhatsApp number: <b>+91 7350060071</b></p>
@@ -199,6 +195,19 @@ app.get('/pair', pairingPage)
 /* PAIRING_PAGE_ROUTES */
 /* OLD_PAIRING_PAGE_BODY */
 
+app.get('/qr', async (req, res) => {
+  if (!authorized(req)) return res.status(401).json({ ok: false, error: 'Unauthorized' })
+  if (status === 'connected') return res.json({ ok: true, connected: true, qrDataUrl: null })
+  if (!lastQr) return res.json({ ok: true, connected: false, qrDataUrl: null, message: 'QR is not ready yet. Wait a few seconds and refresh.' })
+  try {
+    const QRCode = await import('qrcode')
+    const qrDataUrl = await QRCode.default.toDataURL(lastQr, { width: 280, margin: 2 })
+    res.json({ ok: true, connected: false, qrDataUrl })
+  } catch (err) {
+    res.status(500).json({ ok: false, error: 'QR generation failed', detail: String(err?.message || err) })
+  }
+})
+
 app.get('/status', (req, res) => {
   if (!authorized(req)) return res.status(401).json({ ok: false, error: 'Unauthorized' })
   res.json({
@@ -216,7 +225,7 @@ app.post('/pair', async (req, res) => {
   if (!PHONE_NUMBER) return res.status(400).json({ ok: false, error: 'WhatsApp phone number is not configured' })
 
   try {
-    const deadline = Date.now() + 15000
+    const deadline = Date.now() + 5000
     while (!pairingReady && Date.now() < deadline && sock) {
       await new Promise(resolve => setTimeout(resolve, 250))
     }
