@@ -19,6 +19,7 @@ const SUPABASE_URL = String(process.env.SUPABASE_URL || '')
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '')
 const WA_GROUP_JID = String(process.env.WA_GROUP_JID || '').trim()
 const EVENT_POLL_MS = Number(process.env.WA_EVENT_POLL_MS || 5000)
+const BLOCKED_PHONE = '918554887026'
 const logger = pino({ level: process.env.WA_LOG_LEVEL || 'silent' })
 const app = express()
 app.use(express.json({ limit: '256kb' }))
@@ -43,7 +44,8 @@ function authorized(req) {
 
 function recipientJid(phone) {
   const digits = String(phone || '').replace(/\D/g, '')
-  return digits ? `${digits}@s.whatsapp.net` : null
+  if (!digits || digits === BLOCKED_PHONE) return null
+  return `${digits}@s.whatsapp.net`
 }
 
 async function sendText(jid, message) {
@@ -69,15 +71,14 @@ async function processNotificationEvents() {
 
   for (const event of data || []) {
     const targets = []
-    const phone = event.customer_phone || event.phone
-    const jid = recipientJid(phone)
+    const jid = recipientJid(event.customer_phone || event.phone)
     if (jid) targets.push(jid)
     if (WA_GROUP_JID && !targets.includes(WA_GROUP_JID)) targets.push(WA_GROUP_JID)
 
     if (!targets.length) {
       await supabase.from('whatsapp_notification_events').update({
         status: 'failed',
-        error_message: 'No WhatsApp recipient configured'
+        error_message: 'No WhatsApp recipient configured or recipient is blocked'
       }).eq('id', event.id)
       continue
     }
@@ -183,15 +184,17 @@ app.post('/send', async (req, res) => {
   const digits = String(req.body?.phone || '').replace(/\D/g, '')
   const text = String(req.body?.message || '').trim()
   if (!digits || !text) return res.status(400).json({ ok: false, error: 'phone and message are required' })
+  const jid = recipientJid(digits)
+  if (!jid) return res.status(403).json({ ok: false, error: 'This WhatsApp recipient is blocked' })
   try {
-    const result = await sendText(recipientJid(digits), text)
+    const result = await sendText(jid, text)
     res.json({ ok: true, messageId: result?.key?.id || null })
   } catch (err) {
     res.status(500).json({ ok: false, error: String(err?.message || err) })
   }
 })
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`Unique Market WhatsApp bot listening on port ${PORT}`)
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) console.warn('Supabase event bridge is not configured')
   startWhatsApp().catch(err => { status = 'error'; console.error('WhatsApp startup failed', err) })
