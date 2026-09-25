@@ -9,21 +9,100 @@ import { Boom } from '@hapi/boom'
 import pino from 'pino'
 import fs from 'node:fs'
 import path from 'node:path'
+import { createClient } from '@supabase/supabase-js'
 
 const PORT = Number(process.env.PORT || 10000)
 const AUTH_DIR = process.env.WA_AUTH_DIR || path.resolve('whatsapp-bot/auth_info')
 const PHONE_NUMBER = String(process.env.WA_PHONE_NUMBER || '917350060071').replace(/\D/g, '')
+const WA_API_SECRET = String(process.env.WA_API_SECRET || '')
+const SUPABASE_URL = String(process.env.SUPABASE_URL || '')
+const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '')
+const WA_GROUP_JID = String(process.env.WA_GROUP_JID || '').trim()
+const EVENT_POLL_MS = Number(process.env.WA_EVENT_POLL_MS || 5000)
 const logger = pino({ level: process.env.WA_LOG_LEVEL || 'silent' })
 const app = express()
 app.use(express.json({ limit: '256kb' }))
 
+const supabase = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
+  ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+  : null
+
+const botStartedAt = new Date().toISOString()
 let sock = null
 let status = 'starting'
 let lastQr = null
 let pairingCode = null
 let reconnecting = false
+let eventPollerStarted = false
 
 fs.mkdirSync(AUTH_DIR, { recursive: true })
+
+function authorized(req) {
+  return !WA_API_SECRET || req.get('x-wa-api-key') === WA_API_SECRET
+}
+
+function recipientJid(phone) {
+  const digits = String(phone || '').replace(/\D/g, '')
+  return digits ? `${digits}@s.whatsapp.net` : null
+}
+
+async function sendText(jid, message) {
+  if (status !== 'connected' || !sock) throw new Error('WhatsApp is not connected')
+  return sock.sendMessage(jid, { text: message })
+}
+
+async function processNotificationEvents() {
+  if (!supabase || status !== 'connected' || !sock) return
+
+  const { data, error } = await supabase
+    .from('whatsapp_notification_events')
+    .select('id, phone, customer_phone, event_type, message, status, created_at')
+    .eq('status', 'pending')
+    .gt('created_at', botStartedAt)
+    .order('created_at', { ascending: true })
+    .limit(10)
+
+  if (error) {
+    logger.error({ error }, 'notification event query failed')
+    return
+  }
+
+  for (const event of data || []) {
+    const targets = []
+    const phone = event.customer_phone || event.phone
+    const jid = recipientJid(phone)
+    if (jid) targets.push(jid)
+    if (WA_GROUP_JID && !targets.includes(WA_GROUP_JID)) targets.push(WA_GROUP_JID)
+
+    if (!targets.length) {
+      await supabase.from('whatsapp_notification_events').update({
+        status: 'failed',
+        error_message: 'No WhatsApp recipient configured'
+      }).eq('id', event.id)
+      continue
+    }
+
+    try {
+      for (const target of targets) await sendText(target, event.message)
+      await supabase.from('whatsapp_notification_events').update({
+        status: 'sent',
+        sent_at: new Date().toISOString(),
+        error_message: null
+      }).eq('id', event.id)
+    } catch (err) {
+      await supabase.from('whatsapp_notification_events').update({
+        status: 'failed',
+        error_message: String(err?.message || err)
+      }).eq('id', event.id)
+    }
+  }
+}
+
+function startEventPoller() {
+  if (eventPollerStarted) return
+  eventPollerStarted = true
+  setInterval(() => processNotificationEvents().catch(err => logger.error({ err }, 'event poll failed')), EVENT_POLL_MS)
+}
 
 async function startWhatsApp() {
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR)
@@ -46,13 +125,9 @@ async function startWhatsApp() {
     if (qr) {
       lastQr = qr
       status = 'pairing_required'
-
       if (PHONE_NUMBER && !state.creds.registered && !pairingCode) {
-        try {
-          pairingCode = await sock.requestPairingCode(PHONE_NUMBER)
-        } catch (err) {
-          logger.error({ err }, 'pairing code request failed')
-        }
+        try { pairingCode = await sock.requestPairingCode(PHONE_NUMBER) }
+        catch (err) { logger.error({ err }, 'pairing code request failed') }
       }
     }
 
@@ -61,13 +136,13 @@ async function startWhatsApp() {
       lastQr = null
       pairingCode = null
       reconnecting = false
+      startEventPoller()
       console.log('WhatsApp connected')
     }
 
     if (connection === 'close') {
       status = 'disconnected'
       const code = new Boom(lastDisconnect?.error)?.output?.statusCode
-
       if (code !== DisconnectReason.loggedOut && !reconnecting) {
         reconnecting = true
         setTimeout(() => startWhatsApp().catch(err => {
@@ -79,66 +154,45 @@ async function startWhatsApp() {
   })
 }
 
-app.get('/health', (_req, res) => {
-  res.json({ ok: true, service: 'unique-market-whatsapp', status })
-})
+app.get('/health', (_req, res) => res.json({ ok: true, service: 'unique-market-whatsapp', status }))
 
-app.get('/status', (_req, res) => {
+app.get('/status', (req, res) => {
+  if (!authorized(req)) return res.status(401).json({ ok: false, error: 'Unauthorized' })
   res.json({
-    ok: true,
-    status,
-    connected: status === 'connected',
+    ok: true, status, connected: status === 'connected',
     pairingRequired: status === 'pairing_required',
-    pairingCode: pairingCode || null,
-    hasQr: Boolean(lastQr),
-    phoneConfigured: Boolean(PHONE_NUMBER)
+    pairingCode: pairingCode || null, hasQr: Boolean(lastQr),
+    phoneConfigured: Boolean(PHONE_NUMBER), eventBridge: Boolean(supabase)
   })
 })
 
-app.post('/pair', async (_req, res) => {
+app.post('/pair', async (req, res) => {
+  if (!authorized(req)) return res.status(401).json({ ok: false, error: 'Unauthorized' })
   if (!sock) return res.status(503).json({ ok: false, error: 'WhatsApp socket is not ready' })
   if (status === 'connected') return res.json({ ok: true, status: 'connected' })
-  if (!PHONE_NUMBER) {
-    return res.status(400).json({
-      ok: false,
-      error: 'Set WA_PHONE_NUMBER in Render environment variables, digits only with country code'
-    })
-  }
-
   try {
     pairingCode = await sock.requestPairingCode(PHONE_NUMBER)
     res.json({ ok: true, status: 'pairing_required', pairingCode })
   } catch (err) {
-    console.error('Pairing failed', err)
     res.status(500).json({ ok: false, error: 'Pairing code request failed' })
   }
 })
 
 app.post('/send', async (req, res) => {
-  const { phone, message } = req.body || {}
-  const digits = String(phone || '').replace(/\D/g, '')
-  const text = String(message || '').trim()
-
-  if (status !== 'connected' || !sock) {
-    return res.status(503).json({ ok: false, error: 'WhatsApp is not connected' })
-  }
-  if (!digits || !text) {
-    return res.status(400).json({ ok: false, error: 'phone and message are required' })
-  }
-
+  if (!authorized(req)) return res.status(401).json({ ok: false, error: 'Unauthorized' })
+  const digits = String(req.body?.phone || '').replace(/\D/g, '')
+  const text = String(req.body?.message || '').trim()
+  if (!digits || !text) return res.status(400).json({ ok: false, error: 'phone and message are required' })
   try {
-    const result = await sock.sendMessage(`${digits}@s.whatsapp.net`, { text })
+    const result = await sendText(recipientJid(digits), text)
     res.json({ ok: true, messageId: result?.key?.id || null })
   } catch (err) {
-    console.error('WhatsApp send failed', err)
-    res.status(500).json({ ok: false, error: 'Message send failed' })
+    res.status(500).json({ ok: false, error: String(err?.message || err) })
   }
 })
 
 app.listen(PORT, () => {
   console.log(`Unique Market WhatsApp bot listening on port ${PORT}`)
-  startWhatsApp().catch(err => {
-    status = 'error'
-    console.error('WhatsApp startup failed', err)
-  })
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) console.warn('Supabase event bridge is not configured')
+  startWhatsApp().catch(err => { status = 'error'; console.error('WhatsApp startup failed', err) })
 })
