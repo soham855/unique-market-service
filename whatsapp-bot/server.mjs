@@ -15,7 +15,7 @@ const PORT = Number(process.env.PORT || 10000)
 const AUTH_DIR = process.env.WA_AUTH_DIR || path.resolve('whatsapp-bot/auth_info')
 const PHONE_NUMBER = String(process.env.WA_PHONE_NUMBER || '917350060071').replace(/\D/g, '')
 const WA_API_SECRET = String(process.env.WA_API_SECRET || '')
-const SUPABASE_URL = String(process.env.SUPABASE_URL || '')
+const SUPABASE_URL = String(process.env.SUPABASE_URL || 'https://tfscvycomllamoubtlcf.supabase.co')
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '')
 const WA_GROUP_JID = String(process.env.WA_GROUP_JID || '').trim()
 const EVENT_POLL_MS = Number(process.env.WA_EVENT_POLL_MS || 5000)
@@ -66,9 +66,12 @@ async function processNotificationEvents() {
     .limit(10)
 
   if (error) {
+    console.error('WhatsApp outbox query failed:', error)
     logger.error({ error }, 'notification event query failed')
     return
   }
+
+  if (data?.length) console.log(`WhatsApp outbox: ${data.length} pending event(s)`)
 
   for (const event of data || []) {
     const targets = []
@@ -93,6 +96,7 @@ async function processNotificationEvents() {
     }
 
     try {
+      console.log(`WhatsApp outbox sending ${event.id} (${event.event_type}) to ${targets.join(', ')}`)
       for (const target of targets) await sendText(target, event.message)
       await supabase.from('whatsapp_notification_events').update({
         status: 'sent',
@@ -100,6 +104,7 @@ async function processNotificationEvents() {
         error_message: null
       }).eq('id', event.id)
     } catch (err) {
+      console.error(`WhatsApp outbox send failed for ${event.id}:`, err)
       await supabase.from('whatsapp_notification_events').update({
         status: 'failed',
         error_message: String(err?.message || err)
