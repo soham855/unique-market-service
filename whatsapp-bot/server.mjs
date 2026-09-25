@@ -157,7 +157,7 @@ async function startWhatsApp() {
 
 app.get('/health', (_req, res) => res.json({ ok: true, service: 'unique-market-whatsapp', status }))
 
-app.get('/pair', (_req, res) => {
+const pairingPage = (_req, res) => {
   res.type('html').send(`<!doctype html>
 <html>
 <head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Unique Market WhatsApp Pairing</title>
@@ -179,7 +179,13 @@ document.getElementById('btn').onclick=async()=>{
 };
 </script>
 </body></html>`)
-})
+}
+
+app.get('/', pairingPage)
+app.get('/pair', pairingPage)
+
+/* PAIRING_PAGE_ROUTES */
+/* OLD_PAIRING_PAGE_BODY */
 
 app.get('/status', (req, res) => {
   if (!authorized(req)) return res.status(401).json({ ok: false, error: 'Unauthorized' })
