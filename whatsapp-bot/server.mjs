@@ -30,6 +30,7 @@ const supabase = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
 const botStartedAt = new Date().toISOString()
 let sock = null
 let status = 'starting'
+let lastConnectionEvent = null
 let lastQr = null
 let pairingCode = null
 let reconnecting = false
@@ -128,11 +129,13 @@ async function startWhatsApp() {
   })
 
   sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
+    lastConnectionEvent = { connection: connection || null, hasQr: Boolean(qr), at: new Date().toISOString(), code: lastDisconnect ? new Boom(lastDisconnect?.error)?.output?.statusCode || null : null }
     if (connection === 'connecting' || qr) {
       pairingReady = true
       if (qr) {
         lastQr = qr
         status = 'pairing_required'
+        console.log('WhatsApp QR generated')
       }
     }
 
@@ -162,6 +165,19 @@ async function startWhatsApp() {
     }
   })
 }
+
+app.get('/debug', (req, res) => {
+  if (!authorized(req)) return res.status(401).json({ ok: false, error: 'Unauthorized' })
+  res.json({
+    ok: true,
+    status,
+    hasQr: Boolean(lastQr),
+    pairingReady,
+    socket: Boolean(sock),
+    lastConnectionEvent,
+    authFiles: fs.existsSync(AUTH_DIR) ? fs.readdirSync(AUTH_DIR).slice(0, 10) : []
+  })
+})
 
 app.get('/health', (_req, res) => res.json({ ok: true, service: 'unique-market-whatsapp', status }))
 
