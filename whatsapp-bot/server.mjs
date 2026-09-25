@@ -142,12 +142,15 @@ async function startWhatsApp() {
 
   let saveCredsPromise = Promise.resolve()
   sock.ev.on('creds.update', () => {
+    console.log('WhatsApp credentials updated')
     saveCredsPromise = Promise.resolve(saveCreds()).catch(err => console.error('WhatsApp credential save failed:', err))
     return saveCredsPromise
   })
 
   sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
-    lastConnectionEvent = { connection: connection || null, hasQr: Boolean(qr), at: new Date().toISOString(), code: lastDisconnect ? new Boom(lastDisconnect?.error)?.output?.statusCode || null : null }
+    const disconnectCode = lastDisconnect ? new Boom(lastDisconnect?.error)?.output?.statusCode || null : null
+    lastConnectionEvent = { connection: connection || null, hasQr: Boolean(qr), at: new Date().toISOString(), code: disconnectCode }
+    console.log(`WhatsApp connection update: ${connection || 'none'} | qr=${Boolean(qr)} | code=${disconnectCode ?? 'none'}`)
     if (connection === 'connecting' || qr) {
       pairingReady = true
       if (qr) {
@@ -171,7 +174,8 @@ async function startWhatsApp() {
 
     if (connection === 'close') {
       status = 'disconnected'
-      const code = new Boom(lastDisconnect?.error)?.output?.statusCode
+      const code = disconnectCode
+      console.error(`WhatsApp connection closed. code=${code ?? 'unknown'} loggedOut=${code === DisconnectReason.loggedOut}`)
       if (code !== DisconnectReason.loggedOut && !reconnecting) {
         reconnecting = true
         try {
