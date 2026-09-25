@@ -157,6 +157,30 @@ async function startWhatsApp() {
 
 app.get('/health', (_req, res) => res.json({ ok: true, service: 'unique-market-whatsapp', status }))
 
+app.get('/pair', (_req, res) => {
+  res.type('html').send(`<!doctype html>
+<html>
+<head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Unique Market WhatsApp Pairing</title>
+<style>body{font-family:system-ui;max-width:520px;margin:40px auto;padding:20px}input,button{width:100%;padding:12px;margin:8px 0;box-sizing:border-box}button{cursor:pointer}.code{font-size:28px;font-weight:700;letter-spacing:3px}</style></head>
+<body>
+<h2>Unique Market WhatsApp Pairing</h2>
+<p>WhatsApp number: <b>+91 7350060071</b></p>
+<input id="secret" type="password" placeholder="WA_API_SECRET" autocomplete="off">
+<button id="btn">Get pairing code</button>
+<pre id="out"></pre>
+<script>
+document.getElementById('btn').onclick=async()=>{
+  const out=document.getElementById('out'); out.textContent='Loading...';
+  try{
+    const r=await fetch('/pair',{method:'POST',headers:{'Content-Type':'application/json','x-wa-api-key':document.getElementById('secret').value},body:'{}'});
+    const d=await r.json();
+    out.innerHTML=d.pairingCode ? '<div class="code">'+d.pairingCode+'</div><p>WhatsApp → Linked Devices → Link with phone number instead</p>' : JSON.stringify(d,null,2);
+  }catch(e){out.textContent=String(e)}
+};
+</script>
+</body></html>`)
+})
+
 app.get('/status', (req, res) => {
   if (!authorized(req)) return res.status(401).json({ ok: false, error: 'Unauthorized' })
   res.json({
