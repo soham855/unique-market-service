@@ -206,6 +206,20 @@ app.get('/pair', pairingPage)
 
 /* QR_PAIRING_PAGE */
  
+app.get('/qr', async (req, res) => {
+  if (!authorized(req)) return res.status(401).json({ ok: false, error: 'Unauthorized' })
+  res.type('json')
+  if (status === 'connected') return res.json({ ok: true, connected: true, qrDataUrl: null })
+  if (!lastQr) return res.json({ ok: true, connected: false, qrDataUrl: null, message: 'QR is not ready yet. Wait a few seconds and try again.' })
+  try {
+    const QRCode = await import('qrcode')
+    const qrDataUrl = await QRCode.default.toDataURL(lastQr, { width: 280, margin: 2 })
+    return res.json({ ok: true, connected: false, qrDataUrl })
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: 'QR generation failed', detail: String(err?.message || err) })
+  }
+})
+
 app.get('/status', (req, res) => {
   if (!authorized(req)) return res.status(401).json({ ok: false, error: 'Unauthorized' })
   res.json({
