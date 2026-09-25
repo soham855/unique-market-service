@@ -4,6 +4,7 @@ import makeWASocket, {
   makeCacheableSignalKeyStore,
   useMultiFileAuthState,
   fetchLatestWaWebVersion,
+  Browsers,
 } from '@whiskeysockets/baileys'
 import { Boom } from '@hapi/boom'
 import pino from 'pino'
@@ -139,7 +140,7 @@ async function startWhatsApp() {
     version,
     logger,
     auth: { creds: state.creds, keys: makeCacheableSignalKeyStore(state.keys, logger) },
-    browser: ['Unique Market', 'Chrome', '1.0.0'],
+    browser: Browsers.ubuntu('Chrome'),
     markOnlineOnConnect: false,
     syncFullHistory: false,
     connectTimeoutMs: 120000,
