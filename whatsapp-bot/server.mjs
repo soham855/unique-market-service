@@ -168,23 +168,35 @@ app.get('/health', (_req, res) => res.json({ ok: true, service: 'unique-market-w
 const pairingPage = (_req, res) => {
   res.type('html').send(`<!doctype html>
 <html>
-<head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Unique Market WhatsApp Pairing</title>
-<style>body{font-family:system-ui;max-width:520px;margin:40px auto;padding:20px}input,button{width:100%;padding:12px;margin:8px 0;box-sizing:border-box}button{cursor:pointer}.code{font-size:28px;font-weight:700;letter-spacing:3px}.qr{display:block;width:280px;height:280px;margin:18px auto}</style></head>
+<head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Unique Market WhatsApp QR</title>
+<style>body{font-family:system-ui;max-width:520px;margin:40px auto;padding:20px;text-align:center}input,button{width:100%;padding:12px;margin:8px 0;box-sizing:border-box}button{cursor:pointer}.qr{display:block;width:280px;height:280px;margin:18px auto}.hint{color:#555}</style></head>
 <body>
-<h2>Unique Market WhatsApp Pairing</h2>
+<h2>Unique Market WhatsApp QR Pairing</h2>
 <p>WhatsApp number: <b>+91 7350060071</b></p>
 <input id="secret" type="password" placeholder="WA_API_SECRET" autocomplete="off">
-<button id="btn">Get pairing code</button>
-<pre id="out"></pre>
+<button id="btn">Show QR Code</button>
+<p id="out" class="hint">Enter WA_API_SECRET and tap Show QR Code.</p>
+<img id="qr" class="qr" style="display:none" alt="WhatsApp QR code">
 <script>
-document.getElementById('btn').onclick=async()=>{
-  const out=document.getElementById('out'); out.textContent='Loading...';
+const secret=()=>document.getElementById('secret').value;
+const out=document.getElementById('out');
+const qr=document.getElementById('qr');
+async function refresh(){
   try{
-    const r=await fetch('/pair',{method:'POST',headers:{'Content-Type':'application/json','x-wa-api-key':document.getElementById('secret').value},body:'{}'});
+    const r=await fetch('/qr',{headers:{'x-wa-api-key':secret()}});
     const d=await r.json();
-    out.innerHTML=d.pairingCode ? '<div class="code">'+d.pairingCode+'</div><p>WhatsApp → Linked Devices → Link with phone number instead</p>' : JSON.stringify(d,null,2);
+    if(d.qrDataUrl){
+      qr.src=d.qrDataUrl; qr.style.display='block';
+      out.textContent='WhatsApp → Linked Devices → Link a device → Scan this QR code.';
+    }else if(d.connected){
+      qr.style.display='none'; out.textContent='WhatsApp is connected.';
+    }else{
+      qr.style.display='none'; out.textContent=d.message||'Waiting for QR...';
+    }
   }catch(e){out.textContent=String(e)}
-};
+}
+document.getElementById('btn').onclick=async()=>{out.textContent='Starting QR...'; await refresh();};
+setInterval(refresh,3000);
 </script>
 </body></html>`)
 }
@@ -192,22 +204,8 @@ document.getElementById('btn').onclick=async()=>{
 app.get('/', pairingPage)
 app.get('/pair', pairingPage)
 
-/* PAIRING_PAGE_ROUTES */
-/* OLD_PAIRING_PAGE_BODY */
-
-app.get('/qr', async (req, res) => {
-  if (!authorized(req)) return res.status(401).json({ ok: false, error: 'Unauthorized' })
-  if (status === 'connected') return res.json({ ok: true, connected: true, qrDataUrl: null })
-  if (!lastQr) return res.json({ ok: true, connected: false, qrDataUrl: null, message: 'QR is not ready yet. Wait a few seconds and refresh.' })
-  try {
-    const QRCode = await import('qrcode')
-    const qrDataUrl = await QRCode.default.toDataURL(lastQr, { width: 280, margin: 2 })
-    res.json({ ok: true, connected: false, qrDataUrl })
-  } catch (err) {
-    res.status(500).json({ ok: false, error: 'QR generation failed', detail: String(err?.message || err) })
-  }
-})
-
+/* QR_PAIRING_PAGE */
+ 
 app.get('/status', (req, res) => {
   if (!authorized(req)) return res.status(401).json({ ok: false, error: 'Unauthorized' })
   res.json({
