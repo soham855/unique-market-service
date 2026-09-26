@@ -31,7 +31,8 @@
     "express": "^5.1.0",
     "pino": "^9.9.4",
     "@hapi/boom": "^10.0.1",
-    "qrcode": "^1.5.4"
+    "qrcode": "^1.5.4",
+    "@sentry/browser": "^10.22.0"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
