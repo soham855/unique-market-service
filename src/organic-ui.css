@@ -1,0 +1,94 @@
+/* UNIQUE MARKET — Organic Human-Centric Refresh */
+.premium-landing{
+  --organic-ink:#f7f4ee;--organic-muted:#a9a39a;--organic-warm:#f2b66d;--organic-cyan:#67e8f9;
+  background:
+    radial-gradient(900px 600px at 78% -8%,rgba(103,232,249,.12),transparent 60%),
+    radial-gradient(700px 500px at -8% 32%,rgba(242,182,109,.10),transparent 62%),
+    radial-gradient(600px 500px at 80% 75%,rgba(87,227,155,.055),transparent 65%),
+    #071014 !important;
+  color:var(--organic-ink)!important;
+}
+.premium-landing:before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.18;background-image:radial-gradient(rgba(255,255,255,.08) .6px,transparent .6px);background-size:5px 5px;mask-image:linear-gradient(to bottom,black,transparent 75%)}
+.premium-landing>*{position:relative;z-index:1}
+.premium-landing .company-nav{
+  margin-top:12px!important;padding:12px 16px!important;border:1px solid rgba(255,255,255,.10)!important;
+  border-radius:18px!important;background:rgba(8,17,22,.62)!important;box-shadow:0 14px 45px rgba(0,0,0,.18)!important;
+  backdrop-filter:blur(22px)!important;
+}
+.premium-landing .company-logo{letter-spacing:.11em!important}
+.premium-landing .company-navlinks a{transition:color .22s ease,transform .22s ease!important}
+.premium-landing .company-navlinks a:hover{color:#fff!important;transform:translateY(-1px)}
+.premium-landing .nav-portal{border-radius:999px!important;background:rgba(103,232,249,.10)!important;box-shadow:inset 0 1px rgba(255,255,255,.08)!important;transition:.25s ease!important}
+.premium-landing .nav-portal:hover{transform:translateY(-2px);background:rgba(103,232,249,.17)!important}
+.premium-landing .company-hero{min-height:690px!important;gap:72px!important;padding-top:88px!important}
+.premium-landing .hero-copy h1{font-size:clamp(46px,6.5vw,82px)!important;line-height:.96!important;letter-spacing:-.065em!important}
+.premium-landing .hero-copy>p{color:#b3afa8!important;font-size:17px!important;line-height:1.78!important}
+.premium-landing .company-kicker,.premium-landing .section-label{color:#8eeaf6!important}
+.premium-landing .company-ctas a{border-radius:999px!important;min-height:54px!important;padding:0 23px!important}
+.premium-landing .cta-primary{box-shadow:0 16px 40px rgba(34,211,238,.16)!important}
+.premium-landing .cta-primary:hover,.premium-landing .cta-secondary:hover{transform:translateY(-4px) scale(1.01)!important}
+.premium-landing .hero-panel{
+  padding:28px!important;border-radius:32px!important;border:1px solid rgba(255,255,255,.13)!important;
+  background:linear-gradient(145deg,rgba(28,43,48,.62),rgba(6,15,20,.70))!important;
+  box-shadow:0 35px 100px rgba(0,0,0,.34),inset 0 1px rgba(255,255,255,.08)!important;
+  backdrop-filter:blur(22px)!important;transition:transform .35s ease,box-shadow .35s ease!important;
+}
+.premium-landing .hero-panel:hover{transform:translateY(-5px) rotate(.2deg);box-shadow:0 42px 110px rgba(0,0,0,.42),0 0 50px rgba(103,232,249,.05)!important}
+.premium-landing .quick-enquiry-form input{
+  height:46px!important;border-radius:14px!important;background:rgba(3,10,14,.58)!important;border-color:rgba(255,255,255,.10)!important;
+  transition:border-color .22s,box-shadow .22s,transform .22s!important
+}
+.premium-landing .quick-enquiry-form input:focus{transform:translateY(-1px);border-color:rgba(103,232,249,.55)!important}
+.premium-landing .quick-enquiry-submit{border-radius:999px!important;min-height:48px!important;transition:.25s ease!important}
+.premium-landing .quick-enquiry-submit:hover{transform:translateY(-3px);filter:brightness(1.06);box-shadow:0 16px 36px rgba(22,163,74,.22)}
+.premium-landing .company-stats{border-color:rgba(255,255,255,.10)!important}
+.premium-landing .company-stats div{transition:background .25s ease,transform .25s ease;border-radius:14px}
+.premium-landing .company-stats div:hover{background:rgba(255,255,255,.035);transform:translateY(-2px)}
+.premium-landing .company-stats strong{font-size:32px!important}
+.premium-landing .company-stats span{color:#7f8c8a!important}
+.premium-landing .company-section{padding:86px 0!important}
+.premium-landing .section-head h2,.premium-landing .about-card h2,.premium-landing .contact-section h2{letter-spacing:-.055em!important}
+.premium-landing .section-head>p,.premium-landing .about-card p,.premium-landing .contact-section>div>p{color:#aaa7a0!important;line-height:1.8!important}
+.premium-landing .service-grid{gap:18px!important}
+.premium-landing .service-card{
+  min-height:320px!important;padding:26px!important;border-radius:26px!important;
+  background:linear-gradient(145deg,rgba(25,39,43,.68),rgba(7,15,20,.70))!important;
+  border-color:rgba(255,255,255,.095)!important;backdrop-filter:blur(18px)!important;
+  box-shadow:inset 0 1px rgba(255,255,255,.055),0 18px 50px rgba(0,0,0,.18)!important;
+  transition:transform .32s cubic-bezier(.2,.8,.2,1),border-color .32s,box-shadow .32s!important
+}
+.premium-landing .service-card:hover{transform:translateY(-9px) rotate(-.25deg)!important;border-color:rgba(103,232,249,.30)!important;box-shadow:0 30px 65px rgba(0,0,0,.30),0 0 35px rgba(103,232,249,.05)!important}
+.premium-landing .service-icon{border-radius:17px!important;background:rgba(103,232,249,.08)!important}
+.premium-landing .service-card h3{font-size:18px!important}
+.premium-landing .service-card>p,.premium-landing .service-card li{color:#aaa9a3!important}
+.premium-landing .product-grid{gap:13px!important}
+.premium-landing .product-item{
+  border-radius:18px!important;background:rgba(13,25,29,.62)!important;border-color:rgba(255,255,255,.085)!important;
+  transition:transform .25s ease,border-color .25s ease,background .25s ease!important
+}
+.premium-landing .product-item:hover{transform:translateY(-5px) scale(1.01)!important;background:rgba(20,37,42,.75)!important;border-color:rgba(242,182,109,.30)!important}
+.premium-landing .area-list a,.premium-landing .area-list span{background:rgba(255,255,255,.035)!important;border-color:rgba(255,255,255,.09)!important;transition:.22s ease!important}
+.premium-landing .area-list a:hover,.premium-landing .area-list span:hover{transform:translateY(-2px);background:rgba(103,232,249,.07)!important}
+.premium-landing .about-card,.premium-landing .contact-section{
+  border-radius:30px!important;background:linear-gradient(135deg,rgba(31,39,38,.66),rgba(7,16,20,.72))!important;
+  border-color:rgba(242,182,109,.16)!important;backdrop-filter:blur(18px)!important;
+  box-shadow:inset 0 1px rgba(255,255,255,.05),0 24px 70px rgba(0,0,0,.20)!important
+}
+.premium-landing .contact-card{border-radius:22px!important;background:rgba(3,10,14,.48)!important}
+.premium-landing .contact-links a{border-radius:999px!important;transition:.24s ease!important}
+.premium-landing .contact-links a:hover{transform:translateY(-2px);filter:brightness(1.08)}
+.premium-landing .company-footer a,.premium-landing .company-footer p{transition:color .2s ease}
+.premium-landing .contact-popup{
+  border-radius:22px!important;background:rgba(8,18,22,.82)!important;border-color:rgba(103,232,249,.20)!important;
+  backdrop-filter:blur(24px)!important;box-shadow:0 25px 80px rgba(0,0,0,.40)!important
+}
+@media(max-width:640px){
+ .premium-landing .company-nav{margin-top:7px!important;width:calc(100% - 18px)!important}
+ .premium-landing .company-hero{padding-top:52px!important}
+ .premium-landing .hero-copy h1{font-size:45px!important}
+ .premium-landing .company-section{padding:58px 0!important}
+ .premium-landing .service-card{border-radius:22px!important}
+}
+@media(prefers-reduced-motion:reduce){
+ .premium-landing *,.premium-landing *:before,.premium-landing *:after{animation:none!important;transition:none!important}
+}
