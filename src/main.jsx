@@ -1,4 +1,5 @@
 import React,{useEffect,useState} from 'react'
+import {initGlitchTip,setGlitchTipTag} from './lib/glitchtip'
 import {createRoot} from 'react-dom/client'
 import {App as CapacitorApp} from '@capacitor/app'
 import {Capacitor} from '@capacitor/core'
@@ -43,6 +44,9 @@ import CustomerReferral from './components/CustomerReferral'
 import NetworkAITool from './components/NetworkAITool'
 import TrackService from './components/TrackService'
 import {initNativePushNotifications} from './lib/nativeNotifications'
+
+initGlitchTip()
+setGlitchTipTag('service', 'unique-market-web')
 const publicSeoPaths=Object.keys(localSeoPages)
 function App(){
  const pathname=window.location.pathname.replace(/\/$/,'')
