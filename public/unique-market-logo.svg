@@ -1,12 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 360" role="img" aria-labelledby="title desc">
-<title id="title">Unique Market</title><desc id="desc">Unique Market CCTV, IT and Service logo</desc>
-<g transform="translate(20 20)"><rect width="320" height="320" rx="78" fill="#fff"/>
-<circle cx="160" cy="145" r="105" fill="none" stroke="#123b78" stroke-width="12"/>
-<path d="M82 88h90v18h-72v118h72v20H82z" fill="#123b78"/><path d="M188 96h68v18h-50v126h-18z" fill="#123b78"/>
-<path d="M210 101l66-20 36 17-67 23zM243 122h50v32h-50z" fill="#171a1e"/><circle cx="268" cy="138" r="13" fill="#123b78" stroke="#fff" stroke-width="5"/>
-<path d="M246 156l-23 53 22 5 24-52zM221 207h28v65h-28zM228 236l-31 30 18 18 37-32z" fill="#171a1e"/>
-<path d="M188 169v86l-40-34v-52" fill="none" stroke="#123b78" stroke-width="8"/>
-<circle cx="148" cy="169" r="7" fill="#fff" stroke="#123b78" stroke-width="4"/><circle cx="184" cy="191" r="7" fill="#fff" stroke="#123b78" stroke-width="4"/><circle cx="116" cy="196" r="7" fill="#fff" stroke="#123b78" stroke-width="4"/></g>
-<g transform="translate(390 92)"><text x="0" y="78" font-family="Arial,Helvetica,sans-serif" font-size="82" font-weight="900" letter-spacing="3" fill="#123b78">UNIQUE</text>
-<text x="0" y="158" font-family="Arial,Helvetica,sans-serif" font-size="82" font-weight="900" letter-spacing="3" fill="#171a1e">MARKET</text>
-<rect x="2" y="184" width="560" height="3" rx="2" fill="#123b78"/><text x="0" y="222" font-family="Arial,Helvetica,sans-serif" font-size="22" font-weight="800" letter-spacing="8" fill="#123b78">CCTV  •  IT  •  SERVICE</text></g></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 360" role="img" aria-label="Unique Market logo">
+<rect width="360" height="360" rx="88" fill="#fff"/>
+<circle cx="180" cy="165" r="112" fill="none" stroke="#123b78" stroke-width="13"/>
+<path d="M92 103h96v19h-76v126h76v21H92z" fill="#123b78"/>
+<path d="M202 112h72v19h-53v136h-19z" fill="#123b78"/>
+<path d="M226 117l69-21 39 18-70 24zM260 139h53v34h-53z" fill="#171a1e"/>
+<circle cx="286" cy="156" r="14" fill="#123b78" stroke="#fff" stroke-width="5"/>
+<path d="M264 175l-25 57 24 5 26-56zM237 229h30v69h-30zM244 260l-33 32 20 20 39-34z" fill="#171a1e"/>
+<path d="M201 190v91l-43-36v-55" fill="none" stroke="#123b78" stroke-width="9"/>
+<circle cx="158" cy="190" r="8" fill="#fff" stroke="#123b78" stroke-width="4"/>
+<circle cx="197" cy="214" r="8" fill="#fff" stroke="#123b78" stroke-width="4"/>
+<circle cx="122" cy="220" r="8" fill="#fff" stroke="#123b78" stroke-width="4"/>
+</svg>
