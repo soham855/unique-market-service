@@ -2,7 +2,12 @@ name: Unique Market AI Auto-Heal
 
 on:
   workflow_run:
-    workflows: ["Unique Market Auto-Heal Monitor"]
+    workflows:
+      - "Android APK"
+      - "Android AAB"
+      - "Flutter Android"
+      - "Network Agent Windows"
+      - "Workspace Reminder Android"
     types: [completed]
   workflow_dispatch:
 
@@ -41,7 +46,6 @@ jobs:
           touch auto-heal/error.log
 
       - name: Ask AI for constrained repair
-        id: repair
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
@@ -57,7 +61,7 @@ jobs:
 
       - name: Build validation
         run: |
-          npm ci
+          npm install
           npm run build
 
       - name: Create repair branch and PR
