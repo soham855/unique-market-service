@@ -1,0 +1,72 @@
+name: Unique Market Auto-Heal
+
+on:
+  workflow_run:
+    workflows:
+      - "Android APK"
+      - "Android AAB"
+      - "Flutter Android"
+      - "Network Agent Windows"
+      - "Workspace Reminder Android"
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "Failed GitHub Actions run ID to diagnose"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  actions: read
+  issues: write
+
+concurrency:
+  group: unique-market-auto-heal
+  cancel-in-progress: false
+
+jobs:
+  heal:
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'failure'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout production branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 20
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Download failed run logs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.event.workflow_run.id || inputs.run_id }}
+        run: |
+          set -euo pipefail
+          mkdir -p .auto-heal
+          curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${{ github.repository }}/actions/runs/$RUN_ID/logs" -o .auto-heal/logs.zip
+          unzip -q -o .auto-heal/logs.zip -d .auto-heal/logs
+          find .auto-heal/logs -type f -maxdepth 2 -print0 | xargs -0 cat > .auto-heal/combined.log || true
+          tail -c 120000 .auto-heal/combined.log > .auto-heal/error.log
+      - name: Run AI repair agent
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+          GH_TOKEN: ${{ github.token }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_TEAM_ID: ${{ secrets.VERCEL_TEAM_ID }}
+        run: node scripts/auto-heal.mjs
+      - name: Upload repair diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: auto-heal-diagnostics
+          path: .auto-heal/
+          if-no-files-found: ignore
