@@ -1,0 +1,83 @@
+name: Unique Market AI Auto-Heal
+
+on:
+  workflow_run:
+    workflows: ["Unique Market Auto-Heal Monitor"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: read
+  issues: write
+
+concurrency:
+  group: auto-heal
+  cancel-in-progress: true
+
+jobs:
+  repair:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'failure'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Collect failure log
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          mkdir -p auto-heal/logs
+          if [ -n "${RUN_ID:-}" ]; then
+            curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json"               "https://api.github.com/repos/${{ github.repository }}/actions/runs/$RUN_ID/logs" -o auto-heal/logs.zip
+            unzip -q -o auto-heal/logs.zip -d auto-heal/logs
+            find auto-heal/logs -type f -print0 | xargs -0 cat > auto-heal/error.log || true
+          fi
+          touch auto-heal/error.log
+
+      - name: Ask AI for constrained repair
+        id: repair
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+          AUTO_HEAL_LOG: auto-heal/error.log
+        run: node scripts/auto-heal-agent.mjs > auto-heal/plan.json
+
+      - name: Apply patch
+        run: |
+          set -euo pipefail
+          test -s auto-heal.patch
+          git apply --check auto-heal.patch
+          git apply auto-heal.patch
+
+      - name: Build validation
+        run: |
+          npm ci
+          npm run build
+
+      - name: Create repair branch and PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git config user.name "Unique Market Auto-Heal"
+          git config user.email "actions@users.noreply.github.com"
+          BRANCH="auto-heal/${{ github.run_id }}"
+          git checkout -b "$BRANCH"
+          git add -A
+          git diff --cached --stat
+          git commit -m "fix: AI auto-heal CI failure"
+          git push origin "$BRANCH"
+          gh pr create --repo "${{ github.repository }}" --base main --head "$BRANCH"             --title "Auto-Heal: repair failed workflow"             --body-file auto-heal/plan.json
+
+      - name: Report when no safe repair was produced
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create --repo "${{ github.repository }}"             --title "Auto-Heal: repair attempt failed"             --body "The constrained AI repair agent could not produce a validated repair. Review the workflow run and logs before changing production code."
