@@ -1,0 +1,40 @@
+/* Unique Market — breathing-space refinement */
+.premium-landing .company-hero{padding-top:104px!important;padding-bottom:108px!important;gap:88px!important}
+.premium-landing .hero-copy>p{margin-top:30px!important}
+.premium-landing .company-ctas{margin-top:36px!important}
+.premium-landing .hero-trust{margin-top:30px!important}
+.premium-landing .company-stats{margin-top:34px!important;margin-bottom:38px!important}
+.premium-landing .company-stats div{padding:31px 24px!important}
+.premium-landing .company-section{padding-top:108px!important;padding-bottom:108px!important}
+.premium-landing .section-head{margin-bottom:44px!important;gap:76px!important}
+.premium-landing .service-grid{gap:24px!important}
+.premium-landing .service-card{padding:31px!important}
+.premium-landing .product-grid{gap:18px!important}
+.premium-landing .product-item{padding:25px!important}
+.premium-landing .area-list{gap:12px!important}
+.premium-landing .about-card{padding:62px!important}
+.premium-landing .contact-section{padding:54px!important}
+.premium-landing .contact-card{padding:28px!important}
+@media(max-width:900px){
+ .premium-landing .company-hero{padding-top:76px!important;padding-bottom:82px!important;gap:58px!important}
+ .premium-landing .company-section{padding-top:82px!important;padding-bottom:82px!important}
+ .premium-landing .section-head{margin-bottom:34px!important;gap:42px!important}
+ .premium-landing .about-card{padding:42px!important}
+}
+@media(max-width:640px){
+ .premium-landing .company-hero{padding-top:60px!important;padding-bottom:70px!important;gap:42px!important}
+ .premium-landing .hero-copy>p{margin-top:22px!important}
+ .premium-landing .company-ctas{margin-top:28px!important}
+ .premium-landing .hero-trust{margin-top:24px!important}
+ .premium-landing .company-stats{margin-top:28px!important;margin-bottom:30px!important}
+ .premium-landing .company-stats div{padding:23px 16px!important}
+ .premium-landing .company-section{padding-top:68px!important;padding-bottom:68px!important}
+ .premium-landing .section-head{margin-bottom:28px!important;gap:24px!important}
+ .premium-landing .service-grid{gap:16px!important}
+ .premium-landing .service-card{padding:25px!important}
+ .premium-landing .product-grid{gap:14px!important}
+ .premium-landing .product-item{padding:21px!important}
+ .premium-landing .about-card{padding:30px!important}
+ .premium-landing .contact-section{padding:30px!important}
+ .premium-landing .contact-card{padding:22px!important}
+}
