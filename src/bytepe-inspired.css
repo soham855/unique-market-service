@@ -1,0 +1,288 @@
+/* Unique Market — BytePe-inspired storefront UI refresh.
+   UI-only layer: no data, auth, API, payment, WhatsApp or service logic is changed. */
+
+.premium-landing{
+  --store-ink:#111827!important;
+  --store-muted:#64748b!important;
+  --store-line:#e5e7eb!important;
+  --store-card:#ffffff!important;
+  --store-soft:#f8fafc!important;
+  --store-accent:#0891b2!important;
+  --store-accent-dark:#0e7490!important;
+  background:#fff!important;
+  color:var(--store-ink)!important;
+  font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important;
+  overflow-x:hidden!important;
+}
+.premium-landing:before{
+  content:"";position:fixed;inset:0;z-index:-1;
+  background:linear-gradient(180deg,#fff 0%,#f8fafc 55%,#fff 100%)!important;
+}
+.premium-landing .company-nav{
+  width:min(1240px,calc(100% - 40px))!important;
+  padding:14px 18px!important;
+  margin:14px auto 0!important;
+  border:1px solid rgba(15,23,42,.08)!important;
+  border-radius:18px!important;
+  background:rgba(255,255,255,.88)!important;
+  box-shadow:0 8px 30px rgba(15,23,42,.07)!important;
+  backdrop-filter:blur(18px)!important;
+}
+.premium-landing .company-logo{
+  color:#111827!important;
+  font-size:18px!important;
+  letter-spacing:-.03em!important;
+}
+.premium-landing .company-logo span{color:var(--store-accent)!important}
+.premium-landing .company-navlinks{gap:25px!important}
+.premium-landing .company-navlinks a{
+  color:#475569!important;font-size:12px!important;font-weight:750!important;
+  transition:color .2s ease,transform .2s ease!important;
+}
+.premium-landing .company-navlinks a:hover{color:#0891b2!important;transform:translateY(-1px)!important}
+.premium-landing .nav-portal{
+  color:#fff!important;background:#111827!important;border-color:#111827!important;
+  border-radius:11px!important;padding:10px 15px!important;
+  box-shadow:0 6px 18px rgba(15,23,42,.12)!important;
+}
+
+.premium-landing .company-hero{
+  width:min(1240px,calc(100% - 40px))!important;
+  min-height:610px!important;
+  grid-template-columns:1.08fr .72fr!important;
+  gap:70px!important;
+  padding:68px 0 62px!important;
+}
+.premium-landing .company-hero:before{
+  width:560px!important;height:560px!important;right:-170px!important;top:5px!important;
+  border:0!important;
+  background:radial-gradient(circle,rgba(34,211,238,.12),rgba(34,211,238,.035) 42%,transparent 68%)!important;
+  box-shadow:none!important;
+}
+.premium-landing .company-kicker{
+  color:#0e7490!important;font-size:10px!important;letter-spacing:.14em!important;
+  font-weight:900!important;
+}
+.premium-landing .company-kicker:before{background:#22c1dc!important}
+.premium-landing .hero-copy h1{
+  color:#0f172a!important;
+  max-width:760px!important;
+  font-size:clamp(44px,6vw,72px)!important;
+  line-height:1.01!important;
+  letter-spacing:-.065em!important;
+  margin:17px 0 18px!important;
+}
+.premium-landing .hero-copy h1 span{
+  color:#0891b2!important;
+  background:linear-gradient(90deg,#0891b2,#06b6d4)!important;
+  -webkit-background-clip:text!important;background-clip:text!important;
+  -webkit-text-fill-color:transparent!important;
+}
+.premium-landing .hero-copy>p{
+  color:#64748b!important;font-size:15px!important;line-height:1.8!important;
+  max-width:660px!important;
+}
+.premium-landing .company-ctas{margin-top:27px!important}
+.premium-landing .cta-primary{
+  color:#fff!important;background:#111827!important;
+  box-shadow:0 10px 25px rgba(15,23,42,.14)!important;
+  border-radius:12px!important;
+}
+.premium-landing .cta-secondary{
+  color:#0f172a!important;background:#fff!important;
+  border:1px solid #dbe3ec!important;border-radius:12px!important;
+}
+.premium-landing .cta-primary:hover,.premium-landing .cta-secondary:hover{
+  transform:translateY(-2px)!important;box-shadow:0 14px 30px rgba(15,23,42,.12)!important;
+}
+.premium-landing .hero-trust{
+  color:#64748b!important;font-size:10px!important;margin-top:21px!important;
+}
+.premium-landing .hero-trust span:first-child{color:#334155!important}
+
+.premium-landing .hero-panel{
+  padding:24px!important;
+  border:1px solid #e2e8f0!important;
+  border-radius:24px!important;
+  background:#fff!important;
+  box-shadow:0 25px 70px rgba(15,23,42,.11)!important;
+}
+.premium-landing .hero-panel:after{display:none!important}
+.premium-landing .panel-top{
+  color:#0f172a!important;font-size:9px!important;letter-spacing:.14em!important;
+}
+.premium-landing .panel-top span{color:#0891b2!important}
+.premium-landing .quick-enquiry-title{color:#0f172a!important;font-size:23px!important}
+.premium-landing .quick-enquiry-subtitle{color:#64748b!important}
+.premium-landing .quick-enquiry-form input{
+  height:45px!important;color:#0f172a!important;background:#f8fafc!important;
+  border:1px solid #e2e8f0!important;border-radius:11px!important;
+}
+.premium-landing .quick-enquiry-form input::placeholder{color:#94a3b8!important}
+.premium-landing .quick-enquiry-form input:focus{
+  border-color:#22b8d3!important;box-shadow:0 0 0 3px rgba(34,184,211,.09)!important;
+}
+.premium-landing .quick-enquiry-submit{
+  background:#0891b2!important;border-radius:11px!important;
+  box-shadow:0 9px 22px rgba(8,145,178,.18)!important;
+}
+.premium-landing .quick-enquiry-note{color:#94a3b8!important}
+
+.premium-landing .company-stats{
+  width:min(1240px,calc(100% - 40px))!important;
+  margin:0 auto 54px!important;
+  border:1px solid #e5e7eb!important;
+  border-radius:18px!important;
+  overflow:hidden!important;
+  background:#fff!important;
+  box-shadow:0 10px 35px rgba(15,23,42,.045)!important;
+}
+.premium-landing .company-stats div{
+  padding:21px 20px!important;border-right:1px solid #eef2f7!important;
+}
+.premium-landing .company-stats strong{color:#0f172a!important;font-size:26px!important}
+.premium-landing .company-stats span{color:#64748b!important;font-size:8px!important}
+
+.premium-landing .company-section{
+  width:min(1240px,calc(100% - 40px))!important;
+  padding:66px 0!important;
+}
+.premium-landing .section-head{margin-bottom:28px!important}
+.premium-landing .section-label{
+  color:#0891b2!important;font-size:9px!important;letter-spacing:.16em!important;
+}
+.premium-landing .section-head h2{
+  color:#0f172a!important;font-size:clamp(30px,4vw,47px)!important;
+  letter-spacing:-.055em!important;
+}
+.premium-landing .section-head>p{
+  color:#64748b!important;font-size:13px!important;line-height:1.75!important;
+}
+.premium-landing .service-grid{gap:14px!important}
+.premium-landing .service-card{
+  min-height:285px!important;padding:23px!important;
+  border:1px solid #e5e7eb!important;border-radius:18px!important;
+  background:#fff!important;
+  box-shadow:0 10px 32px rgba(15,23,42,.055)!important;
+}
+.premium-landing .service-card:before{background:rgba(8,145,178,.06)!important}
+.premium-landing .service-card:hover{
+  transform:translateY(-5px)!important;
+  border-color:#a5e5ef!important;
+  box-shadow:0 20px 45px rgba(15,23,42,.10)!important;
+}
+.premium-landing .service-icon{
+  color:#0891b2!important;background:#ecfeff!important;
+  border-color:#c9f4f8!important;border-radius:13px!important;
+}
+.premium-landing .service-card h3{color:#111827!important}
+.premium-landing .service-card>p{color:#64748b!important}
+.premium-landing .service-card li{color:#475569!important}
+.premium-landing .service-card li:before{color:#0891b2!important}
+.premium-landing .service-card>a{color:#0891b2!important}
+
+.premium-landing .products-section{border-top:1px solid #eef2f7!important}
+.premium-landing .product-grid{gap:12px!important}
+.premium-landing .product-item{
+  padding:21px!important;border:1px solid #e5e7eb!important;
+  border-radius:16px!important;background:#fff!important;
+  box-shadow:0 8px 24px rgba(15,23,42,.045)!important;
+}
+.premium-landing .product-item:hover{
+  border-color:#a5e5ef!important;transform:translateY(-4px)!important;
+  box-shadow:0 16px 35px rgba(15,23,42,.08)!important;
+}
+.premium-landing .product-item span{color:#0891b2!important}
+.premium-landing .product-item strong{color:#111827!important}
+.premium-landing .product-item small{color:#94a3b8!important}
+
+.premium-landing .area-list a,.premium-landing .area-list span{
+  color:#475569!important;background:#fff!important;border:1px solid #e2e8f0!important;
+  box-shadow:0 5px 16px rgba(15,23,42,.035)!important;
+}
+.premium-landing .area-list a:hover{
+  color:#0891b2!important;border-color:#a5e5ef!important;transform:translateY(-2px)!important;
+}
+
+.premium-landing .about-card{
+  padding:44px!important;border:1px solid #e2e8f0!important;border-radius:22px!important;
+  background:linear-gradient(135deg,#f8fafc,#fff)!important;
+  box-shadow:0 15px 45px rgba(15,23,42,.055)!important;
+}
+.premium-landing .about-card h2{color:#0f172a!important}
+.premium-landing .about-card p{color:#64748b!important}
+.premium-landing .about-points span{
+  color:#334155!important;border-left-color:#0891b2!important;background:#fff!important;
+  border-radius:0 8px 8px 0!important;
+}
+
+.premium-landing .contact-section{
+  width:min(1240px,calc(100% - 40px))!important;
+  padding:45px!important;border:1px solid #d8eef2!important;border-radius:23px!important;
+  background:linear-gradient(135deg,#f0fbfd,#fff)!important;
+  box-shadow:0 18px 50px rgba(15,23,42,.07)!important;
+}
+.premium-landing .contact-section h2{color:#0f172a!important}
+.premium-landing .contact-section>div>p{color:#64748b!important}
+.premium-landing .contact-card{
+  padding:24px!important;border:1px solid #e2e8f0!important;
+  background:#fff!important;border-radius:17px!important;
+}
+.premium-landing .contact-card strong{color:#111827!important}
+.premium-landing .contact-card p{color:#64748b!important}
+.premium-landing .contact-card p a{color:#0891b2!important}
+.premium-landing .contact-links a{
+  color:#334155!important;background:#f8fafc!important;border-color:#e2e8f0!important;
+}
+.premium-landing .contact-links a:first-child{
+  color:#fff!important;background:#16a34a!important;border-color:#16a34a!important;
+}
+
+.premium-landing .company-footer{
+  width:min(1240px,calc(100% - 40px))!important;
+  border-top:1px solid #e5e7eb!important;
+}
+.premium-landing .company-footer p{color:#64748b!important}
+.premium-landing .company-footer strong{color:#334155!important}
+.premium-landing .company-footer a:not(.company-logo){color:#64748b!important}
+.premium-landing .company-footer a:hover{color:#0891b2!important}
+.premium-landing .copyright{
+  color:#94a3b8!important;border-top:1px solid #eef2f7!important;
+}
+
+.premium-landing .contact-popup{
+  border:1px solid #d7edf2!important;
+  background:rgba(255,255,255,.96)!important;
+  box-shadow:0 20px 60px rgba(15,23,42,.16)!important;
+  color:#0f172a!important;
+  backdrop-filter:blur(18px)!important;
+}
+.premium-landing .contact-popup-title{color:#0f172a!important}
+.premium-landing .contact-popup-text{color:#64748b!important}
+.premium-landing .contact-popup-whatsapp{background:#16a34a!important}
+.premium-landing .contact-popup-call{background:#111827!important}
+
+@media(max-width:900px){
+  .premium-landing .company-hero{grid-template-columns:1fr!important;gap:34px!important}
+  .premium-landing .hero-panel{max-width:620px!important}
+  .premium-landing .service-grid{grid-template-columns:repeat(2,1fr)!important}
+}
+@media(max-width:640px){
+  .premium-landing .company-nav,.premium-landing .company-hero,.premium-landing .company-stats,
+  .premium-landing .company-section,.premium-landing .contact-section,.premium-landing .company-footer{
+    width:calc(100% - 24px)!important;
+  }
+  .premium-landing .company-nav{padding:12px 13px!important;margin-top:8px!important}
+  .premium-landing .company-navlinks{display:none!important}
+  .premium-landing .company-hero{padding:44px 0 42px!important}
+  .premium-landing .hero-copy h1{font-size:43px!important}
+  .premium-landing .hero-copy>p{font-size:14px!important}
+  .premium-landing .hero-panel{padding:19px!important;border-radius:19px!important}
+  .premium-landing .quick-enquiry-grid{grid-template-columns:1fr!important}
+  .premium-landing .company-stats{grid-template-columns:repeat(2,1fr)!important;margin-bottom:20px!important}
+  .premium-landing .company-stats div{padding:18px 7px!important}
+  .premium-landing .company-section{padding:48px 0!important}
+  .premium-landing .service-grid,.premium-landing .product-grid{grid-template-columns:1fr!important}
+  .premium-landing .service-card{min-height:0!important}
+  .premium-landing .about-card,.premium-landing .contact-section{padding:24px!important}
+}
