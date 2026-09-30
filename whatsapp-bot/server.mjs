@@ -10,12 +10,14 @@ import { Boom } from '@hapi/boom'
 import pino from 'pino'
 import fs from 'node:fs'
 import path from 'node:path'
+import crypto from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 
 const PORT = Number(process.env.PORT || 10000)
 const AUTH_DIR = process.env.WA_AUTH_DIR || path.resolve('whatsapp-bot/auth_info')
 const PHONE_NUMBER = String(process.env.WA_PHONE_NUMBER || '917350060071').replace(/\D/g, '')
 const WA_API_SECRET = String(process.env.WA_API_SECRET || '')
+const KAPSO_WEBHOOK_SECRET = String(process.env.KAPSO_WEBHOOK_SECRET || '')
 const SUPABASE_URL = String(process.env.SUPABASE_URL || 'https://tfscvycomllamoubtlcf.supabase.co')
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '')
 const WA_GROUP_JID = String(process.env.WA_GROUP_JID || '').trim()
@@ -23,6 +25,31 @@ const EVENT_POLL_MS = Number(process.env.WA_EVENT_POLL_MS || 5000)
 const BLOCKED_PHONE = '918554887026'
 const logger = pino({ level: process.env.WA_LOG_LEVEL || 'silent' })
 const app = express()
+
+// Kapso WhatsApp webhook. Keep this route before express.json() so the raw
+// request body is available for X-Webhook-Signature verification.
+app.post('/webhooks/kapso', express.raw({ type: 'application/json', limit: '1mb' }), async (req, res) => {
+  try {
+    const rawBody = Buffer.isBuffer(req.body) ? req.body : Buffer.from(req.body || '')
+    const signature = String(req.get('x-webhook-signature') || '').trim()
+
+    if (KAPSO_WEBHOOK_SECRET) {
+      const digest = crypto.createHmac('sha256', KAPSO_WEBHOOK_SECRET).update(rawBody).digest('hex')
+      const expected = signature.replace(/^sha256=/i, '')
+      const valid = /^[a-f0-9]{64}$/i.test(expected) &&
+        crypto.timingSafeEqual(Buffer.from(expected, 'hex'), Buffer.from(digest, 'hex'))
+      if (!valid) return res.status(401).json({ ok: false, error: 'Invalid Kapso webhook signature' })
+    }
+
+    const payload = rawBody.length ? JSON.parse(rawBody.toString('utf8')) : {}
+    console.log('Kapso webhook received:', JSON.stringify(payload))
+    return res.status(200).json({ ok: true, received: true })
+  } catch (err) {
+    console.error('Kapso webhook error:', err)
+    return res.status(400).json({ ok: false, error: 'Invalid webhook payload' })
+  }
+})
+
 app.use(express.json({ limit: '256kb' }))
 
 const supabase = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
