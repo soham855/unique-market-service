@@ -181,6 +181,17 @@ async function startWhatsApp() {
     saveCredsPromise = Promise.resolve(saveCreds()).catch(err => console.error('WhatsApp credential save failed:', err))
     return saveCredsPromise
   })
+  // Incoming WhatsApp messages: log them so the bot can verify and route received chats.
+  sock.ev.on('messages.upsert', ({ messages, type }) => {
+    if (type !== 'notify') return
+    for (const msg of messages || []) {
+      if (msg.key?.fromMe) continue
+      const from = msg.key?.remoteJid || ''
+      const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text || ''
+      console.log('WhatsApp incoming message:', JSON.stringify({ from, text, messageId: msg.key?.id || null }))
+    }
+  })
+
   sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
     const disconnectCode = lastDisconnect ? new Boom(lastDisconnect?.error)?.output?.statusCode || null : null
     lastConnectionEvent = { connection: connection || null, hasQr: Boolean(qr), at: new Date().toISOString(), code: disconnectCode }
