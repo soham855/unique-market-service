@@ -18,6 +18,9 @@ const AUTH_DIR = process.env.WA_AUTH_DIR || path.resolve('whatsapp-bot/auth_info
 const PHONE_NUMBER = String(process.env.WA_PHONE_NUMBER || '917350060071').replace(/\D/g, '')
 const WA_API_SECRET = String(process.env.WA_API_SECRET || '')
 const KAPSO_WEBHOOK_SECRET = String(process.env.KAPSO_WEBHOOK_SECRET || '')
+const KAPSO_WEBHOOK_API_KEY = String(process.env.KAPSO_WEBHOOK_API_KEY || '')
+const KAPSO_DEDUPE_TTL_MS = Math.max(60_000, Number(process.env.KAPSO_DEDUPE_TTL_MS || 600_000))
+const kapsoWebhookSeen = new Map()
 const SUPABASE_URL = String(process.env.SUPABASE_URL || 'https://tfscvycomllamoubtlcf.supabase.co')
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '')
 const WA_GROUP_JID = String(process.env.WA_GROUP_JID || '').trim()
@@ -26,14 +29,24 @@ const BLOCKED_PHONE = '918554887026'
 const logger = pino({ level: process.env.WA_LOG_LEVEL || 'silent' })
 const app = express()
 
-// Kapso WhatsApp webhook. Keep this route before express.json() so the raw
-// request body is available for X-Webhook-Signature verification.
+// Kapso webhook. Keep this route before express.json() so the raw body can be
+// authenticated and replayed safely. Kapso webhook configuration uses X-API-Key.
 app.post('/webhooks/kapso', express.raw({ type: 'application/json', limit: '1mb' }), async (req, res) => {
   try {
     const rawBody = Buffer.isBuffer(req.body) ? req.body : Buffer.from(req.body || '')
-    const signature = String(req.get('x-webhook-signature') || '').trim()
+    if (!rawBody.length) return res.status(400).json({ ok: false, error: 'Empty webhook body' })
+
+    if (!KAPSO_WEBHOOK_API_KEY && !KAPSO_WEBHOOK_SECRET) {
+      return res.status(503).json({ ok: false, error: 'Kapso webhook authentication is not configured' })
+    }
+
+    const apiKey = String(req.get('x-api-key') || '').trim()
+    if (KAPSO_WEBHOOK_API_KEY && apiKey !== KAPSO_WEBHOOK_API_KEY) {
+      return res.status(401).json({ ok: false, error: 'Invalid Kapso webhook API key' })
+    }
 
     if (KAPSO_WEBHOOK_SECRET) {
+      const signature = String(req.get('x-webhook-signature') || '').trim()
       const digest = crypto.createHmac('sha256', KAPSO_WEBHOOK_SECRET).update(rawBody).digest('hex')
       const expected = signature.replace(/^sha256=/i, '')
       const valid = /^[a-f0-9]{64}$/i.test(expected) &&
@@ -41,11 +54,27 @@ app.post('/webhooks/kapso', express.raw({ type: 'application/json', limit: '1mb'
       if (!valid) return res.status(401).json({ ok: false, error: 'Invalid Kapso webhook signature' })
     }
 
-    const payload = rawBody.length ? JSON.parse(rawBody.toString('utf8')) : {}
-    console.log('Kapso webhook received:', JSON.stringify(payload))
-    return res.status(200).json({ ok: true, received: true })
+    const eventId = String(req.get('x-kapso-event-id') || req.get('x-webhook-id') || '').trim()
+    const bodyHash = crypto.createHash('sha256').update(rawBody).digest('hex')
+    const dedupeKey = eventId || bodyHash
+    const now = Date.now()
+    for (const [key, seenAt] of kapsoWebhookSeen) {
+      if (now - seenAt > KAPSO_DEDUPE_TTL_MS) kapsoWebhookSeen.delete(key)
+    }
+    if (kapsoWebhookSeen.has(dedupeKey)) return res.status(200).json({ ok: true, duplicate: true })
+    kapsoWebhookSeen.set(dedupeKey, now)
+    if (kapsoWebhookSeen.size > 10_000) kapsoWebhookSeen.delete(kapsoWebhookSeen.keys().next().value)
+
+    const payload = JSON.parse(rawBody.toString('utf8'))
+    const eventType = String(payload?.event || payload?.type || payload?.event_type || 'unknown').slice(0, 80)
+    const messageCount = Array.isArray(payload?.messages) ? payload.messages.length : 0
+    console.log(JSON.stringify({ service: 'kapso-webhook', eventType, messageCount, eventId: eventId || null, receivedAt: new Date().toISOString() }))
+
+    // Intentionally capture-only for the first safe deployment. No ticket/payment
+    // or outbound WhatsApp action is performed until the live payload is verified.
+    return res.status(200).json({ ok: true, received: true, eventType, messageCount })
   } catch (err) {
-    console.error('Kapso webhook error:', err)
+    console.error('Kapso webhook error:', String(err?.message || err))
     return res.status(400).json({ ok: false, error: 'Invalid webhook payload' })
   }
 })
