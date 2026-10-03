@@ -14,6 +14,8 @@ import crypto from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 
 const PORT = Number(process.env.PORT || 10000)
+// On Render, use a mounted persistent disk path via WA_AUTH_DIR.
+// Default remains local for development; set WA_AUTH_DIR=/var/data/whatsapp-auth in Render.
 const AUTH_DIR = process.env.WA_AUTH_DIR || path.resolve('whatsapp-bot/auth_info')
 const PHONE_NUMBER = String(process.env.WA_PHONE_NUMBER || '917350060071').replace(/\D/g, '')
 const WA_API_SECRET = String(process.env.WA_API_SECRET || '')
