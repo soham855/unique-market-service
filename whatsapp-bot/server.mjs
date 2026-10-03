@@ -182,13 +182,31 @@ async function startWhatsApp() {
     return saveCredsPromise
   })
   // Incoming WhatsApp messages: log them so the bot can verify and route received chats.
-  sock.ev.on('messages.upsert', ({ messages, type }) => {
+  sock.ev.on('messages.upsert', async ({ messages, type }) => {
     if (type !== 'notify') return
     for (const msg of messages || []) {
       if (msg.key?.fromMe) continue
       const from = msg.key?.remoteJid || ''
-      const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text || ''
+      const text = String(msg.message?.conversation || msg.message?.extendedTextMessage?.text || '').trim()
       console.log('WhatsApp incoming message:', JSON.stringify({ from, text, messageId: msg.key?.id || null }))
+      if (!text || !from || from.endsWith('@g.us')) continue
+      const normalized = text.toLowerCase()
+      let reply = null
+      if (/^(hi|hello|hey|namaskar|नमस्कार)$/i.test(normalized)) {
+        reply = 'Namaskar! Unique Market WhatsApp Service madhe aaple swagat aahe.\\n\\n1️⃣ Service / Complaint\\n2️⃣ Sales / CCTV\\n3️⃣ AMC\\n4️⃣ Payment\\n\\nKrupaya 1, 2, 3 kiwa 4 pathva.'
+      } else if (normalized === '1') {
+        reply = 'Service Complaint sathi krupaya problem short madhe type kara. Udaharan: Camera band aahe / DVR recording nahi.'
+      } else if (normalized === '2') {
+        reply = 'CCTV/Sales inquiry sathi product kiwa camera quantity pathva. Amhi tumhala pudhe guide karu.'
+      } else if (normalized === '3') {
+        reply = 'AMC service sathi tumcha customer/company name ani location pathva.'
+      } else if (normalized === '4') {
+        reply = 'Payment query sathi invoice number kiwa customer/company name pathva.'
+      }
+      if (reply) {
+        try { await sendText(from, reply); console.log('WhatsApp auto-reply sent:', JSON.stringify({ to: from, text: reply })) }
+        catch (err) { console.error('WhatsApp auto-reply failed:', String(err?.message || err)) }
+      }
     }
   })
 
