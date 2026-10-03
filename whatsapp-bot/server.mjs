@@ -192,7 +192,7 @@ async function startWhatsApp() {
       if (!text || !from || from.endsWith('@g.us')) continue
       const normalized = text.toLowerCase()
       let reply = null
-      if (/^(hi|hello|hey|namaskar|नमस्कार)$/i.test(normalized)) {
+      if (/^(hi+|hello+|hey+|namaskar|नमस्कार)$/i.test(normalized)) {
         reply = 'Namaskar! Unique Market WhatsApp Service madhe aaple swagat aahe.\\n\\n1️⃣ Service / Complaint\\n2️⃣ Sales / CCTV\\n3️⃣ AMC\\n4️⃣ Payment\\n\\nKrupaya 1, 2, 3 kiwa 4 pathva.'
       } else if (normalized === '1') {
         reply = 'Service Complaint sathi krupaya problem short madhe type kara. Udaharan: Camera band aahe / DVR recording nahi.'
