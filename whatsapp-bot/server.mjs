@@ -90,7 +90,9 @@ async function findOrCreateWhatsAppCustomer(phone, name, location) {
     const current = existing[0]
     const patch = {}
     if (name && !current.name) patch.name = name
-    if (location && !current.address) patch.address = location
+    // A WhatsApp complaint must use the location supplied in this complaint.
+    // Never reuse an older saved customer address as the complaint location.
+    if (location) patch.address = location
     if (Object.keys(patch).length) {
       await supabaseRestRequest('/customers?id=eq.' + encodeURIComponent(current.id), {
         method: 'PATCH',
