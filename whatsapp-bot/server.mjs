@@ -113,10 +113,7 @@ async function createWhatsAppComplaint(session, from) {
   if (!supabase) throw new Error('Supabase event bridge is not configured')
   const phone = String(from || '').replace(/\D/g, '')
   const customer = await findOrCreateWhatsAppCustomer(phone, session.name, session.location)
-  const ticket = 'UM-WA-' + Date.now().toString().slice(-8)
   const payload = {
-    ticket_no: ticket,
-    complaint_no: ticket,
     customer_id: customer?.id || null,
     category: 'WhatsApp Service Request',
     service_type: 'Service',
@@ -139,7 +136,7 @@ async function createWhatsAppComplaint(session, from) {
   })
   const complaint = Array.isArray(rows) ? rows[0] || null : null
   if (!complaint?.id) throw new Error('Complaint was not created')
-  return { complaint, customer, ticket: complaint.ticket_no }
+  return { complaint, customer, ticket: complaint.ticket_no || complaint.complaint_no }
 }
 
 function clearComplaintSession(jid) {
