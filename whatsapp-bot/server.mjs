@@ -685,7 +685,7 @@ async function startWhatsApp() {
     logger,
     auth: { creds: state.creds, keys: makeCacheableSignalKeyStore(state.keys, logger) },
     browser: Browsers.ubuntu('Chrome'),
-    markOnlineOnConnect: false,
+    markOnlineOnConnect: true,
     syncFullHistory: false,
     connectTimeoutMs: 120000,
     defaultQueryTimeoutMs: 60000,
@@ -830,11 +830,24 @@ async function startWhatsApp() {
       status = 'disconnected'
       await releaseWhatsAppLease()
       const code = disconnectCode
-      console.error(`WhatsApp connection closed. code=${code ?? 'unknown'} loggedOut=${code === DisconnectReason.loggedOut}`)
-      if (code !== DisconnectReason.loggedOut && !reconnecting) {
+      const isLoggedOut = code === DisconnectReason.loggedOut
+      const isRestartRequired = code === DisconnectReason.restartRequired
+      console.error(`WhatsApp connection closed. code=${code ?? 'unknown'} loggedOut=${isLoggedOut} restartRequired=${isRestartRequired}`)
+
+      // WhatsApp intentionally closes with 515 after a successful QR pairing.
+      // 515 means "restart required", not logout. Recreate the socket immediately
+      // using the freshly saved credentials.
+      if (!isLoggedOut && !reconnecting) {
         reconnecting = true
-        try { await saveCredsPromise; await startWhatsApp() }
-        catch (err) { console.error('WhatsApp reconnect failed', err); reconnecting = false; setTimeout(() => startWhatsApp().catch(() => { reconnecting = false }), 3000) }
+        try {
+          await saveCredsPromise
+          reconnecting = false
+          await startWhatsApp()
+        } catch (err) {
+          console.error('WhatsApp reconnect failed', err)
+          reconnecting = false
+          setTimeout(() => startWhatsApp().catch(reconnectErr => console.error('WhatsApp delayed reconnect failed', reconnectErr)), 3000)
+        }
       }
     }  })
 }
