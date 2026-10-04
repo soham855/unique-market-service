@@ -21,7 +21,7 @@ const categories = {
 }
 const defaultActive = Object.keys(categories)
 
-const COMPANY_WHATSAPP = '918554887026'
+const COMPANY_WHATSAPP = '917350060071'
 
 function buildComplaintMessage(complaint) {
   return [
@@ -36,7 +36,7 @@ function buildComplaintMessage(complaint) {
     'Address: ' + (complaint.location_text || '—'),
     'Description: ' + (complaint.description || '—'),
     'Date: ' + new Date(complaint.created_at || Date.now()).toLocaleString('en-IN'), '',
-    'Status: OPEN', 'Unique Market — CCTV & IT Service', '8554887026'
+    'Status: OPEN', 'Unique Market — CCTV & IT Service', '7350060071'
   ].join('\\n')
 }
 
@@ -50,7 +50,7 @@ function createComplaintReceipt(complaint) {
   const doc = new jsPDF({ unit:'mm', format:'a4' })
   const ticket = complaint.ticket_no || complaint.complaint_no || complaint.id || 'Pending'
   doc.setFontSize(18); doc.text('UNIQUE MARKET', 20, 22)
-  doc.setFontSize(10); doc.text('CCTV & IT Service | 8554887026', 20, 29)
+  doc.setFontSize(10); doc.text('CCTV & IT Service | 7350060071', 20, 29)
   doc.setFontSize(15); doc.text('SERVICE COMPLAINT RECEIPT', 20, 43)
   doc.setFontSize(10)
   const rows = [
@@ -207,6 +207,16 @@ export default function CustomerComplaintModule({ profile, activeModule = 'Compl
       const title = `${categories[form.category][0].replace(/^\S+\s/,'')} - ${form.problem}`
       const { data:createdComplaint, error } = await supabase.from('complaints').insert({ customer_id:customer.id, customer_name:form.customer_name.trim(), customer_phone:form.customer_phone.trim(), company_name:form.company_name.trim() || null, title, description:form.description.trim() || form.problem, category:form.category, priority:form.priority, location_text:form.location_text.trim(), latitude:form.latitude, longitude:form.longitude, gps_accuracy_m:form.gps_accuracy_m, location_captured_at:form.location_captured_at }).select('*').single()
       if (error) throw error
+      const notificationMessage = buildComplaintMessage(createdComplaint)
+      const { error: notificationError } = await supabase.from('whatsapp_notification_events').insert({
+        complaint_id: createdComplaint.id,
+        phone: COMPANY_WHATSAPP,
+        customer_phone: createdComplaint.customer_phone || form.customer_phone.trim(),
+        event_type: 'created',
+        message: notificationMessage,
+        status: 'pending'
+      })
+      if (notificationError) console.error('WhatsApp notification queue failed:', notificationError)
       const receipt = createdComplaint || { ...form, title, description:form.description.trim() || form.problem, customer_id:customer.id, created_at:new Date().toISOString() }
       setLastReceipt(receipt)
       createComplaintReceipt(receipt).save('Unique-Market-' + (receipt.ticket_no || receipt.id || 'Complaint') + '-Receipt.pdf')
