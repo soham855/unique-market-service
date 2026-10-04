@@ -92,17 +92,86 @@ async function sendText(jid, message) {
   return sock.sendMessage(jid, { text: message })
 }
 
+function pdfEscape(value) {
+  return String(value ?? '').replace(/\\/g, '\\\\').replace(/\\(/g, '\\\\(').replace(/\\)/g, '\\\\)').replace(/\r?\n/g, ' ')
+}
+
+function buildComplaintPdfBuffer(complaint, customer) {
+  const rows = [
+    ['Complaint No', complaint?.complaint_no || complaint?.ticket_no || complaint?.id || ''],
+    ['Problem', complaint?.title || complaint?.description || ''],
+    ['Category', complaint?.category || ''],
+    ['Priority', complaint?.priority || ''],
+    ['Status', complaint?.status || ''],
+    ['Customer', customer?.name || complaint?.customer_name || ''],
+    ['Mobile', customer?.mobile || complaint?.customer_phone || ''],
+    ['Company', customer?.company_name || complaint?.company_name || ''],
+    ['Service Address', customer?.address || complaint?.location_text || ''],
+    ['Created', complaint?.created_at || '']
+  ]
+  const lines = ['Unique Market - Complaint Receipt', '', ...rows.map(([k,v]) => k + ': ' + v)]
+  const contentLines = ['BT', '/F1 16 Tf', '50 800 Td']
+  lines.forEach((line, index) => {
+    if (index === 1) contentLines.push('0 -28 Td')
+    else if (index > 1) contentLines.push('0 -20 Td')
+    contentLines.push('(' + pdfEscape(line) + ') Tj')
+  })
+  contentLines.push('ET')
+  const stream = contentLines.join('\n')
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>',
+    '<< /Length ' + Buffer.byteLength(stream, 'utf8') + ' >>\nstream\n' + stream + '\nendstream',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>'
+  ]
+  let pdf = '%PDF-1.4\n'
+  const offsets = [0]
+  objects.forEach((obj, i) => {
+    offsets[i + 1] = Buffer.byteLength(pdf, 'utf8')
+    pdf += (i + 1) + ' 0 obj\n' + obj + '\nendobj\n'
+  })
+  const xref = Buffer.byteLength(pdf, 'utf8')
+  pdf += 'xref\n0 ' + (objects.length + 1) + '\n0000000000 65535 f \n'
+  for (let i = 1; i <= objects.length; i++) pdf += String(offsets[i]).padStart(10, '0') + ' 00000 n \n'
+  pdf += 'trailer\n<< /Size ' + (objects.length + 1) + ' /Root 1 0 R >>\nstartxref\n' + xref + '\n%%EOF\n'
+  return Buffer.from(pdf, 'utf8')
+}
+
+async function getComplaintAndCustomer(complaintId) {
+  if (!complaintId) return { complaint: null, customer: null }
+  const params = new URLSearchParams({
+    select: '*,customer:customers(name,mobile,company_name,address)',
+    id: 'eq.' + complaintId,
+    limit: '1'
+  })
+  const rows = await supabaseRestRequest('/complaints?' + params.toString())
+  const complaint = rows?.[0] || null
+  return { complaint, customer: complaint?.customer || null }
+}
+
 async function sendNotificationEvent(jid, event) {
   const marker = String(event.message || '').match(/\n?\[\[PDF_URL=(https?:\/\/[^\]]+)\]\]\s*$/i)
   const pdfUrl = marker?.[1] || null
   const text = String(event.message || '').replace(/\n?\[\[PDF_URL=https?:\/\/[^\]]+\]\]\s*$/i, '').trim()
   if (text) await sendText(jid, text)
+  if (status !== 'connected' || !sock) throw new Error('WhatsApp is not connected')
   if (pdfUrl) {
-    if (status !== 'connected' || !sock) throw new Error('WhatsApp is not connected')
     await sock.sendMessage(jid, {
       document: { url: pdfUrl },
       mimetype: 'application/pdf',
       fileName: 'Unique-Market-' + (event.event_type || 'Complaint') + '-' + (event.complaint_id || 'Receipt') + '.pdf',
+      caption: '📄 Unique Market Complaint Receipt'
+    })
+  } else if (event.complaint_id) {
+    const { complaint, customer } = await getComplaintAndCustomer(event.complaint_id)
+    if (!complaint) throw new Error('Complaint not found for PDF: ' + event.complaint_id)
+    const pdf = buildComplaintPdfBuffer(complaint, customer)
+    const ticket = complaint.complaint_no || complaint.ticket_no || complaint.id
+    await sock.sendMessage(jid, {
+      document: pdf,
+      mimetype: 'application/pdf',
+      fileName: 'Unique-Market-' + ticket + '-Receipt.pdf',
       caption: '📄 Unique Market Complaint Receipt'
     })
   }
@@ -158,10 +227,19 @@ async function processNotificationEvents() {
     if (data?.length) console.log(`WhatsApp outbox: ${data.length} pending event(s)`)
 
     for (const event of data || []) {
+      let customerPhone = event.customer_phone || ''
+      if (!customerPhone && event.complaint_id) {
+        try {
+          const resolved = await getComplaintAndCustomer(event.complaint_id)
+          customerPhone = resolved.customer?.mobile || resolved.complaint?.customer_phone || ''
+        } catch (err) {
+          console.error('WhatsApp customer lookup failed:', String(err?.message || err))
+        }
+      }
       const targets = []
       const officeJid = recipientJid(PHONE_NUMBER)
       if (officeJid) targets.push(officeJid)
-      const customerJid = recipientJid(event.customer_phone || event.phone)
+      const customerJid = recipientJid(customerPhone || event.phone)
       if (customerJid && !targets.includes(customerJid)) targets.push(customerJid)
       if (WA_GROUP_JID && !targets.includes(WA_GROUP_JID)) targets.push(WA_GROUP_JID)
 
