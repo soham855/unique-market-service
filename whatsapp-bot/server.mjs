@@ -69,6 +69,7 @@ let eventPollerStarted = false
 let eventProcessingInFlight = null
 let pairingReady = false
 let pairingRequestInFlight = null
+const trackedWhatsAppMessages = new Map()
 
 // Simple in-memory WhatsApp complaint flow.
 const complaintSessions = new Map()
@@ -158,6 +159,7 @@ async function sendText(jid, message) {
     fromMe: result?.key?.fromMe ?? null,
     status: result?.status ?? null
   }))
+  if (result?.key?.id) trackedWhatsAppMessages.set(result.key.id, { jid: normalizedJid, status: 'queued', statusCode: result?.status ?? null, updatedAt: new Date().toISOString() })
   return result
 }
 
@@ -303,7 +305,17 @@ async function processNotificationEvents() {
 
     if (data?.length) console.log(`WhatsApp outbox: ${data.length} pending event(s)`)
 
+    const seenEventGroups = new Set()
     for (const event of data || []) {
+      const groupKey = String(event.complaint_id || '') + ':' + String(event.event_type || '')
+      if (seenEventGroups.has(groupKey)) {
+        console.log('WhatsApp duplicate pending event skipped:', JSON.stringify({ eventId: event.id, complaintId: event.complaint_id, eventType: event.event_type }))
+        try {
+          await supabaseRestRequest(`/whatsapp_notification_events?id=eq.${encodeURIComponent(event.id)}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ status: 'failed', error_message: 'Duplicate event skipped; same complaint/event type already queued' }) })
+        } catch (dupErr) { console.error('WhatsApp duplicate event cleanup failed:', String(dupErr?.message || dupErr)) }
+        continue
+      }
+      seenEventGroups.add(groupKey)
       let customerPhone = event.customer_phone || ''
       if (!customerPhone && event.complaint_id) {
         try {
@@ -470,6 +482,17 @@ async function startWhatsApp() {
     }
   })
 
+  sock.ev.on('messages.update', (updates) => {
+    for (const update of updates || []) {
+      const id = update?.key?.id || null
+      if (!id) continue
+      const statusCode = update?.update?.status ?? null
+      const statusName = ({ 1: 'server_ack', 2: 'delivered', 3: 'read', 4: 'played' })[statusCode] || String(statusCode)
+      console.log('WhatsApp message status:', JSON.stringify({ messageId: id, to: update?.key?.remoteJid || null, status: statusName, statusCode }))
+      trackedWhatsAppMessages.set(id, { jid: update?.key?.remoteJid || null, status: statusName, statusCode, updatedAt: new Date().toISOString() })
+      if (trackedWhatsAppMessages.size > 500) trackedWhatsAppMessages.delete(trackedWhatsAppMessages.keys().next().value)
+    }
+  })
   sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
     const disconnectCode = lastDisconnect ? new Boom(lastDisconnect?.error)?.output?.statusCode || null : null
     lastConnectionEvent = { connection: connection || null, hasQr: Boolean(qr), at: new Date().toISOString(), code: disconnectCode }
