@@ -209,16 +209,23 @@ async function sendNotificationEvent(jid, event) {
       caption: '📄 Unique Market Complaint Receipt'
     })
   } else if (event.complaint_id) {
-    const { complaint, customer } = await getComplaintAndCustomer(event.complaint_id)
-    if (!complaint) throw new Error('Complaint not found for PDF: ' + event.complaint_id)
-    const pdf = buildComplaintPdfBuffer(complaint, customer)
-    const ticket = complaint.complaint_no || complaint.ticket_no || complaint.id
-    await sock.sendMessage(jid, {
-      document: pdf,
-      mimetype: 'application/pdf',
-      fileName: 'Unique-Market-' + ticket + '-Receipt.pdf',
-      caption: '📄 Unique Market Complaint Receipt'
-    })
+    // PDF attachment is best-effort. The notification itself must not fail
+    // when the REST role cannot read complaints; the queued WhatsApp event
+    // should still be marked sent after the text is delivered.
+    try {
+      const { complaint, customer } = await getComplaintAndCustomer(event.complaint_id)
+      if (!complaint) throw new Error('Complaint not found for PDF: ' + event.complaint_id)
+      const pdf = buildComplaintPdfBuffer(complaint, customer)
+      const ticket = complaint.complaint_no || complaint.ticket_no || complaint.id
+      await sock.sendMessage(jid, {
+        document: pdf,
+        mimetype: 'application/pdf',
+        fileName: 'Unique-Market-' + ticket + '-Receipt.pdf',
+        caption: '📄 Unique Market Complaint Receipt'
+      })
+    } catch (err) {
+      console.error('WhatsApp PDF attachment skipped:', String(err?.message || err))
+    }
   }
 }
 
