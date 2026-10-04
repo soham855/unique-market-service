@@ -262,7 +262,7 @@ function buildComplaintPdfBuffer(complaint, customer) {
     '(' + pdfEscape('UNIQUE MARKET') + ') Tj',
     '/F1 10 Tf',
     '0 -18 Td',
-    '(' + pdfEscape('CCTV • IT Security • Service & AMC') + ') Tj',
+    '(' + pdfEscape('CCTV | IT Security | Service & AMC') + ') Tj',
     '/F1 9 Tf',
     '0 -16 Td',
     '(' + pdfEscape('Station Road, Hotel Rajdoot, Ichalkaranji') + ') Tj',
@@ -287,7 +287,7 @@ function buildComplaintPdfBuffer(complaint, customer) {
       '50 ' + y + ' Td',
       '(' + pdfEscape(key + ':') + ') Tj',
       '170 0 Td',
-      '(' + pdfEscape(String(value || '—')) + ') Tj',
+      '(' + pdfEscape(String(value || '-')) + ') Tj',
       'ET'
     )
     y -= 43
@@ -306,10 +306,10 @@ function buildComplaintPdfBuffer(complaint, customer) {
     'BT',
     '/F1 10 Tf',
     '50 50 Td',
-    '(' + pdfEscape('Unique Market | CCTV • IT Security • Service & AMC') + ') Tj',
+    '(' + pdfEscape('Unique Market | CCTV | IT Security | Service & AMC') + ') Tj',
     '/F1 9 Tf',
     '0 -16 Td',
-    '(' + pdfEscape('7350060071  •  Station Road, Hotel Rajdoot, Ichalkaranji') + ') Tj',
+    '(' + pdfEscape('7350060071  |  Station Road, Hotel Rajdoot, Ichalkaranji') + ') Tj',
     'ET'
   )
 
