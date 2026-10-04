@@ -828,26 +828,33 @@ async function startWhatsApp() {
     }
     if (connection === 'close') {
       status = 'disconnected'
-      await releaseWhatsAppLease()
       const code = disconnectCode
       const isLoggedOut = code === DisconnectReason.loggedOut
       const isRestartRequired = code === DisconnectReason.restartRequired
       console.error(`WhatsApp connection closed. code=${code ?? 'unknown'} loggedOut=${isLoggedOut} restartRequired=${isRestartRequired}`)
 
-      // WhatsApp intentionally closes with 515 after a successful QR pairing.
-      // 515 means "restart required", not logout. Recreate the socket immediately
-      // using the freshly saved credentials.
+      // 515 is WhatsApp's normal post-pairing restart signal. Persist credentials
+      // first, then schedule a fresh socket outside the close-event handler.
       if (!isLoggedOut && !reconnecting) {
         reconnecting = true
-        try {
-          await saveCredsPromise
-          reconnecting = false
-          await startWhatsApp()
-        } catch (err) {
-          console.error('WhatsApp reconnect failed', err)
-          reconnecting = false
-          setTimeout(() => startWhatsApp().catch(reconnectErr => console.error('WhatsApp delayed reconnect failed', reconnectErr)), 3000)
-        }
+        Promise.resolve(saveCredsPromise)
+          .catch(err => console.error('WhatsApp credential flush before reconnect failed:', String(err?.message || err)))
+          .finally(async () => {
+            try {
+              await releaseWhatsAppLease()
+            } catch (err) {
+              console.error('WhatsApp lease release before reconnect failed:', String(err?.message || err))
+            }
+            setTimeout(() => {
+              reconnecting = false
+              startWhatsApp().catch(err => {
+                console.error('WhatsApp reconnect failed:', String(err?.message || err))
+                setTimeout(() => startWhatsApp().catch(retryErr => console.error('WhatsApp delayed reconnect failed:', String(retryErr?.message || retryErr))), 3000)
+              })
+            }, 1000)
+          })
+      } else {
+        await releaseWhatsAppLease()
       }
     }  })
 }
