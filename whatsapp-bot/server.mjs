@@ -197,8 +197,7 @@ async function releaseWhatsAppLease() {
     await supabase.rpc('release_whatsapp_bot_lease', { p_holder_id: INSTANCE_ID })
     console.log('WhatsApp singleton lease released')
   } catch (err) {
-    console.error('WhatsApp singleton lease release failed:', String(err?.message || err))
-  } finally {
+    console.error('WhatsApp singleton lease release failed:', String(err?.message || err))  } finally {
     whatsappLeaseHeld = false
   }
 }
@@ -397,8 +396,7 @@ function buildComplaintPdfBuffer(complaint, customer) {
 async function getComplaintAndCustomer(complaintId) {
   if (!complaintId) return { complaint: null, customer: null }
   const params = new URLSearchParams({
-    select: '*,customer:customers(name,mobile,company_name,address)',
-    id: 'eq.' + complaintId,
+    select: '*,customer:customers(name,mobile,company_name,address)',    id: 'eq.' + complaintId,
     limit: '1'
   })
   const rows = await supabaseRestRequest('/complaints?' + params.toString())
@@ -597,8 +595,7 @@ async function processNotificationEvents() {
         try {
           const resolved = await getComplaintAndCustomer(event.complaint_id)
           customerPhone = resolved.complaint?.customer_phone || resolved.customer?.mobile || ''
-        } catch (err) {
-          console.error('WhatsApp customer lookup failed:', String(err?.message || err))
+        } catch (err) {          console.error('WhatsApp customer lookup failed:', String(err?.message || err))
         }
       }
       const targets = []
@@ -699,10 +696,15 @@ async function startWhatsApp() {
     if (type !== 'notify') return
     for (const msg of messages || []) {
       if (msg.key?.fromMe) continue
-      const from = msg.key?.remoteJid || ''
+      const remoteJid = msg.key?.remoteJid || ''
+      // WhatsApp can deliver 1:1 incoming messages using an @lid JID.
+      // Prefer the sender's real phone JID when Baileys provides it so replies
+      // are sent to the actual customer number instead of the LID.
+      const senderPn = String(msg.key?.senderPn || msg.key?.senderPN || '').trim()
+      const from = remoteJid.endsWith('@s.whatsapp.net') ? remoteJid : (senderPn || remoteJid)
       const text = String(msg.message?.conversation || msg.message?.extendedTextMessage?.text || '').trim()
-      console.log('WhatsApp incoming message:', JSON.stringify({ from, text, messageId: msg.key?.id || null }))
-      if (!text || !from || from.endsWith('@g.us')) continue
+      console.log('WhatsApp incoming message:', JSON.stringify({ from, remoteJid, senderPn: senderPn || null, text, messageId: msg.key?.id || null }))
+      if (!text || !from || remoteJid.endsWith('@g.us')) continue
 
       const normalized = text.toLowerCase()
       let reply = null
@@ -797,8 +799,7 @@ async function startWhatsApp() {
         try { await saveCredsPromise; await startWhatsApp() }
         catch (err) { console.error('WhatsApp reconnect failed', err); reconnecting = false; setTimeout(() => startWhatsApp().catch(() => { reconnecting = false }), 3000) }
       }
-    }
-  })
+    }  })
 }
 
 app.get('/debug', (req, res) => {
