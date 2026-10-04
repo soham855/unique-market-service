@@ -135,7 +135,30 @@ function recipientJid(phone) {
 
 async function sendText(jid, message) {
   if (status !== 'connected' || !sock) throw new Error('WhatsApp is not connected')
-  return sock.sendMessage(jid, { text: message })
+  const normalizedJid = String(jid || '').trim()
+  if (!normalizedJid || !normalizedJid.endsWith('@s.whatsapp.net')) throw new Error('Invalid WhatsApp recipient')
+  let contact = null
+  try {
+    const result = await sock.onWhatsApp(normalizedJid)
+    contact = Array.isArray(result) ? result[0] : null
+    console.log('WhatsApp recipient check:', JSON.stringify({
+      jid: normalizedJid,
+      exists: contact?.exists ?? null,
+      jid: contact?.jid || normalizedJid
+    }))
+    if (contact?.exists === false) throw new Error('WhatsApp number is not registered: ' + normalizedJid)
+  } catch (err) {
+    console.error('WhatsApp recipient check failed:', String(err?.message || err))
+    if (String(err?.message || '').startsWith('WhatsApp number is not registered:')) throw err
+  }
+  const result = await sock.sendMessage(normalizedJid, { text: message })
+  console.log('WhatsApp text send result:', JSON.stringify({
+    to: normalizedJid,
+    messageId: result?.key?.id || null,
+    fromMe: result?.key?.fromMe ?? null,
+    status: result?.status ?? null
+  }))
+  return result
 }
 
 function pdfEscape(value) {
@@ -303,7 +326,7 @@ async function processNotificationEvents() {
           headers: { Prefer: 'return=minimal' },
           body: JSON.stringify({
             status: 'failed',
-            error_message: 'No WhatsApp recipient configured or recipient is blocked'
+            error_message: 'No valid WhatsApp recipient configured'
           })
         })
         continue
