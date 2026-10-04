@@ -68,6 +68,13 @@ let eventPollerStarted = false
 let pairingReady = false
 let pairingRequestInFlight = null
 
+// Simple in-memory WhatsApp complaint flow.
+const complaintSessions = new Map()
+
+function clearComplaintSession(jid) {
+  complaintSessions.delete(jid)
+}
+
 fs.mkdirSync(AUTH_DIR, { recursive: true })
 
 function authorized(req) {
@@ -194,16 +201,59 @@ async function startWhatsApp() {
       if (!text || !from || from.endsWith('@g.us')) continue
       const normalized = text.toLowerCase()
       let reply = null
-      if (/^(hi+|hello+|hey+|namaskar|नमस्कार)$/i.test(normalized)) {
-        reply = 'Namaskar! Unique Market WhatsApp Service madhe aaple swagat aahe.\\n\\n1️⃣ Service / Complaint\\n2️⃣ Sales / CCTV\\n3️⃣ AMC\\n4️⃣ Payment\\n\\nKrupaya 1, 2, 3 kiwa 4 pathva.'
+      const activeComplaint = complaintSessions.get(from)
+
+      if (/^(cancel|stop|0|menu|back)$/i.test(normalized)) {
+        clearComplaintSession(from)
+        reply = 'Main menu:\\n\\n1️⃣ Service / Complaint\\n2️⃣ Sales / CCTV\\n3️⃣ AMC\\n4️⃣ Payment\\n\\nKrupaya 1, 2, 3 kiwa 4 pathva.'
+      } else if (activeComplaint) {
+        if (activeComplaint.step === 'problem') {
+          activeComplaint.problem = text
+          activeComplaint.step = 'name'
+          reply = 'Problem noted. Ata customer/company name pathva.'
+        } else if (activeComplaint.step === 'name') {
+          activeComplaint.name = text
+          activeComplaint.step = 'location'
+          reply = 'Thanks. Ata service location / area pathva.'
+        } else if (activeComplaint.step === 'location') {
+          activeComplaint.location = text
+          const ticketRef = `WA-${Date.now().toString().slice(-6)}`
+          const officeJid = recipientJid(PHONE_NUMBER)
+          const summary = [
+            '🚨 *New WhatsApp Service Complaint*',
+            '',
+            `Ticket: ${ticketRef}`,
+            `Customer: ${activeComplaint.name}`,
+            `Phone: +${from.replace('@s.whatsapp.net', '')}`,
+            `Location: ${activeComplaint.location}`,
+            `Problem: ${activeComplaint.problem}`
+          ].join('\\n')
+
+          if (officeJid && officeJid !== from) {
+            try {
+              await sendText(officeJid, summary)
+              console.log('WhatsApp complaint forwarded to office:', ticketRef)
+            } catch (err) {
+              console.error('WhatsApp complaint office forward failed:', String(err?.message || err))
+            }
+          }
+
+          clearComplaintSession(from)
+          reply = `✅ Complaint received.\\n\\nTicket ID: ${ticketRef}\\nOur team will contact you shortly.\\n\\nFor another request, type *menu*.`
+        }
+      } else if (/^(hi+|hello+|hey+|namaskar|नमस्कार)$/i.test(normalized)) {
+        reply = 'Namaskar! *Unique Market WhatsApp Service* madhe aaple swagat aahe.\\n\\n1️⃣ Service / Complaint\\n2️⃣ Sales / CCTV\\n3️⃣ AMC\\n4️⃣ Payment\\n\\nKrupaya 1, 2, 3 kiwa 4 pathva.'
       } else if (normalized === '1') {
-        reply = 'Service Complaint sathi krupaya problem short madhe type kara. Udaharan: Camera band aahe / DVR recording nahi.'
+        complaintSessions.set(from, { step: 'problem', problem: '', name: '', location: '' })
+        reply = '🛠️ *Service Complaint*\\n\\nTumchya CCTV/IT system madhla problem short madhe type kara.\\n\\nUdaharan: *Camera band aahe* / *DVR recording nahi* / *CCTV mobile var nahi.*'
       } else if (normalized === '2') {
-        reply = 'CCTV/Sales inquiry sathi product kiwa camera quantity pathva. Amhi tumhala pudhe guide karu.'
+        reply = '📷 *CCTV / Sales*\\n\\nProduct name, camera quantity kiwa requirement pathva. Amhi tumhala quotation sathi guide karu.'
       } else if (normalized === '3') {
-        reply = 'AMC service sathi tumcha customer/company name ani location pathva.'
+        reply = '🔧 *AMC Service*\\n\\nCustomer/company name ani location pathva. Amhi AMC details share karu.'
       } else if (normalized === '4') {
-        reply = 'Payment query sathi invoice number kiwa customer/company name pathva.'
+        reply = '💳 *Payment Query*\\n\\nInvoice number kiwa customer/company name pathva.'
+      } else {
+        reply = 'Krupaya *Hi* pathva menu sathi.\\n\\n1️⃣ Service / Complaint\\n2️⃣ Sales / CCTV\\n3️⃣ AMC\\n4️⃣ Payment'
       }
       if (reply) {
         try { await sendText(from, reply); console.log('WhatsApp auto-reply sent:', JSON.stringify({ to: from, text: reply })) }
