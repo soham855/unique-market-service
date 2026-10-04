@@ -82,7 +82,7 @@ let whatsappLeaseRenewTimer = null
 const complaintSessions = new Map()
 
 async function findOrCreateWhatsAppCustomer(phone, name, location) {
-  const mobile = String(phone || '').replace(/\\D/g, '')
+  const mobile = String(phone || '').replace(/\D/g, '')
   if (!mobile || !supabase) return null
 
   const existing = await supabaseRestRequest('/customers?select=id,name,mobile,company_name,address&mobile=eq.' + encodeURIComponent(mobile) + '&limit=1')
@@ -111,7 +111,7 @@ async function findOrCreateWhatsAppCustomer(phone, name, location) {
 
 async function createWhatsAppComplaint(session, from) {
   if (!supabase) throw new Error('Supabase event bridge is not configured')
-  const phone = String(from || '').replace(/\\D/g, '')
+  const phone = String(from || '').replace(/\D/g, '')
   const customer = await findOrCreateWhatsAppCustomer(phone, session.name, session.location)
   const ticket = 'UM-WA-' + Date.now().toString().slice(-8)
   const payload = {
