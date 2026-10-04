@@ -468,7 +468,7 @@ function formatWhatsAppTime(value) {
 
 function formatWhatsAppBranding(message) {
   const body = String(message || '').trim()
-  const header = '🔷 *UNIQUE MARKET*\\n_CCTV | IT Security | Service & AMC_\\n\\nNamaskar! Aaple swagat aahe.\\n\\n1️⃣ *Service / Complaint*\\n2️⃣ *CCTV / Sales*\\n3️⃣ *AMC Service*\\n4️⃣ *Payment Query*\\n\\nKrupaya *1, 2, 3 kiwa 4* pathva.'
+  const header = '🔷 *UNIQUE MARKET*\\n_CCTV | IT Security | Service & AMC_\\n\\nNamaskar! Aaple swagat aahe.\\n\\n1️⃣ Service / Complaint\\n2️⃣ CCTV / Sales\\n3️⃣ AMC Service\\n4️⃣ Payment Query\\n\\nKrupaya *1, 2, 3 kiwa 4* pathva.'
   const footer = '━━━━━━━━━━━━━━\\n📍 *Station Road, Hotel Rajdoot, Ichalkaranji*\\n📞 *7350060071*\\n_Thank you for choosing Unique Market._'
   if (/^🔷 \\*UNIQUE MARKET\\*/.test(body) || body.includes('Service / Complaint')) return header + '\\n\\n' + footer
   return body + '\\n\\n' + footer
