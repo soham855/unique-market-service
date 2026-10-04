@@ -321,39 +321,98 @@ async function sendDocument(jid, pdf, fileName, caption) {
   return result
 }
 
+async function getProfile(userId) {
+  if (!userId) return null
+  try {
+    const params = new URLSearchParams({ select: 'full_name,phone', id: 'eq.' + userId, limit: '1' })
+    const rows = await supabaseRestRequest('/profiles?' + params.toString())
+    return rows?.[0] || null
+  } catch (err) { console.error('WhatsApp profile lookup failed:', String(err?.message || err)); return null }
+}
+
+function formatWhatsAppTime(value) {
+  if (!value) return 'Just now'
+  try { return new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Kolkata' }).format(new Date(value)) }
+  catch { return String(value) }
+}
+
+function formatServiceStatus(value) {
+  const raw = String(value || '').toLowerCase().replaceAll('_', ' ').trim()
+  const map = { pending: '🟡 Pending', open: '🔵 Open', assigned: '🟣 Assigned', accepted: '🟠 Accepted', in_progress: '🟠 In Progress', completed: '🟢 Completed', closed: '✅ Closed', cancelled: '🔴 Cancelled', rejected: '🔴 Rejected' }
+  return map[raw.replaceAll(' ', '_')] || ('🔵 ' + (raw ? raw.replace(/\b\w/g, m => m.toUpperCase()) : 'Updated'))
+}
+
+function buildWhatsAppNotification(event, complaint, customer, recipientProfile) {
+  const ticket = complaint?.complaint_no || complaint?.ticket_no || complaint?.id || '—'
+  const issue = complaint?.title || complaint?.description || 'Service Request'
+  const name = customer?.name || complaint?.customer_name || 'Customer'
+  const location = customer?.address || complaint?.location_text || complaint?.address || 'Not provided'
+  const statusText = formatServiceStatus(complaint?.status)
+  const receivedAt = formatWhatsAppTime(complaint?.created_at || event?.created_at)
+  if (event.event_type === 'assigned') return [
+    '🔔 *UNIQUE MARKET | NEW ASSIGNMENT*', '',
+    'Hello ' + (recipientProfile?.full_name || 'Team Member') + ',',
+    'A new service complaint has been assigned to you.', '',
+    '🎫 *Ticket:* ' + ticket,
+    '👤 *Customer:* ' + name,
+    '📞 *Mobile:* ' + (customer?.mobile || complaint?.customer_phone || '—'),
+    '🛠️ *Issue:* ' + issue,
+    '📍 *Location:* ' + location,
+    '⚡ *Priority:* ' + (complaint?.priority || 'Normal'), '',
+    '👉 Please open the Service Portal and update the ticket.', '',
+    '— *Unique Market*', 'CCTV • IT Security • Service & AMC', '📞 7350060071'
+  ].join('\n')
+  if (event.event_type === 'status_changed') return [
+    '🔄 *UNIQUE MARKET | SERVICE UPDATE*', '',
+    'Hello ' + name + ' 👋,',
+    'Your service request has been updated.', '',
+    '🎫 *Ticket:* ' + ticket,
+    '🛠️ *Issue:* ' + issue,
+    '📊 *Status:* ' + statusText,
+    '📍 *Location:* ' + location, '',
+    'We will keep you updated on the next service step.',
+    'For assistance, reply here or call us.', '',
+    '— *Unique Market*', 'CCTV • IT Security • Service & AMC', '📞 7350060071'
+  ].join('\n')
+  return [
+    '✅ *UNIQUE MARKET | SERVICE REQUEST RECEIVED*', '',
+    'Hello ' + name + ' 👋,',
+    'Your complaint has been registered successfully.', '',
+    '🎫 *Ticket:* ' + ticket,
+    '🛠️ *Issue:* ' + issue,
+    '📍 *Location:* ' + location,
+    '⚡ *Priority:* ' + (complaint?.priority || 'Normal'),
+    '📊 *Status:* ' + statusText,
+    '🕐 *Received:* ' + receivedAt, '',
+    'Our service team will contact you shortly.',
+    'Please keep this Ticket ID for future reference.', '',
+    '— *Unique Market*', 'CCTV • IT Security • Service & AMC', '📞 7350060071'
+  ].join('\n')
+}
+
 async function sendNotificationEvent(jid, event) {
   const marker = String(event.message || '').match(/\n?\[\[PDF_URL=(https?:\/\/[^\]]+)\]\]\s*$/i)
   const pdfUrl = marker?.[1] || null
-  const text = String(event.message || '').replace(/\n?\[\[PDF_URL=https?:\/\/[^\]]+\]\]\s*$/i, '').trim()
-
-  // Build/fetch the PDF first. Do not silently mark the event sent when the
-  // customer receipt failed; the outbox must retry the complete notification.
   if (status !== 'connected' || !sock) throw new Error('WhatsApp is not connected')
-
+  let complaint = null, customer = null, recipientProfile = null
+  if (event.complaint_id) {
+    const resolved = await getComplaintAndCustomer(event.complaint_id)
+    complaint = resolved.complaint; customer = resolved.customer
+    if (!complaint) throw new Error('Complaint not found: ' + event.complaint_id)
+  }
+  if (event.recipient_user_id) recipientProfile = await getProfile(event.recipient_user_id)
   if (pdfUrl) {
     const response = await fetch(pdfUrl, { redirect: 'follow' })
     if (!response.ok) throw new Error('PDF URL download failed: HTTP ' + response.status)
     const pdf = Buffer.from(await response.arrayBuffer())
-    await sendDocument(
-      jid,
-      pdf,
-      'Unique-Market-' + (event.event_type || 'Complaint') + '-' + (event.complaint_id || 'Receipt') + '.pdf',
-      '📄 Unique Market Complaint Receipt'
-    )
-  } else if (event.complaint_id) {
-    const { complaint, customer } = await getComplaintAndCustomer(event.complaint_id)
-    if (!complaint) throw new Error('Complaint not found for PDF: ' + event.complaint_id)
+    await sendDocument(jid, pdf, 'Unique-Market-' + (event.event_type || 'Complaint') + '-' + (event.complaint_id || 'Receipt') + '.pdf', '📄 *Unique Market* | Complaint Receipt')
+  } else if (complaint) {
     const pdf = buildComplaintPdfBuffer(complaint, customer)
     const ticket = complaint.complaint_no || complaint.ticket_no || complaint.id
-    await sendDocument(
-      jid,
-      pdf,
-      'Unique-Market-' + ticket + '-Receipt.pdf',
-      '📄 Unique Market Complaint Receipt'
-    )
+    await sendDocument(jid, pdf, 'Unique-Market-' + ticket + '-Receipt.pdf', '📄 *Unique Market* | Complaint Receipt')
   }
-
-  if (text) await sendText(jid, text)
+  await sendText(jid, buildWhatsAppNotification(event, complaint, customer, recipientProfile))
+}
 }
 
 function describeSupabaseError(error) {
@@ -397,7 +456,7 @@ async function processNotificationEvents() {
   eventProcessingInFlight = (async () => {
   try {
     const params = new URLSearchParams({
-      select: 'id,complaint_id,phone,customer_phone,event_type,message,status,created_at',
+      select: 'id,complaint_id,recipient_user_id,phone,customer_phone,event_type,message,status,created_at',
       status: 'eq.pending',
       order: 'created_at.asc',
       limit: '10'
