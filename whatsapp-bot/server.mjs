@@ -759,7 +759,7 @@ async function startWhatsApp() {
         locationMessage: locationMessage ? { latitude: locationMessage.degreesLatitude ?? locationMessage.latitude ?? null, longitude: locationMessage.degreesLongitude ?? locationMessage.longitude ?? null } : null,
         messageId: msg.key?.id || null
       }))
-      if (!text || !conversationKey || remoteJid.endsWith('@g.us')) continue
+      if ((!text && !locationMessage) || !conversationKey || remoteJid.endsWith('@g.us')) continue
 
       const normalized = text.toLowerCase()
       let reply = null
