@@ -221,38 +221,70 @@ async function getComplaintAndCustomer(complaintId) {
   return { complaint, customer: complaint?.customer || null }
 }
 
+async function sendDocument(jid, pdf, fileName, caption) {
+  if (status !== 'connected' || !sock) throw new Error('WhatsApp is not connected')
+  if (!Buffer.isBuffer(pdf) || pdf.length < 100 || pdf.subarray(0, 5).toString() !== '%PDF-') {
+    throw new Error('Invalid PDF buffer')
+  }
+  console.log('WhatsApp PDF sending:', JSON.stringify({ to: jid, fileName, bytes: pdf.length }))
+  const result = await sock.sendMessage(jid, {
+    document: pdf,
+    mimetype: 'application/pdf',
+    fileName,
+    caption
+  })
+  console.log('WhatsApp PDF send result:', JSON.stringify({
+    to: jid,
+    messageId: result?.key?.id || null,
+    fromMe: result?.key?.fromMe ?? null,
+    status: result?.status ?? null,
+    bytes: pdf.length
+  }))
+  if (result?.key?.id) {
+    trackedWhatsAppMessages.set(result.key.id, {
+      jid,
+      type: 'document',
+      status: 'queued',
+      statusCode: result?.status ?? null,
+      updatedAt: new Date().toISOString()
+    })
+  }
+  return result
+}
+
 async function sendNotificationEvent(jid, event) {
   const marker = String(event.message || '').match(/\n?\[\[PDF_URL=(https?:\/\/[^\]]+)\]\]\s*$/i)
   const pdfUrl = marker?.[1] || null
   const text = String(event.message || '').replace(/\n?\[\[PDF_URL=https?:\/\/[^\]]+\]\]\s*$/i, '').trim()
-  if (text) await sendText(jid, text)
+
+  // Build/fetch the PDF first. Do not silently mark the event sent when the
+  // customer receipt failed; the outbox must retry the complete notification.
   if (status !== 'connected' || !sock) throw new Error('WhatsApp is not connected')
+
   if (pdfUrl) {
-    await sock.sendMessage(jid, {
-      document: { url: pdfUrl },
-      mimetype: 'application/pdf',
-      fileName: 'Unique-Market-' + (event.event_type || 'Complaint') + '-' + (event.complaint_id || 'Receipt') + '.pdf',
-      caption: '📄 Unique Market Complaint Receipt'
-    })
+    const response = await fetch(pdfUrl, { redirect: 'follow' })
+    if (!response.ok) throw new Error('PDF URL download failed: HTTP ' + response.status)
+    const pdf = Buffer.from(await response.arrayBuffer())
+    await sendDocument(
+      jid,
+      pdf,
+      'Unique-Market-' + (event.event_type || 'Complaint') + '-' + (event.complaint_id || 'Receipt') + '.pdf',
+      '📄 Unique Market Complaint Receipt'
+    )
   } else if (event.complaint_id) {
-    // PDF attachment is best-effort. The notification itself must not fail
-    // when the REST role cannot read complaints; the queued WhatsApp event
-    // should still be marked sent after the text is delivered.
-    try {
-      const { complaint, customer } = await getComplaintAndCustomer(event.complaint_id)
-      if (!complaint) throw new Error('Complaint not found for PDF: ' + event.complaint_id)
-      const pdf = buildComplaintPdfBuffer(complaint, customer)
-      const ticket = complaint.complaint_no || complaint.ticket_no || complaint.id
-      await sock.sendMessage(jid, {
-        document: pdf,
-        mimetype: 'application/pdf',
-        fileName: 'Unique-Market-' + ticket + '-Receipt.pdf',
-        caption: '📄 Unique Market Complaint Receipt'
-      })
-    } catch (err) {
-      console.error('WhatsApp PDF attachment skipped:', String(err?.message || err))
-    }
+    const { complaint, customer } = await getComplaintAndCustomer(event.complaint_id)
+    if (!complaint) throw new Error('Complaint not found for PDF: ' + event.complaint_id)
+    const pdf = buildComplaintPdfBuffer(complaint, customer)
+    const ticket = complaint.complaint_no || complaint.ticket_no || complaint.id
+    await sendDocument(
+      jid,
+      pdf,
+      'Unique-Market-' + ticket + '-Receipt.pdf',
+      '📄 Unique Market Complaint Receipt'
+    )
   }
+
+  if (text) await sendText(jid, text)
 }
 
 function describeSupabaseError(error) {
