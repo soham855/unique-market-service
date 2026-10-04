@@ -469,11 +469,9 @@ function formatWhatsAppTime(value) {
 function formatWhatsAppBranding(message) {
   const body = String(message || '').trim()
   const header = '🔷 *UNIQUE MARKET*\\n_CCTV | IT Security | Service & AMC_\\n\\nNamaskar! Aaple swagat aahe.\\n\\n1️⃣ *Service / Complaint*\\n2️⃣ *CCTV / Sales*\\n3️⃣ *AMC Service*\\n4️⃣ *Payment Query*\\n\\nKrupaya *1, 2, 3 kiwa 4* pathva.'
-  const footer = '📍 *Station Road, Hotel Rajdoot, Ichalkaranji*\\n📞 *7350060071*\\n_Thank you for choosing Unique Market._'
-  if (body.includes('UNIQUE MARKET') && (body.includes('Service / Complaint') || body.includes('CCTV / Sales'))) {
-    return header + '\\n\\n' + footer
-  }
-  return body.includes('UNIQUE MARKET') ? body : header + '\\n\\n' + body + '\\n\\n' + footer
+  const footer = '━━━━━━━━━━━━━━\\n📍 *Station Road, Hotel Rajdoot, Ichalkaranji*\\n📞 *7350060071*\\n_Thank you for choosing Unique Market._'
+  if (/^🔷 \\*UNIQUE MARKET\\*/.test(body) || body.includes('Service / Complaint')) return header + '\\n\\n' + footer
+  return body + '\\n\\n' + footer
 }
 function formatServiceStatus(value) {
   const raw = String(value || '').toLowerCase().replaceAll('_', ' ').trim()
