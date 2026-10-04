@@ -699,7 +699,7 @@ async function startWhatsApp() {
     version,
     logger,
     auth: { creds: state.creds, keys: makeCacheableSignalKeyStore(state.keys, logger) },
-    browser: Browsers.ubuntu('Chrome'),
+    browser: Browsers.macOS('Chrome'),
     markOnlineOnConnect: true,
     syncFullHistory: false,
     connectTimeoutMs: 120000,
