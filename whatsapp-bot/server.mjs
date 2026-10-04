@@ -670,6 +670,157 @@ async function processNotificationEvents() {
   return eventProcessingInFlight
 }
 
+let visitReminderPollerStarted = false
+let visitReminderProcessingInFlight = null
+
+function formatVisitReminderTime(value) {
+  try {
+    return new Intl.DateTimeFormat('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      dateStyle: 'medium',
+      timeStyle: 'short'
+    }).format(new Date(value))
+  } catch {
+    return String(value || '')
+  }
+}
+
+async function processVisitReminders() {
+  if (!SUPABASE_SERVICE_ROLE_KEY || status !== 'connected' || !sock) return
+  if (visitReminderProcessingInFlight) return visitReminderProcessingInFlight
+
+  visitReminderProcessingInFlight = (async () => {
+    const now = Date.now()
+    const windows = [
+      {
+        key: '24h',
+        column: 'whatsapp_visit_reminder_24h_sent_at',
+        minMs: 23 * 60 * 60 * 1000 + 59 * 60 * 1000,
+        maxMs: 24 * 60 * 60 * 1000 + 60 * 1000,
+        label: '1 day'
+      },
+      {
+        key: '1h',
+        column: 'whatsapp_visit_reminder_1h_sent_at',
+        minMs: 59 * 60 * 1000,
+        maxMs: 60 * 60 * 1000 + 60 * 1000,
+        label: '1 hour'
+      }
+    ]
+
+    for (const window of windows) {
+      try {
+        const from = new Date(now + window.minMs).toISOString()
+        const to = new Date(now + window.maxMs).toISOString()
+        const params = new URLSearchParams({
+          select: 'id,complaint_no,ticket_no,title,description,status,customer_name,customer_phone,technician_id,scheduled_visit_at,' + window.column,
+          scheduled_visit_at: 'gte.' + from,
+          'scheduled_visit_at': 'lt.' + to,
+          [window.column]: 'is.null',
+          limit: '20'
+        })
+        const complaints = await supabaseRestRequest('/complaints?' + params.toString())
+
+        for (const complaint of complaints || []) {
+          if (!complaint?.id || !complaint?.scheduled_visit_at) continue
+
+          const resolved = await getComplaintAndCustomer(complaint.id)
+          const customer = resolved.customer
+          const fullComplaint = resolved.complaint || complaint
+          const customerPhone = fullComplaint.customer_phone || customer?.mobile || ''
+          let technician = null
+          if (fullComplaint.technician_id) {
+            technician = await getProfile(fullComplaint.technician_id)
+          }
+          const technicianPhone = technician?.phone || technician?.mobile || ''
+          const targets = []
+          for (const phone of [customerPhone, technicianPhone]) {
+            const jid = recipientJid(phone)
+            if (jid && !targets.includes(jid)) targets.push(jid)
+          }
+          if (!targets.length) continue
+
+          const ticket = fullComplaint.complaint_no || fullComplaint.ticket_no || fullComplaint.id
+          const visitTime = formatVisitReminderTime(fullComplaint.scheduled_visit_at)
+          const issue = fullComplaint.title || fullComplaint.description || 'Service Request'
+          const location = fullComplaint.location_text || fullComplaint.address || customer?.address || 'Not provided'
+
+          const customerMessage = [
+            '📅 *UNIQUE MARKET | SERVICE VISIT REMINDER*',
+            '',
+            'Hello ' + (customer?.name || fullComplaint.customer_name || 'Customer') + ' 👋,',
+            'Your technician visit is scheduled in *' + window.label + '*.',
+            '',
+            '🎫 *Ticket:* ' + ticket,
+            '🛠️ *Issue:* ' + issue,
+            '👨‍🔧 *Technician:* ' + (technician?.full_name || technician?.name || 'Assigned Technician'),
+            '🕐 *Visit:* ' + visitTime,
+            '📍 *Location:* ' + location,
+            '',
+            'Please keep the site accessible for the technician.',
+            'For changes, reply here or call *7350060071*.'
+          ].join('\n')
+
+          const technicianMessage = [
+            '📅 *UNIQUE MARKET | VISIT REMINDER*',
+            '',
+            'Hello ' + (technician?.full_name || technician?.name || 'Technician') + ' 👋,',
+            'You have a scheduled service visit in *' + window.label + '*.',
+            '',
+            '🎫 *Ticket:* ' + ticket,
+            '👤 *Customer:* ' + (customer?.name || fullComplaint.customer_name || 'Customer'),
+            '📞 *Customer Mobile:* ' + (customer?.mobile || fullComplaint.customer_phone || '—'),
+            '🛠️ *Issue:* ' + issue,
+            '🕐 *Visit:* ' + visitTime,
+            '📍 *Location:* ' + location,
+            '',
+            'Please reach the site on time and update the Service Portal after the visit.'
+          ].join('\n')
+
+          try {
+            const customerJid = recipientJid(customerPhone)
+            const technicianJid = recipientJid(technicianPhone)
+            if (customerJid) await sendText(customerJid, customerMessage)
+            if (technicianJid && technicianJid !== customerJid) await sendText(technicianJid, technicianMessage)
+
+            await supabaseRestRequest('/complaints?id=eq.' + encodeURIComponent(fullComplaint.id), {
+              method: 'PATCH',
+              headers: { Prefer: 'return=minimal' },
+              body: JSON.stringify({ [window.column]: new Date().toISOString() })
+            })
+            console.log('WhatsApp visit reminder sent:', JSON.stringify({
+              complaintId: fullComplaint.id,
+              ticket,
+              reminder: window.key,
+              customerPhone: customerPhone || null,
+              technicianPhone: technicianPhone || null
+            }))
+          } catch (err) {
+            console.error('WhatsApp visit reminder send failed:', JSON.stringify({
+              complaintId: fullComplaint.id,
+              reminder: window.key,
+              error: String(err?.message || err)
+            }))
+          }
+        }
+      } catch (err) {
+        console.error('WhatsApp visit reminder query failed:', JSON.stringify({
+          reminder: window.key,
+          error: String(err?.message || err)
+        }))
+      }
+    }
+  })().finally(() => { visitReminderProcessingInFlight = null })
+
+  return visitReminderProcessingInFlight
+}
+
+function startVisitReminderPoller() {
+  if (visitReminderPollerStarted) return
+  visitReminderPollerStarted = true
+  setInterval(() => processVisitReminders().catch(err => console.error('visit reminder poll failed:', String(err?.message || err))), 60000)
+}
+
 function startEventPoller() {
   if (eventPollerStarted) return
   eventPollerStarted = true
@@ -873,6 +1024,7 @@ async function startWhatsApp() {
       status = 'connected'; lastQr = null; pairingCode = null; reconnecting = false
       syncAuthToSupabase().catch(err => console.error('WhatsApp auth sync after open failed:', String(err?.message || err)))
       startEventPoller()
+      startVisitReminderPoller()
       setTimeout(() => processNotificationEvents().catch(err => logger.error({ err: describeSupabaseError(err) }, 'initial event processing failed')), 500)
       console.log('WhatsApp connected')
     }
