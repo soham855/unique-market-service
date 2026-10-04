@@ -696,22 +696,50 @@ async function startWhatsApp() {
     if (type !== 'notify') return
     for (const msg of messages || []) {
       if (msg.key?.fromMe) continue
-      const remoteJid = msg.key?.remoteJid || ''
-      // WhatsApp can deliver 1:1 incoming messages using an @lid JID.
-      // Prefer the sender's real phone JID when Baileys provides it so replies
-      // are sent to the actual customer number instead of the LID.
+      const remoteJid = String(msg.key?.remoteJid || '').trim()
+      // WhatsApp may deliver 1:1 incoming messages with an @lid JID.
+      // Prefer every PN source available on the message, then fall back to
+      // Baileys' persistent LID -> PN mapping store.
       const senderPn = String(msg.key?.senderPn || msg.key?.senderPN || '').trim()
-      const from = remoteJid.endsWith('@s.whatsapp.net') ? remoteJid : (senderPn || remoteJid)
+      const remoteJidAlt = String(msg.key?.remoteJidAlt || '').trim()
+      const participantAlt = String(msg.key?.participantAlt || '').trim()
+      let from = remoteJid.endsWith('@s.whatsapp.net')
+        ? remoteJid
+        : (senderPn.endsWith('@s.whatsapp.net')
+          ? senderPn
+          : (remoteJidAlt.endsWith('@s.whatsapp.net')
+            ? remoteJidAlt
+            : (participantAlt.endsWith('@s.whatsapp.net') ? participantAlt : '')))
+      if (!from && remoteJid.endsWith('@lid') && sock?.signalRepository?.lidMapping?.getPNForLID) {
+        try {
+          const mappedPn = await sock.signalRepository.lidMapping.getPNForLID(remoteJid)
+          if (mappedPn) from = String(mappedPn).trim()
+        } catch (err) {
+          console.error('WhatsApp LID -> PN lookup failed:', String(err?.message || err))
+        }
+      }
+      // Keep the LID as a last-resort conversation key, but never use it as
+      // the outgoing recipient because sendText requires a phone-number JID.
+      const conversationKey = from || remoteJid
       const text = String(msg.message?.conversation || msg.message?.extendedTextMessage?.text || '').trim()
-      console.log('WhatsApp incoming message:', JSON.stringify({ from, remoteJid, senderPn: senderPn || null, text, messageId: msg.key?.id || null }))
-      if (!text || !from || remoteJid.endsWith('@g.us')) continue
+      console.log('WhatsApp incoming message:', JSON.stringify({
+        from: from || null,
+        conversationKey,
+        remoteJid,
+        senderPn: senderPn || null,
+        remoteJidAlt: remoteJidAlt || null,
+        participantAlt: participantAlt || null,
+        text,
+        messageId: msg.key?.id || null
+      }))
+      if (!text || !conversationKey || remoteJid.endsWith('@g.us')) continue
 
       const normalized = text.toLowerCase()
       let reply = null
-      const active = complaintSessions.get(from)
+      const active = complaintSessions.get(conversationKey)
 
       if (/^(cancel|stop|0|menu|back)$/i.test(normalized)) {
-        clearComplaintSession(from)
+        clearComplaintSession(conversationKey)
         reply = '🔷 *UNIQUE MARKET*\\n_CCTV | IT Security | Service & AMC_\\n\\n1️⃣ Service / Complaint\\n2️⃣ CCTV / Sales\\n3️⃣ AMC Service\\n4️⃣ Payment Query\\n\\nKrupaya *1, 2, 3 kiwa 4* pathva.'
       } else if (active) {
         if (active.step === 'problem') {
@@ -741,7 +769,7 @@ async function startWhatsApp() {
       } else if (/^(hi+|hello+|hey+|namaskar|नमस्कार)$/i.test(normalized)) {
         reply = '🔷 *UNIQUE MARKET*\\n_CCTV | IT Security | Service & AMC_\\n\\nNamaskar! Aaple swagat aahe.\\n\\n1️⃣ Service / Complaint\\n2️⃣ CCTV / Sales\\n3️⃣ AMC Service\\n4️⃣ Payment Query\\n\\nKrupaya *1, 2, 3 kiwa 4* pathva.'
       } else if (normalized === '1') {
-        complaintSessions.set(from, { step: 'problem', problem: '', name: '', location: '', priority: 'normal' })
+        complaintSessions.set(conversationKey, { step: 'problem', problem: '', name: '', location: '', priority: 'normal' })
         reply = '🛠️ *SERVICE COMPLAINT*\\n\\nTumchya CCTV/IT system madhla problem short madhe type kara.\\n\\nExample: *Camera band aahe* / *DVR recording nahi* / *CCTV mobile var nahi.*'
       } else if (normalized === '2') {
         reply = '📷 *CCTV / SALES*\\n\\nCamera quantity, brand, model kiwa requirement pathva.\\n\\nAmhi quotation sathi tumchi enquiry note karu.\\n\\nType *menu* for Main Menu.'
