@@ -93,7 +93,7 @@ async function sendText(jid, message) {
 }
 
 function pdfEscape(value) {
-  return String(value ?? '').replace(/\\/g, '\\\\').replace(/\\(/g, '\\\\(').replace(/\\)/g, '\\\\)').replace(/\r?\n/g, ' ')
+  return String(value ?? '').replaceAll('\\\\', '\\\\\\\\').replaceAll('(', '\\\\(').replaceAll(')', '\\\\)').replaceAll('\n', ' ')
 }
 
 function buildComplaintPdfBuffer(complaint, customer) {
