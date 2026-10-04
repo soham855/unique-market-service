@@ -76,8 +76,69 @@ const WHATSAPP_LEASE_RENEW_MS = 15000
 let whatsappLeaseHeld = false
 let whatsappLeaseRenewTimer = null
 
-// Simple in-memory WhatsApp complaint flow.
+// Simple in-memory WhatsApp conversation flow.
+// Conversation state is intentionally kept in memory; the actual complaint/customer
+// record is persisted in Supabase as soon as the Service flow is completed.
 const complaintSessions = new Map()
+
+async function findOrCreateWhatsAppCustomer(phone, name, location) {
+  const mobile = String(phone || '').replace(/\\D/g, '')
+  if (!mobile || !supabase) return null
+
+  const existing = await supabaseRestRequest('/customers?select=id,name,mobile,company_name,address&mobile=eq.' + encodeURIComponent(mobile) + '&limit=1')
+  if (Array.isArray(existing) && existing[0]?.id) {
+    const current = existing[0]
+    const patch = {}
+    if (name && !current.name) patch.name = name
+    if (location && !current.address) patch.address = location
+    if (Object.keys(patch).length) {
+      await supabaseRestRequest('/customers?id=eq.' + encodeURIComponent(current.id), {
+        method: 'PATCH',
+        headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify(patch)
+      })
+    }
+    return { ...current, ...patch }
+  }
+
+  const rows = await supabaseRestRequest('/customers', {
+    method: 'POST',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({ name: name || 'WhatsApp Customer', mobile, address: location || null })
+  })
+  return Array.isArray(rows) ? rows[0] || null : null
+}
+
+async function createWhatsAppComplaint(session, from) {
+  if (!supabase) throw new Error('Supabase event bridge is not configured')
+  const phone = String(from || '').replace(/\\D/g, '')
+  const customer = await findOrCreateWhatsAppCustomer(phone, session.name, session.location)
+  const ticket = 'UM-WA-' + Date.now().toString().slice(-8)
+  const payload = {
+    ticket_no: ticket,
+    complaint_no: ticket,
+    customer_id: customer?.id || null,
+    category: 'WhatsApp Service Request',
+    service_type: 'Service',
+    title: session.problem,
+    description: session.problem,
+    priority: session.priority || 'normal',
+    status: 'open',
+    location_text: session.location,
+    address: session.location,
+    customer_name: session.name,
+    customer_phone: phone,
+    company_name: session.company_name || null
+  }
+  const rows = await supabaseRestRequest('/complaints', {
+    method: 'POST',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify(payload)
+  })
+  const complaint = Array.isArray(rows) ? rows[0] || null : null
+  if (!complaint?.id) throw new Error('Complaint was not created')
+  return { complaint, customer, ticket }
+}
 
 function clearComplaintSession(jid) {
   complaintSessions.delete(jid)
@@ -632,7 +693,8 @@ async function startWhatsApp() {
     saveCredsPromise = Promise.resolve(saveCreds()).then(() => scheduleAuthSync()).catch(err => console.error('WhatsApp credential save failed:', err))
     return saveCredsPromise
   })
-  // Incoming WhatsApp messages: log them so the bot can verify and route received chats.
+  // Incoming WhatsApp messages: route customers through the service menu and persist
+  // completed service requests directly into the same complaints table used by the app.
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
     if (type !== 'notify') return
     for (const msg of messages || []) {
@@ -641,65 +703,61 @@ async function startWhatsApp() {
       const text = String(msg.message?.conversation || msg.message?.extendedTextMessage?.text || '').trim()
       console.log('WhatsApp incoming message:', JSON.stringify({ from, text, messageId: msg.key?.id || null }))
       if (!text || !from || from.endsWith('@g.us')) continue
+
       const normalized = text.toLowerCase()
       let reply = null
-      const activeComplaint = complaintSessions.get(from)
+      const active = complaintSessions.get(from)
 
       if (/^(cancel|stop|0|menu|back)$/i.test(normalized)) {
         clearComplaintSession(from)
-        reply = 'Main menu:\\n\\n1️⃣ Service / Complaint\\n2️⃣ Sales / CCTV\\n3️⃣ AMC\\n4️⃣ Payment\\n\\nKrupaya 1, 2, 3 kiwa 4 pathva.'
-      } else if (activeComplaint) {
-        if (activeComplaint.step === 'problem') {
-          activeComplaint.problem = text
-          activeComplaint.step = 'name'
-          reply = 'Problem noted. Ata customer/company name pathva.'
-        } else if (activeComplaint.step === 'name') {
-          activeComplaint.name = text
-          activeComplaint.step = 'location'
-          reply = 'Thanks. Ata service location / area pathva.'
-        } else if (activeComplaint.step === 'location') {
-          activeComplaint.location = text
-          const ticketRef = `WA-${Date.now().toString().slice(-6)}`
-          const officeJid = recipientJid(PHONE_NUMBER)
-          const summary = [
-            '🚨 *New WhatsApp Service Complaint*',
-            '',
-            `Ticket: ${ticketRef}`,
-            `Customer: ${activeComplaint.name}`,
-            `Phone: +${from.replace('@s.whatsapp.net', '')}`,
-            `Location: ${activeComplaint.location}`,
-            `Problem: ${activeComplaint.problem}`
-          ].join('\\n')
-
-          if (officeJid && officeJid !== from) {
-            try {
-              await sendText(officeJid, summary)
-              console.log('WhatsApp complaint forwarded to office:', ticketRef)
-            } catch (err) {
-              console.error('WhatsApp complaint office forward failed:', String(err?.message || err))
-            }
+        reply = '🔷 *UNIQUE MARKET*\\n_CCTV | IT Security | Service & AMC_\\n\\n1️⃣ Service / Complaint\\n2️⃣ CCTV / Sales\\n3️⃣ AMC Service\\n4️⃣ Payment Query\\n\\nKrupaya *1, 2, 3 kiwa 4* pathva.'
+      } else if (active) {
+        if (active.step === 'problem') {
+          active.problem = text
+          active.step = 'name'
+          reply = '🛠️ *Problem noted.*\\n\\nAta *Customer / Company Name* pathva.'
+        } else if (active.step === 'name') {
+          active.name = text
+          active.step = 'location'
+          reply = '📍 Ata *Service Location / Area / Address* pathva.'
+        } else if (active.step === 'location') {
+          active.location = text
+          active.step = 'priority'
+          reply = '⚡ Problem chi priority pathva:\\n\\n1️⃣ Urgent\\n2️⃣ Normal\\n3️⃣ Low'
+        } else if (active.step === 'priority') {
+          const priorityMap = { '1': 'urgent', '2': 'normal', '3': 'low', urgent: 'urgent', normal: 'normal', low: 'low' }
+          active.priority = priorityMap[normalized] || 'normal'
+          try {
+            const result = await createWhatsAppComplaint(active, from)
+            clearComplaintSession(from)
+            reply = '✅ *SERVICE REQUEST REGISTERED*\\n\\n🎫 *Complaint No:* ' + result.ticket + '\\n👤 *Customer:* ' + active.name + '\\n📍 *Location:* ' + active.location + '\\n🛠️ *Problem:* ' + active.problem + '\\n⚡ *Priority:* ' + active.priority + '\\n\\nOur team will contact you shortly.\\n\\nType *menu* for Main Menu.'
+          } catch (err) {
+            console.error('WhatsApp complaint creation failed:', String(err?.message || err))
+            reply = '⚠️ Complaint register kartana temporary problem ala. Krupaya thodya velane punha try kara kiwa *7350060071* var contact kara.'
           }
-
-          clearComplaintSession(from)
-          reply = `✅ Complaint received.\\n\\nTicket ID: ${ticketRef}\\nOur team will contact you shortly.\\n\\nFor another request, type *menu*.`
         }
       } else if (/^(hi+|hello+|hey+|namaskar|नमस्कार)$/i.test(normalized)) {
-        reply = 'Namaskar! *Unique Market WhatsApp Service* madhe aaple swagat aahe.\\n\\n1️⃣ Service / Complaint\\n2️⃣ Sales / CCTV\\n3️⃣ AMC\\n4️⃣ Payment\\n\\nKrupaya 1, 2, 3 kiwa 4 pathva.'
+        reply = '🔷 *UNIQUE MARKET*\\n_CCTV | IT Security | Service & AMC_\\n\\nNamaskar! Aaple swagat aahe.\\n\\n1️⃣ Service / Complaint\\n2️⃣ CCTV / Sales\\n3️⃣ AMC Service\\n4️⃣ Payment Query\\n\\nKrupaya *1, 2, 3 kiwa 4* pathva.'
       } else if (normalized === '1') {
-        complaintSessions.set(from, { step: 'problem', problem: '', name: '', location: '' })
-        reply = '🛠️ *Service Complaint*\\n\\nTumchya CCTV/IT system madhla problem short madhe type kara.\\n\\nUdaharan: *Camera band aahe* / *DVR recording nahi* / *CCTV mobile var nahi.*'
+        complaintSessions.set(from, { step: 'problem', problem: '', name: '', location: '', priority: 'normal' })
+        reply = '🛠️ *SERVICE COMPLAINT*\\n\\nTumchya CCTV/IT system madhla problem short madhe type kara.\\n\\nExample: *Camera band aahe* / *DVR recording nahi* / *CCTV mobile var nahi.*'
       } else if (normalized === '2') {
-        reply = '📷 *CCTV / Sales*\\n\\nProduct name, camera quantity kiwa requirement pathva. Amhi tumhala quotation sathi guide karu.'
+        reply = '📷 *CCTV / SALES*\\n\\nCamera quantity, brand, model kiwa requirement pathva.\\n\\nAmhi quotation sathi tumchi enquiry note karu.\\n\\nType *menu* for Main Menu.'
       } else if (normalized === '3') {
-        reply = '🔧 *AMC Service*\\n\\nCustomer/company name ani location pathva. Amhi AMC details share karu.'
+        reply = '🔧 *AMC SERVICE*\\n\\nAMC service sathi Customer/Company Name + Location pathva.\\n\\nAmhi tumhala pudhil process sangto.\\n\\nType *menu* for Main Menu.'
       } else if (normalized === '4') {
-        reply = '💳 *Payment Query*\\n\\nInvoice number kiwa customer/company name pathva.'
+        reply = '💳 *PAYMENT QUERY*\\n\\nInvoice Number kiwa Customer/Company Name pathva.\\n\\nOur office team payment status check karel.\\n\\n📞 7350060071'
       } else {
-        reply = 'Krupaya *Hi* pathva menu sathi.\\n\\n1️⃣ Service / Complaint\\n2️⃣ Sales / CCTV\\n3️⃣ AMC\\n4️⃣ Payment'
+        reply = 'Krupaya *Hi* pathva kiwa menu madhun option select kara.\\n\\n1️⃣ Service / Complaint\\n2️⃣ CCTV / Sales\\n3️⃣ AMC Service\\n4️⃣ Payment Query'
       }
+
       if (reply) {
-        try { await sendText(from, reply); console.log('WhatsApp auto-reply sent:', JSON.stringify({ to: from, text: reply })) }
-        catch (err) { console.error('WhatsApp auto-reply failed:', String(err?.message || err)) }
+        try {
+          await sendText(from, reply)
+          console.log('WhatsApp auto-reply sent:', JSON.stringify({ to: from, text: reply }))
+        } catch (err) {
+          console.error('WhatsApp auto-reply failed:', String(err?.message || err))
+        }
       }
     }
   })
