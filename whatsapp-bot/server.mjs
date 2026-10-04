@@ -24,7 +24,6 @@ const SUPABASE_URL = String(process.env.SUPABASE_URL || 'https://tfscvycomllamou
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '')
 const WA_GROUP_JID = String(process.env.WA_GROUP_JID || '').trim()
 const EVENT_POLL_MS = Number(process.env.WA_EVENT_POLL_MS || 5000)
-const BLOCKED_PHONE = '918554887026'
 const logger = pino({ level: process.env.WA_LOG_LEVEL || 'silent' })
 let authSyncTimer = null
 let authSyncInFlight = null
@@ -130,7 +129,7 @@ function authorized(req) {
 
 function recipientJid(phone) {
   const digits = String(phone || '').replace(/\D/g, '')
-  if (!digits || digits === BLOCKED_PHONE) return null
+  if (!digits) return null
   return `${digits}@s.whatsapp.net`
 }
 
