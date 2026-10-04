@@ -461,73 +461,69 @@ async function getProfile(userId) {
 }
 
 function formatWhatsAppTime(value) {
-  if (!value) return 'Just now'
-  try { return new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Kolkata' }).format(new Date(value)) }
+  if (!value) return 'आत्ताच'
+  try { return new Intl.DateTimeFormat('mr-IN', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Kolkata' }).format(new Date(value)) }
   catch { return String(value) }
 }
 
 function formatWhatsAppBranding(message) {
   const body = String(message || '').trim()
-  const header = '🔷 *UNIQUE MARKET*\n_CCTV | IT Security | Service & AMC_'
-  const footer = '━━━━━━━━━━━━━━\n📍 *Station Road, Hotel Rajdoot, Ichalkaranji*\n📞 *7350060071*\n_Thank you for choosing Unique Market._'
-  const withHeader = body.includes('UNIQUE MARKET') ? body : header + '\n\n' + body
-  return withHeader.replace(/(?:\n)?━━━━━━━━━━━━━━[\\s\\S]*$/m, '').trim() + '\n\n' + footer
+  const header = '🔷 *युनिक मार्केट*\\n_CCTV | IT सुरक्षा | सेवा व AMC_'
+  const footer = '━━━━━━━━━━━━━━\\n📍 *स्टेशन रोड, हॉटेल राजदूत, इचलकरंजी*\\n📞 *7350060071*\\n_युनिक मार्केटची सेवा निवडल्याबद्दल धन्यवाद._'
+  const cleaned = body.replace(/(?:\\n)?━━━━━━━━━━━━━━[\\s\\S]*$/m, '').replace(/^🔷 \\*UNIQUE MARKET\\*[\\s\\S]*?Service & AMC_\\n?/i, '').trim()
+  return header + '\\n\\n' + cleaned + '\\n\\n' + footer
 }
 
 function formatServiceStatus(value) {
   const raw = String(value || '').toLowerCase().replaceAll('_', ' ').trim()
-  const map = { pending: '🟡 Pending', open: '🔵 Open', assigned: '🟣 Assigned', accepted: '🟠 Accepted', in_progress: '🟠 In Progress', completed: '🟢 Completed', closed: '✅ Closed', cancelled: '🔴 Cancelled', rejected: '🔴 Rejected' }
-  return map[raw.replaceAll(' ', '_')] || ('🔵 ' + (raw ? raw.replace(/\b\w/g, m => m.toUpperCase()) : 'Updated'))
+  const map = { pending: '🟡 प्रलंबित', open: '🔵 नवीन', assigned: '🟣 तंत्रज्ञ नियुक्त', accepted: '🟠 स्वीकारले', in_progress: '🟠 सेवा सुरू', completed: '🟢 सेवा पूर्ण', closed: '✅ बंद', cancelled: '🔴 रद्द', rejected: '🔴 नाकारले' }
+  return map[raw.replaceAll(' ', '_')] || ('🔵 ' + (raw || 'अद्ययावत'))
 }
 
 function buildWhatsAppNotification(event, complaint, customer, recipientProfile) {
   const ticket = complaint?.complaint_no || complaint?.ticket_no || complaint?.id || '—'
-  const issue = complaint?.title || complaint?.description || 'Service Request'
-  const name = customer?.name || complaint?.customer_name || 'Customer'
-  const location = customer?.address || complaint?.location_text || complaint?.address || 'Not provided'
+  const issue = complaint?.title || complaint?.description || 'सेवा विनंती'
+  const name = customer?.name || complaint?.customer_name || 'ग्राहक'
+  const location = customer?.address || complaint?.location_text || complaint?.address || 'नमूद केलेले नाही'
   const statusText = formatServiceStatus(complaint?.status)
   const receivedAt = formatWhatsAppTime(complaint?.created_at || event?.created_at)
   if (event.event_type === 'assigned') return [
-    '🔔 *UNIQUE MARKET | NEW ASSIGNMENT*', '',
-    'Hello ' + (recipientProfile?.full_name || 'Team Member') + ',',
-    'A new service complaint has been assigned to you.', '',
-    '🎫 *Ticket:* ' + ticket,
-    '👤 *Customer:* ' + name,
-    '📞 *Mobile:* ' + (customer?.mobile || complaint?.customer_phone || '—'),
-    '🛠️ *Issue:* ' + issue,
-    '📍 *Location:* ' + location,
-    '⚡ *Priority:* ' + (complaint?.priority || 'Normal'), '',
-    '👉 Please open the Service Portal and update the ticket.', '',
-    '━━━━━━━━━━━━━━', '📍 *Station Road, Hotel Rajdoot, Ichalkaranji*', '📞 *7350060071*', '_Unique Market | CCTV • IT Security • Service & AMC_'
-  ].join('\n')
+    '🔔 *नवीन सेवा तक्रार नियुक्त*', '',
+    'नमस्कार ' + (recipientProfile?.full_name || 'तंत्रज्ञ') + ',',
+    'आपल्याला नवीन सेवा तक्रार सोपवण्यात आली आहे.', '',
+    '🎫 *तक्रार क्रमांक:* ' + ticket,
+    '👤 *ग्राहक:* ' + name,
+    '📞 *मोबाईल:* ' + (customer?.mobile || complaint?.customer_phone || '—'),
+    '🛠️ *अडचण:* ' + issue,
+    '📍 *सेवेचे ठिकाण:* ' + location,
+    '⚡ *प्राधान्य:* ' + (complaint?.priority || 'सामान्य'), '',
+    '👉 कृपया Service Portal उघडून तक्रारीची पुढील कारवाई नोंदवा.'
+  ].join('\\n')
   if (event.event_type === 'status_changed') return [
-    '🔄 *UNIQUE MARKET | SERVICE UPDATE*', '',
-    'Hello ' + name + ' 👋,',
-    'Your service request has been updated.', '',
-    '🎫 *Ticket:* ' + ticket,
-    '🛠️ *Issue:* ' + issue,
-    '📊 *Status:* ' + statusText,
-    '📍 *Location:* ' + location, '',
-    'We will keep you updated on the next service step.',
-    'For assistance, reply here or call us.', '',
-    '━━━━━━━━━━━━━━', '📍 *Station Road, Hotel Rajdoot, Ichalkaranji*', '📞 *7350060071*', '_Unique Market | CCTV • IT Security • Service & AMC_'
-  ].join('\n')
+    '🔄 *सेवा तक्रारीची स्थिती अद्ययावत*', '',
+    'नमस्कार ' + name + ',',
+    'आपल्या सेवा तक्रारीची स्थिती अद्ययावत करण्यात आली आहे.', '',
+    '🎫 *तक्रार क्रमांक:* ' + ticket,
+    '🛠️ *अडचण:* ' + issue,
+    '📊 *स्थिती:* ' + statusText,
+    '📍 *सेवेचे ठिकाण:* ' + location, '',
+    'पुढील सेवेसंबंधी माहिती आपल्याला कळवली जाईल.',
+    'मदतीसाठी येथे संदेश पाठवा किंवा *7350060071* वर संपर्क करा.'
+  ].join('\\n')
   return [
-    '✅ *UNIQUE MARKET | SERVICE REQUEST RECEIVED*', '',
-    'Hello ' + name + ' 👋,',
-    'Your complaint has been registered successfully.', '',
-    '🎫 *Ticket:* ' + ticket,
-    '🛠️ *Issue:* ' + issue,
-    '📍 *Location:* ' + location,
-    '⚡ *Priority:* ' + (complaint?.priority || 'Normal'),
-    '📊 *Status:* ' + statusText,
-    '🕐 *Received:* ' + receivedAt, '',
-    'Our service team will contact you shortly.',
-    'Please keep this Ticket ID for future reference.', '',
-    '— *Unique Market*', 'CCTV • IT Security • Service & AMC', '📞 7350060071'
-  ].join('\n')
+    '✅ *तक्रार यशस्वीरीत्या नोंदवली*', '',
+    'नमस्कार ' + name + ',',
+    'आपली सेवा तक्रार यशस्वीरीत्या नोंदवली आहे.', '',
+    '🎫 *तक्रार क्रमांक:* ' + ticket,
+    '🛠️ *अडचण:* ' + issue,
+    '📍 *सेवेचे ठिकाण:* ' + location,
+    '⚡ *प्राधान्य:* ' + (complaint?.priority || 'सामान्य'),
+    '📊 *स्थिती:* ' + statusText,
+    '🕐 *नोंदणीची वेळ:* ' + receivedAt, '',
+    'आमची सेवा टीम लवकरच आपल्याशी संपर्क साधेल.',
+    'पुढील चौकशीसाठी कृपया हा तक्रार क्रमांक जतन करून ठेवा.'
+  ].join('\\n')
 }
-
 async function sendNotificationEvent(jid, event) {
   const marker = String(event.message || '').match(/\n?\[\[PDF_URL=(https?:\/\/[^\]]+)\]\]\s*$/i)
   const pdfUrl = marker?.[1] || null
@@ -769,45 +765,46 @@ async function startWhatsApp() {
 
       if (/^(cancel|stop|0|menu|back)$/i.test(normalized)) {
         clearComplaintSession(conversationKey)
-        reply = '🔷 *UNIQUE MARKET*\n_CCTV | IT Security | Service & AMC_\n\n1️⃣ Service / Complaint\n2️⃣ CCTV / Sales\n3️⃣ AMC Service\n4️⃣ Payment Query\n\nKrupaya *1, 2, 3 kiwa 4* pathva.'
+        reply = 'मुख्य मेनू\\n\\n1️⃣ सेवा / तक्रार नोंदणी\\n2️⃣ CCTV / खरेदी चौकशी\\n3️⃣ AMC सेवा\\n4️⃣ पेमेंट चौकशी\\n\\nकृपया *1, 2, 3 किंवा 4* पैकी एक क्रमांक पाठवा.'
       } else if (active) {
         if (active.step === 'problem') {
           active.problem = text
           active.step = 'name'
-          reply = '🛠️ *Problem noted.*\n\nAta *Customer / Company Name* pathva.'
+          reply = '📝 *अडचण नोंदवली आहे.*\\n\\nकृपया आपले *नाव किंवा कंपनीचे नाव* पाठवा.'
         } else if (active.step === 'name') {
           active.name = text
           active.step = 'location'
-          reply = '📍 Ata *Service Location / Area / Address* pathva.'
+          reply = '📍 कृपया *सेवा देण्याचा संपूर्ण पत्ता किंवा परिसराचे नाव* पाठवा.'
         } else if (active.step === 'location') {
           active.location = text
           active.step = 'priority'
-          reply = '⚡ Problem chi priority pathva:\n\n1️⃣ Urgent\n2️⃣ Normal\n3️⃣ Low'
+          reply = '⚡ कृपया तक्रारीचे प्राधान्य निवडा:\\n\\n1️⃣ *तातडीची*\\n2️⃣ *सामान्य*\\n3️⃣ *कमी प्राधान्य*'
         } else if (active.step === 'priority') {
           const priorityMap = { '1': 'urgent', '2': 'normal', '3': 'low', urgent: 'urgent', normal: 'normal', low: 'low' }
           active.priority = priorityMap[normalized] || 'normal'
           try {
             const result = await createWhatsAppComplaint(active, from)
-            clearComplaintSession(from)
-            reply = '✅ *SERVICE REQUEST REGISTERED*\n\n🎫 *Complaint No:* ' + result.ticket + '\n👤 *Customer:* ' + active.name + '\n📍 *Location:* ' + active.location + '\n🛠️ *Problem:* ' + active.problem + '\n⚡ *Priority:* ' + active.priority + '\n\nOur team will contact you shortly.\n\nType *menu* for Main Menu.'
+            clearComplaintSession(conversationKey)
+            const priorityText = { urgent: 'तातडीची', normal: 'सामान्य', low: 'कमी प्राधान्य' }[active.priority] || 'सामान्य'
+            reply = '✅ *तक्रार यशस्वीरीत्या नोंदवली आहे.*\\n\\n🎫 *तक्रार क्रमांक:* ' + result.ticket + '\\n👤 *ग्राहक:* ' + active.name + '\\n📍 *सेवेचे ठिकाण:* ' + active.location + '\\n🛠️ *अडचण:* ' + active.problem + '\\n⚡ *प्राधान्य:* ' + priorityText + '\\n\\nआमची सेवा टीम लवकरच आपल्याशी संपर्क साधेल.\\n\\nमुख्य मेनूसाठी *मेनू* असे पाठवा.'
           } catch (err) {
             console.error('WhatsApp complaint creation failed:', String(err?.message || err))
-            reply = '⚠️ Complaint register kartana temporary problem ala. Krupaya thodya velane punha try kara kiwa *7350060071* var contact kara.'
+            reply = '⚠️ *तक्रार नोंदवताना तांत्रिक अडचण आली आहे.*\\n\\nकृपया काही वेळाने पुन्हा प्रयत्न करा किंवा *7350060071* वर संपर्क करा.'
           }
         }
       } else if (/^(hi+|hello+|hey+|namaskar|नमस्कार)$/i.test(normalized)) {
-        reply = '🔷 *UNIQUE MARKET*\n_CCTV | IT Security | Service & AMC_\n\nNamaskar! Aaple swagat aahe.\n\n1️⃣ Service / Complaint\n2️⃣ CCTV / Sales\n3️⃣ AMC Service\n4️⃣ Payment Query\n\nKrupaya *1, 2, 3 kiwa 4* pathva.'
+        reply = '🙏 *नमस्कार!*\\n\\nआपले युनिक मार्केटमध्ये मनःपूर्वक स्वागत आहे.\\n\\nकृपया आपल्याला हवी असलेली सेवा निवडा:\\n\\n1️⃣ *सेवा / तक्रार नोंदणी*\\n2️⃣ *CCTV / खरेदी चौकशी*\\n3️⃣ *AMC सेवा*\\n4️⃣ *पेमेंट चौकशी*\\n\\nकृपया *1, 2, 3 किंवा 4* पैकी एक क्रमांक पाठवा.'
       } else if (normalized === '1') {
         complaintSessions.set(conversationKey, { step: 'problem', problem: '', name: '', location: '', priority: 'normal' })
-        reply = '🛠️ *SERVICE COMPLAINT*\n\nTumchya CCTV/IT system madhla problem short madhe type kara.\n\nExample: *Camera band aahe* / *DVR recording nahi* / *CCTV mobile var nahi.*'
+        reply = '🛠️ *सेवा / तक्रार नोंदणी*\\n\\nकृपया आपल्या CCTV किंवा IT प्रणालीमध्ये नेमकी कोणती अडचण आली आहे ते थोडक्यात लिहा.\\n\\nउदा.: *कॅमेरा बंद आहे*, *DVR मध्ये रेकॉर्डिंग होत नाही*, *मोबाईलवर CCTV दिसत नाही*.'
       } else if (normalized === '2') {
-        reply = '📷 *CCTV / SALES*\n\nCamera quantity, brand, model kiwa requirement pathva.\n\nAmhi quotation sathi tumchi enquiry note karu.\n\nType *menu* for Main Menu.'
+        reply = '📷 *CCTV / खरेदी चौकशी*\\n\\nकृपया कॅमेऱ्यांची संख्या, ब्रँड, मॉडेल किंवा आपली आवश्यकता पाठवा.\\n\\nआपली चौकशी नोंदवून आमची टीम आपल्याशी संपर्क साधेल.'
       } else if (normalized === '3') {
-        reply = '🔧 *AMC SERVICE*\n\nAMC service sathi Customer/Company Name + Location pathva.\n\nAmhi tumhala pudhil process sangto.\n\nType *menu* for Main Menu.'
+        reply = '🔧 *AMC सेवा*\\n\\nकृपया *ग्राहक / कंपनीचे नाव* आणि *सेवेचे ठिकाण* पाठवा.\\n\\nआमची टीम AMC संदर्भातील पुढील माहिती देईल.'
       } else if (normalized === '4') {
-        reply = '💳 *PAYMENT QUERY*\n\nInvoice Number kiwa Customer/Company Name pathva.\n\nOur office team payment status check karel.\n\n📞 7350060071'
+        reply = '💳 *पेमेंट चौकशी*\\n\\nकृपया *इनव्हॉइस क्रमांक* किंवा *ग्राहक / कंपनीचे नाव* पाठवा.\\n\\nआमची कार्यालयीन टीम पेमेंटची स्थिती तपासून आपल्याला कळवेल.\\n\\n📞 *7350060071*'
       } else {
-        reply = 'Krupaya *Hi* pathva kiwa menu madhun option select kara.\n\n1️⃣ Service / Complaint\n2️⃣ CCTV / Sales\n3️⃣ AMC Service\n4️⃣ Payment Query'
+        reply = 'कृपया *नमस्कार* पाठवा किंवा खालीलपैकी एक पर्याय निवडा.\\n\\n1️⃣ सेवा / तक्रार नोंदणी\\n2️⃣ CCTV / खरेदी चौकशी\\n3️⃣ AMC सेवा\\n4️⃣ पेमेंट चौकशी'
       }
 
       if (reply) {
