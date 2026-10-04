@@ -482,9 +482,9 @@ function formatServiceStatus(value) {
 
 function buildWhatsAppNotification(event, complaint, customer, recipientProfile) {
   const ticket = complaint?.complaint_no || complaint?.ticket_no || complaint?.id || '—'
-  const issue = complaint?.title || complaint?.description || 'सेवा विनंती'
-  const name = customer?.name || complaint?.customer_name || 'ग्राहक'
-  const location = customer?.address || complaint?.location_text || complaint?.address || 'नमूद केलेले नाही'
+  const issue = complaint?.title || complaint?.description || 'Service Request'
+  const name = customer?.name || complaint?.customer_name || 'Customer'
+  const location = customer?.address || complaint?.location_text || complaint?.address || 'Not provided'
   const statusText = formatServiceStatus(complaint?.status)
   const receivedAt = formatWhatsAppTime(complaint?.created_at || event?.created_at)
   if (event.event_type === 'assigned') return [
