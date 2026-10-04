@@ -67,6 +67,7 @@ let lastQr = null
 let pairingCode = null
 let reconnecting = false
 let eventPollerStarted = false
+let eventProcessingInFlight = null
 let pairingReady = false
 let pairingRequestInFlight = null
 
@@ -267,7 +268,8 @@ async function supabaseRestRequest(pathname, options = {}) {
 
 async function processNotificationEvents() {
   if (!SUPABASE_SERVICE_ROLE_KEY || status !== 'connected' || !sock) return
-
+  if (eventProcessingInFlight) return eventProcessingInFlight
+  eventProcessingInFlight = (async () => {
   try {
     const params = new URLSearchParams({
       select: 'id,complaint_id,phone,customer_phone,event_type,message,status,created_at',
@@ -339,7 +341,8 @@ async function processNotificationEvents() {
   } catch (err) {
     console.error('WhatsApp outbox query failed:', String(err?.message || err))
     logger.error({ error: String(err?.message || err) }, 'notification event query failed')
-  }
+  }  })().finally(() => { eventProcessingInFlight = null })
+  return eventProcessingInFlight
 }
 
 function startEventPoller() {
