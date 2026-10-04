@@ -206,9 +206,12 @@ export default function CustomerComplaintModule({ profile, activeModule = 'Compl
     try {
       const customer = await resolveCustomer()
       const registeredMobile = String(customer.mobile || '').trim()
-      if (!registeredMobile) throw new Error('Registered customer mobile number is missing. Please ask Admin to update the customer profile.')
-      const complaintForm = { ...form, customer_phone: registeredMobile, customer_name: customer.name || form.customer_name, company_name: customer.company_name || form.company_name, location_text: customer.address || form.location_text }
-      if (!complaintForm.customer_name.trim()) throw new Error('Customer Name is required.'); if (!complaintForm.customer_phone.trim()) throw new Error('Registered customer mobile number is required.'); if (!complaintForm.location_text.trim()) throw new Error('Service Address is required.'); if (!form.category || !activeCategories.includes(form.category)) throw new Error('Please select an available service category.'); if (!form.problem) throw new Error('Problem is required.'); if (!form.priority) throw new Error('Priority is required.'); if (form.latitude == null || form.longitude == null) throw new Error('Please tap “📍 Get Precise GPS Location” and wait for GPS accuracy before raising the complaint.')
+      const manualMobile = String(form.customer_phone || '').trim()
+      if (!registeredMobile && !manualMobile) throw new Error('Customer mobile number is required.')
+      const recipientPhones = [...new Set([registeredMobile, manualMobile].filter(Boolean).filter(p => p.replace(/\D/g, '') !== COMPANY_WHATSAPP))]
+      if (!recipientPhones.length) throw new Error('A valid customer recipient mobile number is required.')
+      const complaintForm = { ...form, customer_phone: manualMobile || registeredMobile, customer_name: customer.name || form.customer_name, company_name: customer.company_name || form.company_name, location_text: customer.address || form.location_text }
+      if (!complaintForm.customer_name.trim()) throw new Error('Customer Name is required.'); if (!complaintForm.customer_phone.trim()) throw new Error('Customer mobile number is required.'); if (!complaintForm.location_text.trim()) throw new Error('Service Address is required.'); if (!form.category || !activeCategories.includes(form.category)) throw new Error('Please select an available service category.'); if (!form.problem) throw new Error('Problem is required.'); if (!form.priority) throw new Error('Priority is required.'); if (form.latitude == null || form.longitude == null) throw new Error('Please tap “📍 Get Precise GPS Location” and wait for GPS accuracy before raising the complaint.')
       const title = `${categories[form.category][0].replace(/^\S+\s/,'')} - ${form.problem}`
       const { data:createdComplaint, error } = await supabase.from('complaints').insert({ customer_id:customer.id, customer_name:complaintForm.customer_name.trim(), customer_phone:complaintForm.customer_phone.trim(), company_name:complaintForm.company_name.trim() || null, title, description:form.description.trim() || form.problem, category:form.category, priority:form.priority, location_text:complaintForm.location_text.trim(), latitude:complaintForm.latitude, longitude:complaintForm.longitude, gps_accuracy_m:form.gps_accuracy_m, location_captured_at:form.location_captured_at }).select('*').single()
       if (error) throw error
@@ -221,19 +224,21 @@ export default function CustomerComplaintModule({ profile, activeModule = 'Compl
       const { data:publicUrlData } = supabase.storage.from('service-reports').getPublicUrl(receiptPath)
       const receiptUrl = publicUrlData?.publicUrl
       if (!receiptUrl) throw new Error('Complaint created, but receipt PDF URL could not be generated.')
-      const notificationMessage = buildComplaintMessage({ ...createdComplaint, customer_phone: registeredMobile }, receiptUrl) + '\n[[PDF_URL=' + receiptUrl + ']]'
-      const { error: notificationError } = await supabase.from('whatsapp_notification_events').insert({
-        complaint_id: createdComplaint.id,
-        phone: COMPANY_WHATSAPP,
-        customer_phone: registeredMobile,
-        event_type: 'created',
-        message: notificationMessage,
-        status: 'pending'
-      })
-      if (notificationError) console.error('WhatsApp notification queue failed:', notificationError)
+      const notificationMessage = buildComplaintMessage({ ...createdComplaint, customer_phone: complaintForm.customer_phone }, receiptUrl) + '\n[[PDF_URL=' + receiptUrl + ']]'
+      for (const recipientPhone of recipientPhones) {
+        const { error: notificationError } = await supabase.from('whatsapp_notification_events').insert({
+          complaint_id: createdComplaint.id,
+          phone: COMPANY_WHATSAPP,
+          customer_phone: recipientPhone,
+          event_type: 'created',
+          message: notificationMessage,
+          status: 'pending'
+        })
+        if (notificationError) console.error('WhatsApp notification queue failed:', notificationError)
+      }
       setLastReceipt(receipt)
       receiptDoc.save('Unique-Market-' + (receipt.ticket_no || receipt.id || 'Complaint') + '-Receipt.pdf')
-      await load(); setForm(f=>({ ...f, category:'', problem:'', priority:'normal', description:'', latitude:null, longitude:null, gps_accuracy_m:null, location_captured_at:null })); setMessage('Complaint raised successfully. Receipt PDF saved. WhatsApp message + PDF will be sent to the registered customer mobile.'); if (onSubmitted) onSubmitted()
+      await load(); setForm(f=>({ ...f, category:'', problem:'', priority:'normal', description:'', latitude:null, longitude:null, gps_accuracy_m:null, location_captured_at:null })); setMessage('Complaint raised successfully. Receipt PDF saved. WhatsApp message + PDF will be sent to the registered and manual customer number(s).'); if (onSubmitted) onSubmitted()
     } catch (error) { setMessage(error.message || 'Unable to submit complaint') } finally { setLoading(false) }
   }
   const visibleCategories = Object.entries(categories).filter(([id]) => activeCategories.includes(id)); const problems = form.category ? categories[form.category]?.[1] || [] : []
