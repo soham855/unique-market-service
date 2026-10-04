@@ -793,7 +793,7 @@ async function startWhatsApp() {
           }
         }
       } else if (/^(hi+|hello+|hey+|namaskar|नमस्कार)$/i.test(normalized)) {
-        reply = '🔷 *UNIQUE MARKET*\\n_CCTV | IT Security | Service & AMC_\\n\\nNamaskar! Aaple swagat aahe.\\n\\n1️⃣ Service / Complaint\\n2️⃣ CCTV / Sales\\n3️⃣ AMC Service\\n4️⃣ Payment Query\\n\\nKrupaya *1, 2, 3 kiwa 4* pathva.'
+        reply = '🔷 *UNIQUE MARKET*\\n_CCTV | IT Security | Service & AMC_\\n\\n━━━━━━━━━━━━━━━━━━\\n\\n🙏 *Namaskar!*\\n*Welcome to Unique Market.*\\n\\nPlease select the service you need 👇\\n\\n1️⃣ *Service / Complaint*\\n2️⃣ *CCTV / Sales Inquiry*\\n3️⃣ *AMC Service*\\n4️⃣ *Payment Query*\\n\\n━━━━━━━━━━━━━━━━━━\\n👉 *Reply with 1, 2, 3 or 4 to continue.*\\n\\n━━━━━━━━━━━━━━━━━━\\n\\n📍 *Our Office*\\nStation Road, Hotel Rajdoot, Ichalkaranji\\n\\n📞 *Contact*\\n7350060071\\n\\n━━━━━━━━━━━━━━━━━━\\n\\n_Thank you for choosing_\\n*UNIQUE MARKET*\\n_CCTV • IT Security • Service & AMC_'
       } else if (normalized === '1') {
         complaintSessions.set(conversationKey, { step: 'problem', problem: '', name: '', location: '', priority: 'normal' })
         reply = '🛠️ *SERVICE COMPLAINT*\\n\\nTumchya CCTV/IT system madhla problem short madhe type kara.\\n\\nExample: *Camera band aahe* / *DVR recording nahi* / *CCTV mobile var nahi.*'
