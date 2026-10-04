@@ -137,7 +137,7 @@ async function createWhatsAppComplaint(session, from) {
   })
   const complaint = Array.isArray(rows) ? rows[0] || null : null
   if (!complaint?.id) throw new Error('Complaint was not created')
-  return { complaint, customer, ticket }
+  return { complaint, customer, ticket: complaint.ticket_no }
 }
 
 function clearComplaintSession(jid) {
