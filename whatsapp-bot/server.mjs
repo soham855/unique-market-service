@@ -92,6 +92,22 @@ async function sendText(jid, message) {
   return sock.sendMessage(jid, { text: message })
 }
 
+async function sendNotificationEvent(jid, event) {
+  const marker = String(event.message || '').match(/\n?\[\[PDF_URL=(https?:\/\/[^\]]+)\]\]\s*$/i)
+  const pdfUrl = marker?.[1] || null
+  const text = String(event.message || '').replace(/\n?\[\[PDF_URL=https?:\/\/[^\]]+\]\]\s*$/i, '').trim()
+  if (text) await sendText(jid, text)
+  if (pdfUrl) {
+    if (status !== 'connected' || !sock) throw new Error('WhatsApp is not connected')
+    await sock.sendMessage(jid, {
+      document: { url: pdfUrl },
+      mimetype: 'application/pdf',
+      fileName: 'Unique-Market-' + (event.event_type || 'Complaint') + '-' + (event.complaint_id || 'Receipt') + '.pdf',
+      caption: '📄 Unique Market Complaint Receipt'
+    })
+  }
+}
+
 function describeSupabaseError(error) {
   if (!error) return 'unknown Supabase error'
   return JSON.stringify({
@@ -163,7 +179,7 @@ async function processNotificationEvents() {
 
       try {
         console.log(`WhatsApp outbox sending ${event.id} (${event.event_type}) to ${targets.join(', ')}`)
-        for (const target of targets) await sendText(target, event.message)
+        for (const target of targets) await sendNotificationEvent(target, event)
         await supabaseRestRequest(`/whatsapp_notification_events?id=eq.${encodeURIComponent(event.id)}`, {
           method: 'PATCH',
           headers: { Prefer: 'return=minimal' },
