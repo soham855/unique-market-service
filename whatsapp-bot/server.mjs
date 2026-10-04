@@ -486,7 +486,22 @@ app.get('/pair', pairingPage)
 app.post('/reset', async (req, res) => {
   if (!authorized(req)) return res.status(401).json({ ok: false, error: 'Unauthorized' })
   if (status === 'connected') return res.status(409).json({ ok: false, error: 'WhatsApp is already connected' })
-  try { if (sock) { try { sock.end(new Error('Reset requested')) } catch {} sock = null }; lastQr = null; pairingCode = null; pairingReady = false; reconnecting = false; fs.rmSync(AUTH_DIR, { recursive: true, force: true }); fs.mkdirSync(AUTH_DIR, { recursive: true }); await startWhatsApp(); return res.json({ ok: true, message: 'WhatsApp session reset. Wait a few seconds and request a new QR.' }) }
+  try {
+    if (sock) { try { sock.end(new Error('Reset requested')) } catch {} sock = null }
+    lastQr = null; pairingCode = null; pairingReady = false; reconnecting = false
+    fs.rmSync(AUTH_DIR, { recursive: true, force: true })
+    fs.mkdirSync(AUTH_DIR, { recursive: true })
+    // Clear the persisted Baileys auth state too; otherwise startWhatsApp()
+    // restores the same corrupt Signal session from Supabase after every reset.
+    if (SUPABASE_SERVICE_ROLE_KEY) {
+      await supabaseRestRequest('/whatsapp_auth_sessions?file_name=not.is.null', {
+        method: 'DELETE',
+        headers: { Prefer: 'return=minimal' }
+      })
+    }
+    await startWhatsApp()
+    return res.json({ ok: true, message: 'WhatsApp local + Supabase session reset. Wait for a fresh QR and scan it once.' })
+  }
   catch (err) { return res.status(500).json({ ok: false, error: 'WhatsApp reset failed', detail: String(err?.message || err) }) }
 })
 app.get('/qr', async (req, res) => {
