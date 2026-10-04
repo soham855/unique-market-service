@@ -77,6 +77,50 @@ function clearComplaintSession(jid) {
 
 fs.mkdirSync(AUTH_DIR, { recursive: true })
 
+async function restoreAuthFromSupabase() {
+  if (!SUPABASE_SERVICE_ROLE_KEY) return false
+  try {
+    const rows = await supabaseRestRequest('/whatsapp_auth_sessions?select=file_name,data&order=file_name.asc')
+    if (!Array.isArray(rows) || !rows.length) return false
+    for (const row of rows) {
+      if (!row?.file_name || typeof row.data !== 'string') continue
+      const safeName = path.basename(row.file_name)
+      if (safeName !== row.file_name) continue
+      fs.writeFileSync(path.join(AUTH_DIR, safeName), Buffer.from(row.data, 'base64'))
+    }
+    console.log(`WhatsApp auth restored from Supabase: ${rows.length} file(s)`)
+    return true
+  } catch (err) {
+    console.error('WhatsApp auth restore failed:', String(err?.message || err))
+    return false
+  }
+}
+
+async function syncAuthToSupabase() {
+  if (!SUPABASE_SERVICE_ROLE_KEY) return
+  if (authSyncInFlight) return authSyncInFlight
+  authSyncInFlight = (async () => {
+    const files = fs.readdirSync(AUTH_DIR, { withFileTypes: true })
+      .filter(entry => entry.isFile())
+      .map(entry => entry.name)
+    for (const fileName of files) {
+      const data = fs.readFileSync(path.join(AUTH_DIR, fileName)).toString('base64')
+      await supabaseRestRequest('/whatsapp_auth_sessions?on_conflict=file_name', {
+        method: 'POST',
+        headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify({ file_name: fileName, data, updated_at: new Date().toISOString() })
+      })
+    }
+    console.log(`WhatsApp auth synced to Supabase: ${files.length} file(s)`)
+  })().catch(err => console.error('WhatsApp auth sync failed:', String(err?.message || err))).finally(() => { authSyncInFlight = null })
+  return authSyncInFlight
+}
+
+function scheduleAuthSync() {
+  clearTimeout(authSyncTimer)
+  authSyncTimer = setTimeout(() => syncAuthToSupabase().catch(() => {}), 1500)
+}
+
 function authorized(req) {
   return !WA_API_SECRET || req.get('x-wa-api-key') === WA_API_SECRET
 }
@@ -296,6 +340,7 @@ function startEventPoller() {
 }
 
 async function startWhatsApp() {
+  await restoreAuthFromSupabase()
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR)
   pairingReady = false
   pairingRequestInFlight = null
@@ -316,7 +361,7 @@ async function startWhatsApp() {
   let saveCredsPromise = Promise.resolve()
   sock.ev.on('creds.update', () => {
     console.log('WhatsApp credentials updated')
-    saveCredsPromise = Promise.resolve(saveCreds()).catch(err => console.error('WhatsApp credential save failed:', err))
+    saveCredsPromise = Promise.resolve(saveCreds()).then(() => scheduleAuthSync()).catch(err => console.error('WhatsApp credential save failed:', err))
     return saveCredsPromise
   })
   // Incoming WhatsApp messages: log them so the bot can verify and route received chats.
