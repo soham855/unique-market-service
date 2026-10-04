@@ -776,18 +776,18 @@ async function startWhatsApp() {
         } else if (active.step === 'name') {
           active.name = text
           active.step = 'location'
-          reply = '📍 *SERVICE LOCATION*\\n\\n1️⃣ *Current Location Share करा*\\n2️⃣ *Address Manually Type करा*\\n\\nCurrent location sathi WhatsApp → 📎 → Location → Send your current location.'
+          reply = '📍 *SERVICE LOCATION*\n\n1️⃣ *Current Location Share करा*\n2️⃣ *Address Manually Type करा*\n\nCurrent location sathi WhatsApp → 📎 → Location → Send your current location.'
         } else if (active.step === 'location') {
           if (/^1$/.test(normalized)) {
             active.locationMode = 'current'
             active.step = 'waiting_location'
-            reply = '📍 Ata WhatsApp madhun *Current Location* share kara.\\n\\n📎 → Location → *Send your current location*'
+            reply = '📍 Ata WhatsApp madhun *Current Location* share kara.\n\n📎 → Location → *Send your current location*'
           } else if (/^2$/.test(normalized)) {
             active.locationMode = 'manual'
             active.step = 'manual_location'
             reply = '✍️ Ata *Service Address / Area* type kara.'
           } else {
-            reply = '📍 Location sathi option select kara:\\n\\n1️⃣ Current Location Share करा\\n2️⃣ Address Manually Type करा'
+            reply = '📍 Location sathi option select kara:\n\n1️⃣ Current Location Share करा\n2️⃣ Address Manually Type करा'
           }
         } else if (active.step === 'manual_location') {
           active.location = text
@@ -804,14 +804,13 @@ async function startWhatsApp() {
               active.longitude = lng
               active.location = 'https://www.google.com/maps?q=' + lat + ',' + lng
               active.step = 'priority'
-              reply = '✅ *Current Location received.*\\n\\n⚡ Problem chi priority pathva:\n\n1️⃣ Urgent\n2️⃣ Normal\n3️⃣ Low'
+              reply = '✅ *Current Location received.*\n\n⚡ Problem chi priority pathva:\n\n1️⃣ Urgent\n2️⃣ Normal\n3️⃣ Low'
             } else {
               reply = '⚠️ Location receive zali nahi. Krupaya punha *Current Location* share kara.'
             }
           } else {
-            reply = '📍 Krupaya WhatsApp madhun *Current Location* share kara.\\n\\n📎 → Location → *Send your current location*'
+            reply = '📍 Krupaya WhatsApp madhun *Current Location* share kara.\n\n📎 → Location → *Send your current location*'
           }
-        } else if (active.step === 'priority')
         } else if (active.step === 'priority') {
           const priorityMap = { '1': 'urgent', '2': 'normal', '3': 'low', urgent: 'urgent', normal: 'normal', low: 'low' }
           active.priority = priorityMap[normalized] || 'normal'
