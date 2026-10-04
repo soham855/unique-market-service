@@ -27,6 +27,7 @@ const EVENT_POLL_MS = Number(process.env.WA_EVENT_POLL_MS || 5000)
 const BLOCKED_PHONE = '918554887026'
 const logger = pino({ level: process.env.WA_LOG_LEVEL || 'silent' })
 let authSyncTimer = null
+let authSyncInFlight = null
 const app = express()
 
 // Kapso WhatsApp webhook. Keep this route before express.json() so the raw
