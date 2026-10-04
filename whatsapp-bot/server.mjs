@@ -228,6 +228,7 @@ async function syncAuthToSupabase() {
     const files = fs.readdirSync(AUTH_DIR, { withFileTypes: true })
       .filter(entry => entry.isFile())
       .map(entry => entry.name)
+    if (!files.length) throw new Error('WhatsApp auth directory is empty; refusing to overwrite persisted auth')
     for (const fileName of files) {
       const data = fs.readFileSync(path.join(AUTH_DIR, fileName)).toString('base64')
       await supabaseRestRequest('/whatsapp_auth_sessions?on_conflict=file_name', {
@@ -237,7 +238,10 @@ async function syncAuthToSupabase() {
       })
     }
     console.log(`WhatsApp auth synced to Supabase: ${files.length} file(s)`)
-  })().catch(err => console.error('WhatsApp auth sync failed:', String(err?.message || err))).finally(() => { authSyncInFlight = null })
+  })().catch(err => {
+    console.error('WhatsApp auth sync failed:', String(err?.message || err))
+    throw err
+  }).finally(() => { authSyncInFlight = null })
   return authSyncInFlight
 }
 
@@ -695,7 +699,13 @@ async function startWhatsApp() {
   let saveCredsPromise = Promise.resolve()
   sock.ev.on('creds.update', () => {
     console.log('WhatsApp credentials updated')
-    saveCredsPromise = Promise.resolve(saveCreds()).then(() => scheduleAuthSync()).catch(err => console.error('WhatsApp credential save failed:', err))
+    saveCredsPromise = Promise.resolve()
+      .then(() => saveCreds())
+      .then(() => syncAuthToSupabase())
+      .catch(err => {
+        console.error('WhatsApp credential save/sync failed:', String(err?.message || err))
+        throw err
+      })
     return saveCredsPromise
   })
   // Incoming WhatsApp messages: route customers through the service menu and persist
@@ -822,6 +832,7 @@ async function startWhatsApp() {
     }
     if (connection === 'open') {
       status = 'connected'; lastQr = null; pairingCode = null; reconnecting = false
+      syncAuthToSupabase().catch(err => console.error('WhatsApp auth sync after open failed:', String(err?.message || err)))
       startEventPoller()
       setTimeout(() => processNotificationEvents().catch(err => logger.error({ err: describeSupabaseError(err) }, 'initial event processing failed')), 500)
       console.log('WhatsApp connected')
