@@ -196,24 +196,30 @@ function recipientJid(phone) {
   return `${digits}@s.whatsapp.net`
 }
 
-async function sendText(jid, message) {
-  if (status !== 'connected' || !sock) throw new Error('WhatsApp is not connected')
-  const normalizedJid = String(jid || '').trim()
-  if (!normalizedJid || !normalizedJid.endsWith('@s.whatsapp.net')) throw new Error('Invalid WhatsApp recipient')
-  let contact = null
+async function resolveWhatsAppJid(jid) {
+  const inputJid = String(jid || '').trim()
+  if (!inputJid || !inputJid.endsWith('@s.whatsapp.net')) throw new Error('Invalid WhatsApp recipient')
   try {
-    const result = await sock.onWhatsApp(normalizedJid)
-    contact = Array.isArray(result) ? result[0] : null
+    const result = await sock.onWhatsApp(inputJid)
+    const contact = Array.isArray(result) ? result[0] : null
+    const resolvedJid = String(contact?.jid || inputJid).trim()
     console.log('WhatsApp recipient check:', JSON.stringify({
-      jid: normalizedJid,
-      exists: contact?.exists ?? null,
-      jid: contact?.jid || normalizedJid
+      requestedJid: inputJid,
+      resolvedJid,
+      exists: contact?.exists ?? null
     }))
-    if (contact?.exists === false) throw new Error('WhatsApp number is not registered: ' + normalizedJid)
+    if (contact?.exists === false) throw new Error('WhatsApp number is not registered: ' + inputJid)
+    return resolvedJid
   } catch (err) {
     console.error('WhatsApp recipient check failed:', String(err?.message || err))
     if (String(err?.message || '').startsWith('WhatsApp number is not registered:')) throw err
+    return inputJid
   }
+}
+
+async function sendText(jid, message) {
+  if (status !== 'connected' || !sock) throw new Error('WhatsApp is not connected')
+  const normalizedJid = await resolveWhatsAppJid(jid)
   const result = await sock.sendMessage(normalizedJid, { text: message })
   console.log('WhatsApp text send result:', JSON.stringify({
     to: normalizedJid,
@@ -288,15 +294,16 @@ async function sendDocument(jid, pdf, fileName, caption) {
   if (!Buffer.isBuffer(pdf) || pdf.length < 100 || pdf.subarray(0, 5).toString() !== '%PDF-') {
     throw new Error('Invalid PDF buffer')
   }
-  console.log('WhatsApp PDF sending:', JSON.stringify({ to: jid, fileName, bytes: pdf.length }))
-  const result = await sock.sendMessage(jid, {
+  const resolvedJid = await resolveWhatsAppJid(jid)
+  console.log('WhatsApp PDF sending:', JSON.stringify({ requestedJid: jid, to: resolvedJid, fileName, bytes: pdf.length }))
+  const result = await sock.sendMessage(resolvedJid, {
     document: pdf,
     mimetype: 'application/pdf',
     fileName,
     caption
   })
   console.log('WhatsApp PDF send result:', JSON.stringify({
-    to: jid,
+    to: resolvedJid,
     messageId: result?.key?.id || null,
     fromMe: result?.key?.fromMe ?? null,
     status: result?.status ?? null,
@@ -304,7 +311,7 @@ async function sendDocument(jid, pdf, fileName, caption) {
   }))
   if (result?.key?.id) {
     trackedWhatsAppMessages.set(result.key.id, {
-      jid,
+      jid: resolvedJid,
       type: 'document',
       status: 'queued',
       statusCode: result?.status ?? null,
