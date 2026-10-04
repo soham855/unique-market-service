@@ -238,7 +238,7 @@ function pdfEscape(value) {
 function buildComplaintPdfBuffer(complaint, customer) {
   const rows = [
     ['Complaint No', complaint?.complaint_no || complaint?.ticket_no || complaint?.id || ''],
-    ['Problem', complaint?.title || complaint?.description || ''],
+    ['Problem / Issue', complaint?.title || complaint?.description || ''],
     ['Category', complaint?.category || ''],
     ['Priority', complaint?.priority || ''],
     ['Status', complaint?.status || ''],
@@ -246,37 +246,93 @@ function buildComplaintPdfBuffer(complaint, customer) {
     ['Mobile', customer?.mobile || complaint?.customer_phone || ''],
     ['Company', customer?.company_name || complaint?.company_name || ''],
     ['Service Address', customer?.address || complaint?.location_text || ''],
-    ['Created', complaint?.created_at || '']
+    ['Created', formatWhatsAppTime(complaint?.created_at)]
   ]
-  const lines = ['Unique Market - Complaint Receipt', '', ...rows.map(([k,v]) => k + ': ' + v)]
-  const contentLines = ['BT', '/F1 16 Tf', '50 800 Td']
-  lines.forEach((line, index) => {
-    if (index === 1) contentLines.push('0 -28 Td')
-    else if (index > 1) contentLines.push('0 -20 Td')
-    contentLines.push('(' + pdfEscape(line) + ') Tj')
+
+  // Branded one-page PDF receipt. Uses built-in Helvetica fonts so the PDF
+  // remains portable on WhatsApp and does not depend on external font files.
+  const contentLines = [
+    'q',
+    '0.95 0.97 1 rg',
+    '0 760 595 82 re f',
+    'Q',
+    'BT',
+    '/F1 20 Tf',
+    '50 807 Td',
+    '(' + pdfEscape('UNIQUE MARKET') + ') Tj',
+    '/F1 10 Tf',
+    '0 -18 Td',
+    '(' + pdfEscape('CCTV • IT Security • Service & AMC') + ') Tj',
+    '/F1 9 Tf',
+    '0 -16 Td',
+    '(' + pdfEscape('Station Road, Hotel Rajdoot, Ichalkaranji') + ') Tj',
+    '0 -14 Td',
+    '(' + pdfEscape('Contact: 7350060071') + ') Tj',
+    'ET',
+    'BT',
+    '/F1 16 Tf',
+    '50 725 Td',
+    '(' + pdfEscape('SERVICE COMPLAINT RECEIPT') + ') Tj',
+    '/F1 9 Tf',
+    '0 -16 Td',
+    '(' + pdfEscape('Thank you for contacting Unique Market. Your service request is registered.') + ') Tj',
+    'ET'
+  ]
+
+  let y = 675
+  rows.forEach(([key, value]) => {
+    contentLines.push(
+      'BT',
+      '/F1 10 Tf',
+      '50 ' + y + ' Td',
+      '(' + pdfEscape(key + ':') + ') Tj',
+      '170 0 Td',
+      '(' + pdfEscape(String(value || '—')) + ') Tj',
+      'ET'
+    )
+    y -= 43
   })
-  contentLines.push('ET')
-  const stream = contentLines.join('\n')
+
+  contentLines.push(
+    'BT',
+    '/F1 9 Tf',
+    '50 118 Td',
+    '(' + pdfEscape('For service updates, please keep this complaint number for reference.') + ') Tj',
+    'ET',
+    'q',
+    '0.95 0.97 1 rg',
+    '0 0 595 76 re f',
+    'Q',
+    'BT',
+    '/F1 10 Tf',
+    '50 50 Td',
+    '(' + pdfEscape('Unique Market | CCTV • IT Security • Service & AMC') + ') Tj',
+    '/F1 9 Tf',
+    '0 -16 Td',
+    '(' + pdfEscape('7350060071  •  Station Road, Hotel Rajdoot, Ichalkaranji') + ') Tj',
+    'ET'
+  )
+
+  const stream = contentLines.join('\\n')
   const objects = [
     '<< /Type /Catalog /Pages 2 0 R >>',
     '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
     '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>',
-    '<< /Length ' + Buffer.byteLength(stream, 'utf8') + ' >>\nstream\n' + stream + '\nendstream',
+    '<< /Length ' + Buffer.byteLength(stream, 'utf8') + ' >>\\nstream\\n' + stream + '\\nendstream',
     '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>'
   ]
-  let pdf = '%PDF-1.4\n'
+  let pdf = '%PDF-1.4\\n'
   const offsets = [0]
   objects.forEach((obj, i) => {
     offsets[i + 1] = Buffer.byteLength(pdf, 'utf8')
-    pdf += (i + 1) + ' 0 obj\n' + obj + '\nendobj\n'
+    pdf += (i + 1) + ' 0 obj\\n' + obj + '\\nendobj\\n'
   })
   const xref = Buffer.byteLength(pdf, 'utf8')
-  pdf += 'xref\n0 ' + (objects.length + 1) + '\n0000000000 65535 f \n'
-  for (let i = 1; i <= objects.length; i++) pdf += String(offsets[i]).padStart(10, '0') + ' 00000 n \n'
-  pdf += 'trailer\n<< /Size ' + (objects.length + 1) + ' /Root 1 0 R >>\nstartxref\n' + xref + '\n%%EOF\n'
+  pdf += 'xref\\n0 ' + (objects.length + 1) + '\\n0000000000 65535 f \\n'
+  for (let i = 1; i <= objects.length; i++) pdf += String(offsets[i]).padStart(10, '0') + ' 00000 n \\n'
+  pdf += 'trailer\\n<< /Size ' + (objects.length + 1) + ' /Root 1 0 R >>\\nstartxref\\n' + xref + '\\n%%EOF\\n'
   return Buffer.from(pdf, 'utf8')
 }
-
 async function getComplaintAndCustomer(complaintId) {
   if (!complaintId) return { complaint: null, customer: null }
   const params = new URLSearchParams({
