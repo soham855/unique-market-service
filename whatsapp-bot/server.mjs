@@ -533,10 +533,12 @@ app.get('/', pairingPage)
 app.get('/pair', pairingPage)
 app.post('/reset', async (req, res) => {
   if (!authorized(req)) return res.status(401).json({ ok: false, error: 'Unauthorized' })
-  if (status === 'connected') return res.status(409).json({ ok: false, error: 'WhatsApp is already connected' })
   try {
+    // Force a clean re-link even when the current WhatsApp session is connected.
+    // Block the close handler from auto-reconnecting while the old session is being removed.
+    reconnecting = true
     if (sock) { try { sock.end(new Error('Reset requested')) } catch {} sock = null }
-    lastQr = null; pairingCode = null; pairingReady = false; reconnecting = false
+    lastQr = null; pairingCode = null; pairingReady = false
     fs.rmSync(AUTH_DIR, { recursive: true, force: true })
     fs.mkdirSync(AUTH_DIR, { recursive: true })
     // Clear the persisted Baileys auth state too; otherwise startWhatsApp()
