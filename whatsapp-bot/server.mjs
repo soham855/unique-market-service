@@ -468,9 +468,9 @@ function formatWhatsAppTime(value) {
 
 function formatWhatsAppBranding(message) {
   const body = String(message || '').trim()
-  const canonicalMenu = '🔷 *UNIQUE MARKET*\\n_CCTV | IT Security | Service & AMC_\\n\\nNamaskar! Aaple swagat aahe.\\n\\n1️⃣ Service / Complaint\\n2️⃣ CCTV / Sales\\n3️⃣ AMC Service\\n4️⃣ Payment Query\\n\\nKrupaya *1, 2, 3 kiwa 4* pathva.\\n\\n━━━━━━━━━━━━━━\\n📍 *Station Road, Hotel Rajdoot, Ichalkaranji*\\n📞 *7350060071*\\n_Thank you for choosing Unique Market._'
+  const canonicalMenu = '🔷 *UNIQUE MARKET*\n_CCTV | IT Security | Service & AMC_\n\nNamaskar! Aaple swagat aahe.\n\n1️⃣ Service / Complaint\n2️⃣ CCTV / Sales\n3️⃣ AMC Service\n4️⃣ Payment Query\n\nKrupaya *1, 2, 3 kiwa 4* pathva.\n\n━━━━━━━━━━━━━━\n📍 *Station Road, Hotel Rajdoot, Ichalkaranji*\n📞 *7350060071*\n_Thank you for choosing Unique Market._'
   if (/UNIQUE MARKET|Service \/ Complaint|CCTV \/ Sales|Namaskar! Aaple swagat aahe\./i.test(body)) return canonicalMenu
-  return body + '\\n\\n' + canonicalMenu.split('\\n\\n').slice(-2).join('\\n\\n')
+  return body + '\n\n' + canonicalMenu.split('\n\n').slice(-2).join('\n\n')
 }
 function formatServiceStatus(value) {
   const raw = String(value || '').toLowerCase().replaceAll('_', ' ').trim()
@@ -763,12 +763,12 @@ async function startWhatsApp() {
 
       if (/^(cancel|stop|0|menu|back)$/i.test(normalized)) {
         clearComplaintSession(conversationKey)
-        reply = '🔷 *UNIQUE MARKET*\\n_CCTV | IT Security | Service & AMC_\\n\\nNamaskar! Aaple swagat aahe.\\n\\n1️⃣ Service / Complaint\\n2️⃣ CCTV / Sales\\n3️⃣ AMC Service\\n4️⃣ Payment Query\\n\\nKrupaya *1, 2, 3 kiwa 4* pathva.'
+        reply = '🔷 *UNIQUE MARKET*\n_CCTV | IT Security | Service & AMC_\n\nNamaskar! Aaple swagat aahe.\n\n1️⃣ Service / Complaint\n2️⃣ CCTV / Sales\n3️⃣ AMC Service\n4️⃣ Payment Query\n\nKrupaya *1, 2, 3 kiwa 4* pathva.'
       } else if (active) {
         if (active.step === 'problem') {
           active.problem = text
           active.step = 'name'
-          reply = '🛠️ *Problem noted.*\\n\\nAta *Customer / Company Name* pathva.'
+          reply = '🛠️ *Problem noted.*\n\nAta *Customer / Company Name* pathva.'
         } else if (active.step === 'name') {
           active.name = text
           active.step = 'location'
@@ -776,7 +776,7 @@ async function startWhatsApp() {
         } else if (active.step === 'location') {
           active.location = text
           active.step = 'priority'
-          reply = '⚡ Problem chi priority pathva:\\n\\n1️⃣ Urgent\\n2️⃣ Normal\\n3️⃣ Low'
+          reply = '⚡ Problem chi priority pathva:\n\n1️⃣ Urgent\n2️⃣ Normal\n3️⃣ Low'
         } else if (active.step === 'priority') {
           const priorityMap = { '1': 'urgent', '2': 'normal', '3': 'low', urgent: 'urgent', normal: 'normal', low: 'low' }
           active.priority = priorityMap[normalized] || 'normal'
@@ -784,25 +784,25 @@ async function startWhatsApp() {
             const result = await createWhatsAppComplaint(active, from)
             clearComplaintSession(conversationKey)
             const priorityText = { urgent: 'Urgent', normal: 'Normal', low: 'Low' }[active.priority] || 'Normal'
-            reply = '✅ *SERVICE REQUEST REGISTERED*\\n\\n🎫 *Complaint No:* ' + result.ticket + '\\n👤 *Customer:* ' + active.name + '\\n📍 *Location:* ' + active.location + '\\n🛠️ *Problem:* ' + active.problem + '\\n⚡ *Priority:* ' + priorityText + '\\n\\nOur team will contact you shortly.\\n\\nType *menu* for Main Menu.'
+            reply = '✅ *SERVICE REQUEST REGISTERED*\n\n🎫 *Complaint No:* ' + result.ticket + '\n👤 *Customer:* ' + active.name + '\n📍 *Location:* ' + active.location + '\n🛠️ *Problem:* ' + active.problem + '\n⚡ *Priority:* ' + priorityText + '\n\nOur team will contact you shortly.\n\nType *menu* for Main Menu.'
           } catch (err) {
             console.error('WhatsApp complaint creation failed:', String(err?.message || err))
             reply = '⚠️ Complaint register kartana temporary problem ala. Krupaya thodya velane punha try kara kiwa *7350060071* var contact kara.'
           }
         }
       } else if (/^(hi+|hello+|hey+|namaskar|नमस्कार)$/i.test(normalized)) {
-        reply = '🔷 *UNIQUE MARKET*\\n_CCTV | IT Security | Service & AMC_\\n\\nNamaskar! Aaple swagat aahe.\\n\\n1️⃣ Service / Complaint\\n2️⃣ CCTV / Sales\\n3️⃣ AMC Service\\n4️⃣ Payment Query\\n\\nKrupaya *1, 2, 3 kiwa 4* pathva.'
+        reply = '🔷 *UNIQUE MARKET*\n_CCTV | IT Security | Service & AMC_\n\nNamaskar! Aaple swagat aahe.\n\n1️⃣ Service / Complaint\n2️⃣ CCTV / Sales\n3️⃣ AMC Service\n4️⃣ Payment Query\n\nKrupaya *1, 2, 3 kiwa 4* pathva.'
       } else if (normalized === '1') {
         complaintSessions.set(conversationKey, { step: 'problem', problem: '', name: '', location: '', priority: 'normal' })
-        reply = '🛠️ *SERVICE COMPLAINT*\\n\\nTumchya CCTV/IT system madhla problem short madhe type kara.\\n\\nExample: *Camera band aahe* / *DVR recording nahi* / *CCTV mobile var nahi.*'
+        reply = '🛠️ *SERVICE COMPLAINT*\n\nTumchya CCTV/IT system madhla problem short madhe type kara.\n\nExample: *Camera band aahe* / *DVR recording nahi* / *CCTV mobile var nahi.*'
       } else if (normalized === '2') {
-        reply = '📷 *CCTV / SALES*\\n\\nCamera quantity, brand, model kiwa requirement pathva.\\n\\nAmhi quotation sathi tumchi enquiry note karu.\\n\\nType *menu* for Main Menu.'
+        reply = '📷 *CCTV / SALES*\n\nCamera quantity, brand, model kiwa requirement pathva.\n\nAmhi quotation sathi tumchi enquiry note karu.\n\nType *menu* for Main Menu.'
       } else if (normalized === '3') {
-        reply = '🔧 *AMC SERVICE*\\n\\nAMC service sathi Customer/Company Name + Location pathva.\\n\\nAmhi tumhala pudhil process sangto.\\n\\nType *menu* for Main Menu.'
+        reply = '🔧 *AMC SERVICE*\n\nAMC service sathi Customer/Company Name + Location pathva.\n\nAmhi tumhala pudhil process sangto.\n\nType *menu* for Main Menu.'
       } else if (normalized === '4') {
-        reply = '💳 *PAYMENT QUERY*\\n\\nInvoice Number kiwa Customer/Company Name pathva.\\n\\nOur office team payment status check karel.\\n\\n📞 7350060071'
+        reply = '💳 *PAYMENT QUERY*\n\nInvoice Number kiwa Customer/Company Name pathva.\n\nOur office team payment status check karel.\n\n📞 7350060071'
       } else {
-        reply = 'Krupaya *Hi* pathva kiwa menu madhun option select kara.\\n\\n1️⃣ Service / Complaint\\n2️⃣ CCTV / Sales\\n3️⃣ AMC Service\\n4️⃣ Payment Query'
+        reply = 'Krupaya *Hi* pathva kiwa menu madhun option select kara.\n\n1️⃣ Service / Complaint\n2️⃣ CCTV / Sales\n3️⃣ AMC Service\n4️⃣ Payment Query'
       }
 
       if (reply) {
