@@ -451,6 +451,14 @@ function formatWhatsAppTime(value) {
   catch { return String(value) }
 }
 
+function formatWhatsAppBranding(message) {
+  const body = String(message || '').trim()
+  const header = '🔷 *UNIQUE MARKET*\\n_CCTV | IT Security | Service & AMC_'
+  const footer = '━━━━━━━━━━━━━━\\n📍 *Station Road, Hotel Rajdoot, Ichalkaranji*\\n📞 *7350060071*\\n_Thank you for choosing Unique Market._'
+  const withHeader = body.includes('UNIQUE MARKET') ? body : header + '\\n\\n' + body
+  return withHeader.replace(/(?:\\n)?━━━━━━━━━━━━━━[\\s\\S]*$/m, '').trim() + '\\n\\n' + footer
+}
+
 function formatServiceStatus(value) {
   const raw = String(value || '').toLowerCase().replaceAll('_', ' ').trim()
   const map = { pending: '🟡 Pending', open: '🔵 Open', assigned: '🟣 Assigned', accepted: '🟠 Accepted', in_progress: '🟠 In Progress', completed: '🟢 Completed', closed: '✅ Closed', cancelled: '🔴 Cancelled', rejected: '🔴 Rejected' }
@@ -475,7 +483,7 @@ function buildWhatsAppNotification(event, complaint, customer, recipientProfile)
     '📍 *Location:* ' + location,
     '⚡ *Priority:* ' + (complaint?.priority || 'Normal'), '',
     '👉 Please open the Service Portal and update the ticket.', '',
-    '— *Unique Market*', 'CCTV • IT Security • Service & AMC', '📞 7350060071'
+    '━━━━━━━━━━━━━━', '📍 *Station Road, Hotel Rajdoot, Ichalkaranji*', '📞 *7350060071*', '_Unique Market | CCTV • IT Security • Service & AMC_'
   ].join('\n')
   if (event.event_type === 'status_changed') return [
     '🔄 *UNIQUE MARKET | SERVICE UPDATE*', '',
@@ -487,7 +495,7 @@ function buildWhatsAppNotification(event, complaint, customer, recipientProfile)
     '📍 *Location:* ' + location, '',
     'We will keep you updated on the next service step.',
     'For assistance, reply here or call us.', '',
-    '— *Unique Market*', 'CCTV • IT Security • Service & AMC', '📞 7350060071'
+    '━━━━━━━━━━━━━━', '📍 *Station Road, Hotel Rajdoot, Ichalkaranji*', '📞 *7350060071*', '_Unique Market | CCTV • IT Security • Service & AMC_'
   ].join('\n')
   return [
     '✅ *UNIQUE MARKET | SERVICE REQUEST RECEIVED*', '',
@@ -782,6 +790,7 @@ async function startWhatsApp() {
       }
 
       if (reply) {
+        reply = formatWhatsAppBranding(reply)
         try {
           await sendText(from, reply)
           console.log('WhatsApp auto-reply sent:', JSON.stringify({ to: from, text: reply }))
