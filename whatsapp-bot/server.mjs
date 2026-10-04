@@ -496,7 +496,7 @@ function buildWhatsAppNotification(event, complaint, customer, recipientProfile)
     '📍 *Location:* ' + location,
     '⚡ *Priority:* ' + (complaint?.priority || 'Normal'), '',
     '👉 Please open the Service Portal and update the ticket.'
-  ].join('\\n')
+  ].join('\n')
   if (event.event_type === 'status_changed') return [
     '🔄 *UNIQUE MARKET | SERVICE UPDATE*', '',
     'Hello ' + name + ' 👋,',
@@ -507,7 +507,7 @@ function buildWhatsAppNotification(event, complaint, customer, recipientProfile)
     '📍 *Location:* ' + location, '',
     'We will keep you updated on the next service step.',
     'For assistance, reply here or call us.'
-  ].join('\\n')
+  ].join('\n')
   return [
     '✅ *UNIQUE MARKET | SERVICE REQUEST RECEIVED*', '',
     'Hello ' + name + ' 👋,',
@@ -520,7 +520,7 @@ function buildWhatsAppNotification(event, complaint, customer, recipientProfile)
     '🕐 *Received:* ' + receivedAt, '',
     'Our service team will contact you shortly.',
     'Please keep this Ticket ID for future reference.'
-  ].join('\\n')
+  ].join('\n')
 }
 async function sendNotificationEvent(jid, event) {
   const marker = String(event.message || '').match(/\n?\[\[PDF_URL=(https?:\/\/[^\]]+)\]\]\s*$/i)
