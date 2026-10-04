@@ -126,6 +126,8 @@ async function createWhatsAppComplaint(session, from) {
     status: 'open',
     location_text: session.location,
     address: session.location,
+    latitude: session.latitude ?? null,
+    longitude: session.longitude ?? null,
     customer_name: session.name,
     customer_phone: phone,
     company_name: session.company_name || null
@@ -744,6 +746,7 @@ async function startWhatsApp() {
       // Keep the LID as a last-resort conversation key, but never use it as
       // the outgoing recipient because sendText requires a phone-number JID.
       const conversationKey = from || remoteJid
+      const locationMessage = msg.message?.locationMessage || null
       const text = String(msg.message?.conversation || msg.message?.extendedTextMessage?.text || '').trim()
       console.log('WhatsApp incoming message:', JSON.stringify({
         from: from || null,
@@ -753,6 +756,7 @@ async function startWhatsApp() {
         remoteJidAlt: remoteJidAlt || null,
         participantAlt: participantAlt || null,
         text,
+        locationMessage: locationMessage ? { latitude: locationMessage.degreesLatitude ?? locationMessage.latitude ?? null, longitude: locationMessage.degreesLongitude ?? locationMessage.longitude ?? null } : null,
         messageId: msg.key?.id || null
       }))
       if (!text || !conversationKey || remoteJid.endsWith('@g.us')) continue
@@ -772,11 +776,42 @@ async function startWhatsApp() {
         } else if (active.step === 'name') {
           active.name = text
           active.step = 'location'
-          reply = '📍 Ata *Service Location / Area / Address* pathva.'
+          reply = '📍 *SERVICE LOCATION*\\n\\n1️⃣ *Current Location Share करा*\\n2️⃣ *Address Manually Type करा*\\n\\nCurrent location sathi WhatsApp → 📎 → Location → Send your current location.'
         } else if (active.step === 'location') {
+          if (/^1$/.test(normalized)) {
+            active.locationMode = 'current'
+            active.step = 'waiting_location'
+            reply = '📍 Ata WhatsApp madhun *Current Location* share kara.\\n\\n📎 → Location → *Send your current location*'
+          } else if (/^2$/.test(normalized)) {
+            active.locationMode = 'manual'
+            active.step = 'manual_location'
+            reply = '✍️ Ata *Service Address / Area* type kara.'
+          } else {
+            reply = '📍 Location sathi option select kara:\\n\\n1️⃣ Current Location Share करा\\n2️⃣ Address Manually Type करा'
+          }
+        } else if (active.step === 'manual_location') {
           active.location = text
+          active.latitude = null
+          active.longitude = null
           active.step = 'priority'
           reply = '⚡ Problem chi priority pathva:\n\n1️⃣ Urgent\n2️⃣ Normal\n3️⃣ Low'
+        } else if (active.step === 'waiting_location') {
+          if (locationMessage) {
+            const lat = Number(locationMessage.degreesLatitude ?? locationMessage.latitude)
+            const lng = Number(locationMessage.degreesLongitude ?? locationMessage.longitude)
+            if (Number.isFinite(lat) && Number.isFinite(lng)) {
+              active.latitude = lat
+              active.longitude = lng
+              active.location = 'https://www.google.com/maps?q=' + lat + ',' + lng
+              active.step = 'priority'
+              reply = '✅ *Current Location received.*\\n\\n⚡ Problem chi priority pathva:\n\n1️⃣ Urgent\n2️⃣ Normal\n3️⃣ Low'
+            } else {
+              reply = '⚠️ Location receive zali nahi. Krupaya punha *Current Location* share kara.'
+            }
+          } else {
+            reply = '📍 Krupaya WhatsApp madhun *Current Location* share kara.\\n\\n📎 → Location → *Send your current location*'
+          }
+        } else if (active.step === 'priority')
         } else if (active.step === 'priority') {
           const priorityMap = { '1': 'urgent', '2': 'normal', '3': 'low', urgent: 'urgent', normal: 'normal', low: 'low' }
           active.priority = priorityMap[normalized] || 'normal'
@@ -793,7 +828,7 @@ async function startWhatsApp() {
       } else if (/^(hi+|hello+|hey+|namaskar|नमस्कार)$/i.test(normalized)) {
         reply = '🔷 *UNIQUE MARKET*\n_CCTV | IT Security | Service & AMC_\n\nNamaskar! Aaple swagat aahe.\n\n1️⃣ Service / Complaint\n2️⃣ CCTV / Sales\n3️⃣ AMC Service\n4️⃣ Payment Query\n\nKrupaya *1, 2, 3 kiwa 4* pathva.'
       } else if (normalized === '1') {
-        complaintSessions.set(conversationKey, { step: 'problem', problem: '', name: '', location: '', priority: 'normal' })
+        complaintSessions.set(conversationKey, { step: 'problem', problem: '', name: '', location: '', locationMode: null, latitude: null, longitude: null, priority: 'normal' })
         reply = '🛠️ *SERVICE COMPLAINT*\n\nTumchya CCTV/IT system madhla problem short madhe type kara.\n\nExample: *Camera band aahe* / *DVR recording nahi* / *CCTV mobile var nahi.*'
       } else if (normalized === '2') {
         reply = '📷 *CCTV / SALES*\n\nCamera quantity, brand, model kiwa requirement pathva.\n\nAmhi quotation sathi tumchi enquiry note karu.\n\nType *menu* for Main Menu.'
