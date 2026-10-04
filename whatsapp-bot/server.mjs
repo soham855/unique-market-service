@@ -70,6 +70,11 @@ let eventProcessingInFlight = null
 let pairingReady = false
 let pairingRequestInFlight = null
 const trackedWhatsAppMessages = new Map()
+const INSTANCE_ID = String(process.env.RENDER_INSTANCE_ID || process.env.RENDER_SERVICE_ID || 'local') + ':' + crypto.randomUUID()
+const WHATSAPP_LEASE_TTL_SECONDS = 45
+const WHATSAPP_LEASE_RENEW_MS = 15000
+let whatsappLeaseHeld = false
+let whatsappLeaseRenewTimer = null
 
 // Simple in-memory WhatsApp complaint flow.
 const complaintSessions = new Map()
@@ -79,6 +84,63 @@ function clearComplaintSession(jid) {
 }
 
 fs.mkdirSync(AUTH_DIR, { recursive: true })
+
+async function acquireWhatsAppLease() {
+  if (!SUPABASE_SERVICE_ROLE_KEY) return true
+  try {
+    const result = await supabase.rpc('acquire_whatsapp_bot_lease', {
+      p_holder_id: INSTANCE_ID,
+      p_ttl_seconds: WHATSAPP_LEASE_TTL_SECONDS
+    })
+    if (result.error) throw result.error
+    whatsappLeaseHeld = result.data === true
+    if (!whatsappLeaseHeld) {
+      console.log('WhatsApp singleton lease is held by another instance; this instance will not connect.')
+      return false
+    }
+    console.log('WhatsApp singleton lease acquired:', INSTANCE_ID)
+    clearInterval(whatsappLeaseRenewTimer)
+    whatsappLeaseRenewTimer = setInterval(async () => {
+      if (!whatsappLeaseHeld) return
+      try {
+        const renewed = await supabase.rpc('renew_whatsapp_bot_lease', {
+          p_holder_id: INSTANCE_ID,
+          p_ttl_seconds: WHATSAPP_LEASE_TTL_SECONDS
+        })
+        if (renewed.error) throw renewed.error
+        if (renewed.data !== true) {
+          whatsappLeaseHeld = false
+          clearInterval(whatsappLeaseRenewTimer)
+          console.error('WhatsApp singleton lease lost; closing socket to prevent a second session.')
+          if (sock) {
+            try { sock.end(new Error('WhatsApp singleton lease lost')) } catch {}
+            sock = null
+          }
+        }
+      } catch (err) {
+        console.error('WhatsApp singleton lease renew failed:', String(err?.message || err))
+      }
+    }, WHATSAPP_LEASE_RENEW_MS)
+    return true
+  } catch (err) {
+    console.error('WhatsApp singleton lease acquire failed:', String(err?.message || err))
+    return false
+  }
+}
+
+async function releaseWhatsAppLease() {
+  clearInterval(whatsappLeaseRenewTimer)
+  whatsappLeaseRenewTimer = null
+  if (!whatsappLeaseHeld || !SUPABASE_SERVICE_ROLE_KEY) return
+  try {
+    await supabase.rpc('release_whatsapp_bot_lease', { p_holder_id: INSTANCE_ID })
+    console.log('WhatsApp singleton lease released')
+  } catch (err) {
+    console.error('WhatsApp singleton lease release failed:', String(err?.message || err))
+  } finally {
+    whatsappLeaseHeld = false
+  }
+}
 
 async function restoreAuthFromSupabase() {
   if (!SUPABASE_SERVICE_ROLE_KEY) return false
@@ -418,6 +480,13 @@ function startEventPoller() {
 }
 
 async function startWhatsApp() {
+  if (reconnecting && status === 'resetting') return
+  const leaseAcquired = await acquireWhatsAppLease()
+  if (!leaseAcquired) {
+    status = 'waiting_for_singleton'
+    setTimeout(() => startWhatsApp().catch(err => console.error('WhatsApp singleton retry failed:', err)), 10000)
+    return
+  }
   await restoreAuthFromSupabase()
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR)
   pairingReady = false
@@ -541,6 +610,7 @@ async function startWhatsApp() {
     }
     if (connection === 'close') {
       status = 'disconnected'
+      await releaseWhatsAppLease()
       const code = disconnectCode
       console.error(`WhatsApp connection closed. code=${code ?? 'unknown'} loggedOut=${code === DisconnectReason.loggedOut}`)
       if (code !== DisconnectReason.loggedOut && !reconnecting) {
@@ -569,6 +639,8 @@ app.post('/reset', async (req, res) => {
     // Force a clean re-link even when the current WhatsApp session is connected.
     // Block the close handler from auto-reconnecting while the old session is being removed.
     reconnecting = true
+    status = 'resetting'
+    await releaseWhatsAppLease()
     if (sock) { try { sock.end(new Error('Reset requested')) } catch {} sock = null }
     lastQr = null; pairingCode = null; pairingReady = false
     fs.rmSync(AUTH_DIR, { recursive: true, force: true })
