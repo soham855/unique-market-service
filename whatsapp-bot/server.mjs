@@ -229,15 +229,26 @@ async function syncAuthToSupabase() {
       .filter(entry => entry.isFile())
       .map(entry => entry.name)
     if (!files.length) throw new Error('WhatsApp auth directory is empty; refusing to overwrite persisted auth')
+    let synced = 0
     for (const fileName of files) {
-      const data = fs.readFileSync(path.join(AUTH_DIR, fileName)).toString('base64')
+      let data
+      try {
+        data = fs.readFileSync(path.join(AUTH_DIR, fileName)).toString('base64')
+      } catch (err) {
+        if (err?.code === 'ENOENT') {
+          console.warn('WhatsApp auth file changed during sync; will retry:', fileName)
+          continue
+        }
+        throw err
+      }
       await supabaseRestRequest('/whatsapp_auth_sessions?on_conflict=file_name', {
         method: 'POST',
         headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
         body: JSON.stringify({ file_name: fileName, data, updated_at: new Date().toISOString() })
       })
+      synced += 1
     }
-    console.log(`WhatsApp auth synced to Supabase: ${files.length} file(s)`)
+    if (synced > 0) console.log(`WhatsApp auth synced to Supabase: ${synced}/${files.length} file(s)`)
   })().catch(err => {
     console.error('WhatsApp auth sync failed:', String(err?.message || err))
     throw err
