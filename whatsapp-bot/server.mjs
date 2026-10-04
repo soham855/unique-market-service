@@ -105,58 +105,93 @@ function describeSupabaseError(error) {
   })
 }
 
-async function processNotificationEvents() {
-  if (!supabase || status !== 'connected' || !sock) return
-
-  const { data, error } = await supabase
-    .from('whatsapp_notification_events')
-    .select('id, phone, customer_phone, event_type, message, status, created_at')
-    .eq('status', 'pending')
-    .order('created_at', { ascending: true })
-    .limit(10)
-
-  if (error) {
-    const detail = describeSupabaseError(error)
-    console.error('WhatsApp outbox query failed:', detail)
-    logger.error({ error: detail }, 'notification event query failed')
-    return
+async function supabaseRestRequest(pathname, options = {}) {
+  if (!SUPABASE_SERVICE_ROLE_KEY) throw new Error('Supabase service role key is not configured')
+  const baseUrl = 'https://tfscvycomllamoubtlcf.supabase.co/rest/v1'
+  const response = await fetch(baseUrl + pathname, {
+    ...options,
+    headers: {
+      apikey: SUPABASE_SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      'Content-Type': 'application/json',
+      ...(options.headers || {})
+    }
+  })
+  const raw = await response.text()
+  let body = null
+  try { body = raw ? JSON.parse(raw) : null } catch {}
+  if (!response.ok) {
+    const detail = body ? JSON.stringify(body) : raw.slice(0, 500)
+    throw new Error(`Supabase REST ${response.status}: ${detail}`)
   }
+  return body
+}
 
-  if (data?.length) console.log(`WhatsApp outbox: ${data.length} pending event(s)`)
+async function processNotificationEvents() {
+  if (!SUPABASE_SERVICE_ROLE_KEY || status !== 'connected' || !sock) return
 
-  for (const event of data || []) {
-    const targets = []
-    const officeJid = recipientJid(PHONE_NUMBER)
-    if (officeJid) targets.push(officeJid)
-    const customerJid = recipientJid(event.customer_phone || event.phone)
-    if (customerJid && !targets.includes(customerJid)) targets.push(customerJid)
-    if (WA_GROUP_JID && !targets.includes(WA_GROUP_JID)) targets.push(WA_GROUP_JID)
+  try {
+    const params = new URLSearchParams({
+      select: 'id,phone,customer_phone,event_type,message,status,created_at',
+      status: 'eq.pending',
+      order: 'created_at.asc',
+      limit: '10'
+    })
+    const data = await supabaseRestRequest(`/whatsapp_notification_events?${params.toString()}`)
 
-    if (!targets.length) {
-      await supabase.from('whatsapp_notification_events').update({
-        status: 'failed',
-        error_message: 'No WhatsApp recipient configured or recipient is blocked'
-      }).eq('id', event.id)
-      continue
+    if (data?.length) console.log(`WhatsApp outbox: ${data.length} pending event(s)`)
+
+    for (const event of data || []) {
+      const targets = []
+      const officeJid = recipientJid(PHONE_NUMBER)
+      if (officeJid) targets.push(officeJid)
+      const customerJid = recipientJid(event.customer_phone || event.phone)
+      if (customerJid && !targets.includes(customerJid)) targets.push(customerJid)
+      if (WA_GROUP_JID && !targets.includes(WA_GROUP_JID)) targets.push(WA_GROUP_JID)
+
+      if (!targets.length) {
+        await supabaseRestRequest(`/whatsapp_notification_events?id=eq.${encodeURIComponent(event.id)}`, {
+          method: 'PATCH',
+          headers: { Prefer: 'return=minimal' },
+          body: JSON.stringify({
+            status: 'failed',
+            error_message: 'No WhatsApp recipient configured or recipient is blocked'
+          })
+        })
+        continue
+      }
+
+      try {
+        console.log(`WhatsApp outbox sending ${event.id} (${event.event_type}) to ${targets.join(', ')}`)
+        for (const target of targets) await sendText(target, event.message)
+        await supabaseRestRequest(`/whatsapp_notification_events?id=eq.${encodeURIComponent(event.id)}`, {
+          method: 'PATCH',
+          headers: { Prefer: 'return=minimal' },
+          body: JSON.stringify({
+            status: 'sent',
+            sent_at: new Date().toISOString(),
+            error_message: null
+          })
+        })
+      } catch (err) {
+        console.error(`WhatsApp outbox send failed for ${event.id}:`, String(err?.message || err))
+        try {
+          await supabaseRestRequest(`/whatsapp_notification_events?id=eq.${encodeURIComponent(event.id)}`, {
+            method: 'PATCH',
+            headers: { Prefer: 'return=minimal' },
+            body: JSON.stringify({
+              status: 'failed',
+              error_message: String(err?.message || err)
+            })
+          })
+        } catch (updateErr) {
+          console.error('WhatsApp outbox failure update failed:', String(updateErr?.message || updateErr))
+        }
+      }
     }
-
-    try {
-      console.log(`WhatsApp outbox sending ${event.id} (${event.event_type}) to ${targets.join(', ')}`)
-      for (const target of targets) await sendText(target, event.message)
-      const { error: updateError } = await supabase.from('whatsapp_notification_events').update({
-        status: 'sent',
-        sent_at: new Date().toISOString(),
-        error_message: null
-      }).eq('id', event.id)
-      if (updateError) console.error('WhatsApp outbox status update failed:', describeSupabaseError(updateError))
-    } catch (err) {
-      console.error(`WhatsApp outbox send failed for ${event.id}:`, String(err?.message || err))
-      const { error: updateError } = await supabase.from('whatsapp_notification_events').update({
-        status: 'failed',
-        error_message: String(err?.message || err)
-      }).eq('id', event.id)
-      if (updateError) console.error('WhatsApp outbox failure update failed:', describeSupabaseError(updateError))
-    }
+  } catch (err) {
+    console.error('WhatsApp outbox query failed:', String(err?.message || err))
+    logger.error({ error: String(err?.message || err) }, 'notification event query failed')
   }
 }
 
