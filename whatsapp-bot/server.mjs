@@ -413,7 +413,6 @@ async function sendNotificationEvent(jid, event) {
   }
   await sendText(jid, buildWhatsAppNotification(event, complaint, customer, recipientProfile))
 }
-}
 
 function describeSupabaseError(error) {
   if (!error) return 'unknown Supabase error'
