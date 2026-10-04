@@ -262,7 +262,7 @@ async function processNotificationEvents() {
 
   try {
     const params = new URLSearchParams({
-      select: 'id,phone,customer_phone,event_type,message,status,created_at',
+      select: 'id,complaint_id,phone,customer_phone,event_type,message,status,created_at',
       status: 'eq.pending',
       order: 'created_at.asc',
       limit: '10'
@@ -276,7 +276,7 @@ async function processNotificationEvents() {
       if (!customerPhone && event.complaint_id) {
         try {
           const resolved = await getComplaintAndCustomer(event.complaint_id)
-          customerPhone = resolved.customer?.mobile || resolved.complaint?.customer_phone || ''
+          customerPhone = resolved.complaint?.customer_phone || resolved.customer?.mobile || ''
         } catch (err) {
           console.error('WhatsApp customer lookup failed:', String(err?.message || err))
         }
