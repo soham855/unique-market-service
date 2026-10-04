@@ -222,7 +222,7 @@ export default function CustomerComplaintModule({ profile, activeModule = 'Compl
       const { error: notificationError } = await supabase.from('whatsapp_notification_events').insert({
         complaint_id: createdComplaint.id,
         phone: COMPANY_WHATSAPP,
-        customer_phone: createdComplaint.customer_phone || form.customer_phone.trim(),
+        customer_phone: customer.mobile || createdComplaint.customer_phone || form.customer_phone.trim(),
         event_type: 'created',
         message: notificationMessage,
         status: 'pending'
