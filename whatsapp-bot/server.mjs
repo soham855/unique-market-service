@@ -851,10 +851,8 @@ async function processBusinessReminders() {
 
     // PAYMENT: remind only genuinely unpaid challans, at most once every 3 days.
     try {
-      const from = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString()
       const params = new URLSearchParams({
         select: 'id,challan_no,customer_id,challan_date,due_date,subtotal,paid_amount,payment_status,party_name,whatsapp_payment_reminder_last_sent_at',
-        challan_date: 'gte.' + from.slice(0, 10),
         limit: '100'
       })
       const challans = await supabaseRestRequest('/challans?' + params.toString())
