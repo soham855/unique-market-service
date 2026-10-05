@@ -55,6 +55,33 @@ app.post('/webhooks/kapso', express.raw({ type: 'application/json', limit: '1mb'
 
 app.use(express.json({ limit: '256kb' }))
 
+app.get('/quote-form', (req, res) => {
+  const phone = String(req.query.phone || '').replace(/\D/g, '').slice(0, 15)
+  res.type('html').send(\`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Unique Market — Instant CCTV Quote</title><style>*{box-sizing:border-box}body{margin:0;background:#f5f7fb;font-family:Arial,sans-serif;color:#172033}.wrap{max-width:620px;margin:auto;padding:18px}.card{background:#fff;border-radius:20px;padding:22px;box-shadow:0 8px 30px #00000012}h1{margin:0 0 5px;font-size:24px}.sub{color:#667085;margin-bottom:20px;font-size:14px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:520px){.grid{grid-template-columns:1fr}}label{font-size:13px;font-weight:700;display:block;margin:12px 0 6px}input,select{width:100%;padding:13px;border:1px solid #d8dee9;border-radius:11px;font-size:15px;background:#fff}.full{grid-column:1/-1}button{width:100%;margin-top:20px;padding:15px;border:0;border-radius:12px;background:#111827;color:#fff;font-size:16px;font-weight:700}.note{font-size:12px;color:#667085;margin-top:14px;line-height:1.5}.ok{display:none;text-align:center;padding:25px}.err{color:#b42318;margin-top:10px;font-size:13px}</style></head><body><div class="wrap"><div class="card"><h1>🔷 UNIQUE MARKET</h1><div class="sub">Instant CCTV Quote Requirement</div><form id="f"><div class="grid">
+<div><label>Customer Name *</label><input name="name" required></div><div><label>Mobile *</label><input name="phone" inputmode="tel" value="' + phone + '" required></div>
+<div class="full"><label>Company Name</label><input name="company_name"></div>
+<div><label>2MP IP Dome Qty *</label><input name="dome_2mp_qty" type="number" min="0" value="0" required></div><div><label>2MP IP Bullet Qty *</label><input name="bullet_2mp_qty" type="number" min="0" value="0" required></div>
+<div><label>NVR / DVR Channel *</label><select name="nvr_channel" required><option value="">Select</option><option>4CH</option><option>8CH</option><option>16CH</option><option>32CH</option><option>64CH</option></select></div>
+<div><label>HDD *</label><select name="hdd" required><option value="">Select</option><option>500GB</option><option>1TB</option><option>2TB</option><option>4TB</option><option>6TB</option><option>8TB</option></select></div>
+<div><label>Power Supply *</label><select name="power_supply" required><option value="">Select</option><option>4CH</option><option>8CH</option><option>16CH</option><option>32CH</option></select></div>
+<div><label>Cat6 90m Bundles *</label><input name="cable_90m_bundles" type="number" min="0" value="0" required></div>
+<div><label>Remote View *</label><select name="router" required><option value="">Select</option><option>4G Router x1</option><option>5G Router x1</option><option>No Router</option></select></div>
+<div class="full"><label>Site Location / Address *</label><input name="location" required placeholder="Installation location"></div>
+</div><button type="submit">Submit Quote Request</button><div id="err" class="err"></div><div class="note">Your requirement will be received by Unique Market. Final pricing will be shared after requirement verification.</div></form><div id="ok" class="ok"><h2>✅ Requirement Submitted</h2><p>Your CCTV quote request has been received.</p><p><b>Unique Market</b><br>📞 7350060071</p></div></div></div>
+<script>const f=document.getElementById('f'),e=document.getElementById('err'),ok=document.getElementById('ok');f.addEventListener('submit',async(ev)=>{ev.preventDefault();e.textContent='';const b=Object.fromEntries(new FormData(f).entries());if(Number(b.dome_2mp_qty||0)+Number(b.bullet_2mp_qty||0)<1){e.textContent='Please select at least 1 camera.';return}const btn=f.querySelector('button');btn.disabled=true;btn.textContent='Submitting...';try{const r=await fetch('/api/quote-submit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});const j=await r.json();if(!r.ok)throw new Error(j.error||'Submit failed');f.style.display='none';ok.style.display='block'}catch(x){e.textContent=x.message;btn.disabled=false;btn.textContent='Submit Quote Request'}});</script></body></html>\`)
+})
+app.post('/api/quote-submit', async (req, res) => {
+  try {
+    const b=req.body||{}, phone=String(b.phone||'').replace(/\D/g,''), name=String(b.name||'').trim(), location=String(b.location||'').trim()
+    const dome=Number(b.dome_2mp_qty||0), bullet=Number(b.bullet_2mp_qty||0)
+    if(!phone||phone.length<10||!name||!location||dome<0||bullet<0||dome+bullet<1) return res.status(400).json({ok:false,error:'Please enter valid required details.'})
+    const session={name,company_name:String(b.company_name||'').trim(),location,dome_2mp_qty:dome,bullet_2mp_qty:bullet,nvr_channel:String(b.nvr_channel||'').trim(),hdd:String(b.hdd||'').trim(),power_supply:String(b.power_supply||'').trim(),cable_90m_bundles:Number(b.cable_90m_bundles||0),router:String(b.router||'').trim()}
+    const lead=await createWhatsAppQuoteLead(session,phone)
+    res.json({ok:true,lead_id:String(lead.id).slice(0,8)})
+  } catch(err) { console.error('Quote form submit failed:',String(err?.message||err)); res.status(500).json({ok:false,error:'Quote submit failed. Please contact 7350060071.'}) }
+})
+
+
 const supabase = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
   ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
   : null
@@ -1226,7 +1253,7 @@ async function startWhatsApp() {
         reply = '🛠️ *SERVICE COMPLAINT*\n\nTumchya CCTV/IT system madhla problem short madhe type kara.\n\nExample: *Camera band aahe* / *DVR recording nahi* / *CCTV mobile var nahi.*'
       } else if (normalized === '2') {
         quoteSessions.set(conversationKey, { step: 'dome', dome_2mp_qty: 0, bullet_2mp_qty: 0, nvr_channel: '', hdd: '', power_supply: '', cable_90m_bundles: 0, router: '', name: '', company_name: '', location: '' })
-        reply = '📷 *INSTANT CCTV QUOTE*\n\n2MP IP Dome camera kiti pahijet? Quantity pathva.\nExample: *4*'
+        reply = '📷 *INSTANT CCTV QUOTE*\n\nQuote details fill karanyasathi ha form open kara:\n\n👉 https://unique-market-whatsapp.onrender.com/quote-form?phone=' + encodeURIComponent(String(from || '').replace(/\\D/g, '')) + '\n\nForm submit kelyavar requirement directly Unique Market la receive hoil.'
       } else if (normalized === '3') {
         reply = '📷 *CCTV / SALES*\n\nCamera quantity, brand, model kiwa requirement pathva.\n\nAmhi quotation sathi tumchi enquiry note karu.\n\nType *menu* for Main Menu.'
       } else if (normalized === '4') {
