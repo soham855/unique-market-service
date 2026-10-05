@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 import aiohttp
@@ -9,8 +10,8 @@ load_dotenv()
 
 logger = logging.getLogger("unique-market-voice")
 
-SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
-SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+SUPABASE_URL = os.getenv("SUPABASE_URL", "").strip().rstrip("/")
+SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip()
 
 SYSTEM_PROMPT = """
 You are the AI voice receptionist for UNIQUE MARKET, Ichalkaranji.
@@ -61,15 +62,10 @@ class UniqueMarketAgent(Agent):
         address: str,
         priority: str = "normal",
     ) -> str:
-        """Create a confirmed Unique Market service complaint in Supabase.
-
-        Call this only after the customer has explicitly confirmed the collected
-        problem, name, address, and priority.
-        """
+        """Create a confirmed Unique Market service complaint in Supabase."""
         normalized_priority = priority.strip().lower()
         if normalized_priority not in {"urgent", "normal", "low"}:
             normalized_priority = "normal"
-
         row = await supabase_insert("complaints", {
             "category": "Voice AI Service Request",
             "service_type": "Service",
@@ -82,22 +78,17 @@ class UniqueMarketAgent(Agent):
             "customer_name": customer_name,
             "customer_phone": "",
         })
-
         ticket = row.get("ticket_no") or row.get("complaint_no") or row.get("id")
         return f"Service request created successfully. Ticket number: {ticket}"
 
 server = AgentServer(
-    # Render free tier has limited CPU. Do not pre-warm child processes:
-    # they consume the CPU before a call starts and can hit the 10s
-    # initialization timeout. A process will be created when a job arrives.
     num_idle_processes=0,
-    # Use active-job count instead of raw CPU as the admission signal.
-    # This keeps one test call available even when Python startup briefly
-    # spikes CPU above 70%.
-    load_threshold=0.9,
+    load_threshold=0.95,
 )
 
 def compute_load(agent_server: AgentServer) -> float:
+    # Render free tier can report high CPU while Python starts. Admission is
+    # based on active calls so the first Playground call is not rejected.
     return min(len(agent_server.active_jobs), 1.0)
 
 server.load_fnc = compute_load
@@ -108,6 +99,8 @@ async def entrypoint(ctx: JobContext):
     await ctx.connect()
     logger.info("UM VOICE: LiveKit room connected")
 
+    # Initialize the realtime plugin on the agent process, then yield once so
+    # network/TLS setup and plugin initialization cannot monopolize the event loop.
     session = AgentSession(
         llm=google.realtime.RealtimeModel(
             model="gemini-2.5-flash-native-audio-preview-12-2025",
@@ -116,12 +109,14 @@ async def entrypoint(ctx: JobContext):
             instructions=SYSTEM_PROMPT,
         ),
     )
+    await asyncio.sleep(0)
     logger.info("UM VOICE: Gemini realtime session created")
 
     await session.start(
         room=ctx.room,
         agent=UniqueMarketAgent(),
     )
+    await asyncio.sleep(0)
     logger.info("UM VOICE: AgentSession started; sending greeting")
 
     await session.generate_reply(
