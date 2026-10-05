@@ -86,14 +86,21 @@ class UniqueMarketAgent(Agent):
         ticket = row.get("ticket_no") or row.get("complaint_no") or row.get("id")
         return f"Service request created successfully. Ticket number: {ticket}"
 
-# Render free instances can report CPU load above 1.0 because the worker
-# load is measured across the process pool. A 2.0 threshold prevents the
-# worker from rejecting the first test call while still allowing the normal
-# process-pool protection to work.
 server = AgentServer(
-    load_threshold=2.0,
-    num_idle_processes=1,
+    # Render free tier has limited CPU. Do not pre-warm child processes:
+    # they consume the CPU before a call starts and can hit the 10s
+    # initialization timeout. A process will be created when a job arrives.
+    num_idle_processes=0,
+    # Use active-job count instead of raw CPU as the admission signal.
+    # This keeps one test call available even when Python startup briefly
+    # spikes CPU above 70%.
+    load_threshold=0.9,
 )
+
+def compute_load(agent_server: AgentServer) -> float:
+    return min(len(agent_server.active_jobs), 1.0)
+
+server.load_fnc = compute_load
 
 @server.rtc_session(agent_name="unique-market-voice")
 async def entrypoint(ctx: JobContext):
