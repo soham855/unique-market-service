@@ -1096,7 +1096,7 @@ async function startWhatsApp() {
       if ((!text && !locationMessage) || !conversationKey || remoteJid.endsWith('@g.us')) continue
 
       const normalized = text.toLowerCase()
-      let reply = null
+      // Instant Quote now uses the web form. If an old interactive quote session is active, force option 2 back to the form link.\n      if (normalized === '2' && quoteSessions.has(conversationKey)) clearComplaintSession(conversationKey)\n      let reply = null
       const active = complaintSessions.get(conversationKey)
       const quote = quoteSessions.get(conversationKey)
 
@@ -1254,7 +1254,7 @@ async function startWhatsApp() {
         complaintSessions.set(conversationKey, { step: 'problem', problem: '', name: '', location: '', locationMode: null, latitude: null, longitude: null, priority: 'normal' })
         reply = '🛠️ *SERVICE COMPLAINT*\n\nTumchya CCTV/IT system madhla problem short madhe type kara.\n\nExample: *Camera band aahe* / *DVR recording nahi* / *CCTV mobile var nahi.*'
       } else if (normalized === '2') {
-        quoteSessions.set(conversationKey, { step: 'dome', dome_2mp_qty: 0, bullet_2mp_qty: 0, nvr_channel: '', hdd: '', power_supply: '', cable_90m_bundles: 0, router: '', name: '', company_name: '', location: '' })
+        clearComplaintSession(conversationKey)
         reply = '📷 *INSTANT CCTV QUOTE*\n\nQuote details fill karanyasathi ha form open kara:\n\n👉 https://unique-market-whatsapp-zgw1.onrender.com/quote-form?phone=' + encodeURIComponent(String(from || '').replace(/\\D/g, '')) + '\n\nForm submit kelyavar requirement directly Unique Market la receive hoil.'
       } else if (normalized === '3') {
         reply = '📷 *CCTV / SALES*\n\nCamera quantity, brand, model kiwa requirement pathva.\n\nAmhi quotation sathi tumchi enquiry note karu.\n\nType *menu* for Main Menu.'
