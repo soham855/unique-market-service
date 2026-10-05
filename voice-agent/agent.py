@@ -47,9 +47,7 @@ async def supabase_insert(path: str, payload: dict) -> dict:
 
 class UniqueMarketAgent(Agent):
     def __init__(self):
-        super().__init__(
-            instructions=SYSTEM_PROMPT,
-        )
+        super().__init__(instructions=SYSTEM_PROMPT)
 
     @function_tool()
     async def create_service_request(
@@ -91,9 +89,12 @@ server = AgentServer()
 async def entrypoint(ctx: JobContext):
     await ctx.connect()
 
+    # Gemini 2.5 Flash Live is the stable native-audio model for this
+    # LiveKit Google plugin version. Gemini 3.1 Live has a known greeting/
+    # generate_reply compatibility issue on older 1.8.x plugin builds.
     session = AgentSession(
         llm=google.realtime.RealtimeModel(
-            model="gemini-3.1-flash-live-preview",
+            model="gemini-2.5-flash-native-audio-preview-12-2025",
             voice="Puck",
             temperature=0.5,
             instructions=SYSTEM_PROMPT,
