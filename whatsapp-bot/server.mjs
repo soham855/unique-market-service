@@ -80,6 +80,7 @@ let whatsappLeaseRenewTimer = null
 // Conversation state is intentionally kept in memory; the actual complaint/customer
 // record is persisted in Supabase as soon as the Service flow is completed.
 const complaintSessions = new Map()
+const quoteSessions = new Map()
 
 async function findOrCreateWhatsAppCustomer(phone, name, location) {
   const mobile = String(phone || '').replace(/\D/g, '')
@@ -141,8 +142,45 @@ async function createWhatsAppComplaint(session, from) {
   return { complaint, customer, ticket: complaint.ticket_no || complaint.complaint_no }
 }
 
+
+async function createWhatsAppQuoteLead(session, from) {
+  if (!supabase) throw new Error('Supabase event bridge is not configured')
+  const phone = String(from || '').replace(/\\D/g, '')
+  const totalCameras = Number(session.dome_2mp_qty || 0) + Number(session.bullet_2mp_qty || 0)
+  const payload = {
+    phone,
+    customer_name: session.name || null,
+    company_name: session.company_name || null,
+    location: session.location || null,
+    dome_2mp_qty: Number(session.dome_2mp_qty || 0),
+    bullet_2mp_qty: Number(session.bullet_2mp_qty || 0),
+    nvr_channel: session.nvr_channel || null,
+    hdd: session.hdd || null,
+    power_supply: session.power_supply || null,
+    cable_90m_bundles: Number(session.cable_90m_bundles || 0),
+    router: session.router || null,
+    total_cameras: totalCameras,
+    connector_qty: totalCameras * 3,
+    installation_camera_qty: totalCameras,
+    status: 'new'
+  }
+  const rows = await supabaseRestRequest('/whatsapp_quote_leads', {
+    method: 'POST',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify(payload)
+  })
+  const lead = Array.isArray(rows) ? rows[0] || null : null
+  if (!lead?.id) throw new Error('Quote lead was not saved')
+  return lead
+}
+
+function quoteMenuText() {
+  return '📷 *INSTANT CCTV QUOTE*\\n\\nSelect Camera Type & Quantity:\\n\\n1️⃣ 2MP IP Dome\\n2️⃣ 2MP IP Bullet\\n\\nReply *1* or *2* to continue.'
+}
+
 function clearComplaintSession(jid) {
   complaintSessions.delete(jid)
+  quoteSessions.delete(jid)
 }
 
 fs.mkdirSync(AUTH_DIR, { recursive: true })
@@ -1045,10 +1083,98 @@ async function startWhatsApp() {
       const normalized = text.toLowerCase()
       let reply = null
       const active = complaintSessions.get(conversationKey)
+      const quote = quoteSessions.get(conversationKey)
 
       if (/^(cancel|stop|0|menu|back)$/i.test(normalized)) {
         clearComplaintSession(conversationKey)
         reply = '🔷 *UNIQUE MARKET*\n_CCTV | IT Security | Service & AMC_\n\nNamaskar! Aaple swagat aahe.\n\n1️⃣ Service / Complaint\n2️⃣ CCTV / Sales\n3️⃣ AMC Service\n4️⃣ Payment Query\n\nKrupaya *1, 2, 3 kiwa 4* pathva.'
+      } else if (quote) {
+        const qty = Number.parseInt(text, 10)
+        if (quote.step === 'dome') {
+          if (!Number.isInteger(qty) || qty < 0) {
+            reply = '❌ Quantity valid number madhe dya. Example: *4*'
+          } else {
+            quote.dome_2mp_qty = qty
+            quote.step = 'bullet'
+            reply = '📷 *2MP IP BULLET*\\n\\nKiti cameras pahijet? Quantity pathva.\\nExample: *4*'
+          }
+        } else if (quote.step === 'bullet') {
+          if (!Number.isInteger(qty) || qty < 0) {
+            reply = '❌ Quantity valid number madhe dya. Example: *4*'
+          } else {
+            quote.bullet_2mp_qty = qty
+            quote.step = 'nvr'
+            reply = '🎥 *NVR / DVR CHANNEL*\\n\\n1️⃣ 4 Channel\\n2️⃣ 8 Channel\\n3️⃣ 16 Channel\\n4️⃣ More Options\\n\\nKrupaya *1, 2, 3 kiwa 4* pathva.'
+          }
+        } else if (quote.step === 'nvr') {
+          if (normalized === '1') { quote.nvr_channel = '4CH'; quote.step = 'hdd'; reply = '💾 *HDD*\\n\\n1️⃣ 500GB\\n2️⃣ 1TB\\n3️⃣ 2TB\\n4️⃣ 4TB\\n5️⃣ More Options\\n\\nOption pathva.' }
+          else if (normalized === '2') { quote.nvr_channel = '8CH'; quote.step = 'hdd'; reply = '💾 *HDD*\\n\\n1️⃣ 500GB\\n2️⃣ 1TB\\n3️⃣ 2TB\\n4️⃣ 4TB\\n5️⃣ More Options\\n\\nOption pathva.' }
+          else if (normalized === '3') { quote.nvr_channel = '16CH'; quote.step = 'hdd'; reply = '💾 *HDD*\\n\\n1️⃣ 500GB\\n2️⃣ 1TB\\n3️⃣ 2TB\\n4️⃣ 4TB\\n5️⃣ More Options\\n\\nOption pathva.' }
+          else if (normalized === '4') { quote.step = 'nvr_more'; reply = '🎥 *MORE NVR OPTIONS*\\n\\n32 Channel / 64 Channel madhun requirement type kara.\\nExample: *32CH*' }
+          else reply = 'Krupaya *1, 2, 3 kiwa 4* pathva.'
+        } else if (quote.step === 'nvr_more') {
+          const nvr = text.toUpperCase().replace(/\\s+/g, '')
+          if (!/^(32|64)CH$/.test(nvr)) reply = '❌ 32CH kiwa 64CH pathva. Example: *32CH*'
+          else { quote.nvr_channel = nvr; quote.step = 'hdd'; reply = '💾 *HDD*\\n\\n1️⃣ 500GB\\n2️⃣ 1TB\\n3️⃣ 2TB\\n4️⃣ 4TB\\n5️⃣ More Options\\n\\nOption pathva.' }
+        } else if (quote.step === 'hdd') {
+          const hddMap = {'1':'500GB','2':'1TB','3':'2TB','4':'4TB'}
+          if (hddMap[normalized]) { quote.hdd = hddMap[normalized]; quote.step = 'power'; reply = '🔌 *POWER SUPPLY*\\n\\n1️⃣ 4 Channel\\n2️⃣ 8 Channel\\n3️⃣ More Options\\n\\nOption pathva.' }
+          else if (normalized === '5') { quote.step = 'hdd_more'; reply = '💾 *MORE HDD OPTIONS*\\n\\n6TB kiwa 8TB pathva. Example: *6TB*' }
+          else reply = 'Krupaya *1 ते 5* madhla option pathva.'
+        } else if (quote.step === 'hdd_more') {
+          const hdd = text.toUpperCase().replace(/\\s+/g, '')
+          if (!/^(6|8)TB$/.test(hdd)) reply = '❌ 6TB kiwa 8TB pathva.'
+          else { quote.hdd = hdd; quote.step = 'power'; reply = '🔌 *POWER SUPPLY*\\n\\n1️⃣ 4 Channel\\n2️⃣ 8 Channel\\n3️⃣ More Options\\n\\nOption pathva.' }
+        } else if (quote.step === 'power') {
+          if (normalized === '1') { quote.power_supply = '4CH'; quote.step = 'cable'; reply = '📦 *CAT6 CABLE*\\n\\nCable *90m bundle* madhe ahe.\\n\\nKiti bundles pahijet? Number pathva.\\nExample: *2*\\n\\nJast cable asel tar actual bundle quantity pathva.' }
+          else if (normalized === '2') { quote.power_supply = '8CH'; quote.step = 'cable'; reply = '📦 *CAT6 CABLE*\\n\\nCable *90m bundle* madhe ahe.\\n\\nKiti bundles pahijet? Number pathva.\\nExample: *2*' }
+          else if (normalized === '3') { quote.step = 'power_more'; reply = '🔌 *MORE POWER OPTIONS*\\n\\n16CH / 32CH type kara. Example: *16CH*' }
+          else reply = 'Krupaya *1, 2 kiwa 3* pathva.'
+        } else if (quote.step === 'power_more') {
+          const power = text.toUpperCase().replace(/\\s+/g, '')
+          if (!/^(16|32)CH$/.test(power)) reply = '❌ 16CH kiwa 32CH pathva.'
+          else { quote.power_supply = power; quote.step = 'cable'; reply = '📦 *CAT6 CABLE*\\n\\nCable *90m bundle* madhe ahe.\\n\\nKiti bundles pahijet? Number pathva.' }
+        } else if (quote.step === 'cable') {
+          if (!Number.isInteger(qty) || qty < 0) reply = '❌ Bundle quantity number madhe dya. Example: *2*'
+          else {
+            quote.cable_90m_bundles = qty
+            quote.step = 'router'
+            reply = '📡 *REMOTE MOBILE VIEW*\\n\\n1️⃣ 4G Router — 1 Qty\\n2️⃣ 5G Router — 1 Qty\\n3️⃣ No Router\\n\\nOption pathva.'
+          }
+        } else if (quote.step === 'router') {
+          if (normalized === '1') quote.router = '4G Router x1'
+          else if (normalized === '2') quote.router = '5G Router x1'
+          else if (normalized === '3') quote.router = 'No Router'
+          else { reply = 'Krupaya *1, 2 kiwa 3* pathva.' }
+          if (!reply) {
+            quote.step = 'name'
+            reply = '👤 *CUSTOMER / COMPANY NAME*\\n\\nName kiwa Company Name pathva.'
+          }
+        } else if (quote.step === 'name') {
+          quote.name = text
+          quote.step = 'company'
+          reply = '🏢 *COMPANY NAME*\\n\\nCompany name asel tar pathva. Nasel tar *skip* pathva.'
+        } else if (quote.step === 'company') {
+          quote.company_name = /^skip$/i.test(text) ? '' : text
+          quote.step = 'location'
+          reply = '📍 *SITE LOCATION*\\n\\nService/Installation location pathva.'
+        } else if (quote.step === 'location') {
+          quote.location = text
+          const total = Number(quote.dome_2mp_qty || 0) + Number(quote.bullet_2mp_qty || 0)
+          if (total <= 0) {
+            reply = '⚠️ Kamit kami 1 camera quantity required ahe. *menu* pathvun Quote punha start kara.'
+            quoteSessions.delete(conversationKey)
+          } else {
+            try {
+              const lead = await createWhatsAppQuoteLead(quote, from)
+              quoteSessions.delete(conversationKey)
+              reply = '✅ *CCTV QUOTE REQUIREMENT SAVED*\\n\\n👤 *Customer:* ' + quote.name + '\\n📍 *Location:* ' + quote.location + '\\n\\n📷 *2MP Dome:* ' + quote.dome_2mp_qty + '\\n📷 *2MP Bullet:* ' + quote.bullet_2mp_qty + '\\n🎥 *NVR/DVR:* ' + quote.nvr_channel + '\\n💾 *HDD:* ' + quote.hdd + '\\n🔌 *Power:* ' + quote.power_supply + '\\n📦 *90m Cable:* ' + quote.cable_90m_bundles + ' bundle(s)\\n🔗 *Connectors:* ' + (total * 3) + ' pcs\\n📡 *Remote View:* ' + quote.router + '\\n🛠️ *Installation:* ' + total + ' camera(s)\\n\\n💰 *Price WhatsApp bot var show kela janar nahi.*\\nAmhi tumchi requirement check karun final quotation share karu.\\n\\nLead ID: ' + String(lead.id).slice(0, 8) + '\\n\\nType *menu* for Main Menu.'
+            } catch (err) {
+              console.error('WhatsApp CCTV quote lead save failed:', String(err?.message || err))
+              reply = '⚠️ Quote requirement save kartana temporary problem ala. Krupaya punha try kara kiwa *7350060071* var contact kara.'
+            }
+          }
+        }
       } else if (active) {
         if (active.step === 'problem') {
           active.problem = text
@@ -1111,13 +1237,18 @@ async function startWhatsApp() {
         complaintSessions.set(conversationKey, { step: 'problem', problem: '', name: '', location: '', locationMode: null, latitude: null, longitude: null, priority: 'normal' })
         reply = '🛠️ *SERVICE COMPLAINT*\n\nTumchya CCTV/IT system madhla problem short madhe type kara.\n\nExample: *Camera band aahe* / *DVR recording nahi* / *CCTV mobile var nahi.*'
       } else if (normalized === '2') {
-        reply = '📷 *CCTV / SALES*\n\nCamera quantity, brand, model kiwa requirement pathva.\n\nAmhi quotation sathi tumchi enquiry note karu.\n\nType *menu* for Main Menu.'
+        quoteSessions.set(conversationKey, { step: 'dome', dome_2mp_qty: 0, bullet_2mp_qty: 0, nvr_channel: '', hdd: '', power_supply: '', cable_90m_bundles: 0, router: '', name: '', company_name: '', location: '' })
+        reply = '📷 *INSTANT CCTV QUOTE*\n\n2MP IP Dome camera kiti pahijet? Quantity pathva.\nExample: *4*'
       } else if (normalized === '3') {
-        reply = '🔧 *AMC SERVICE*\n\nAMC service sathi Customer/Company Name + Location pathva.\n\nAmhi tumhala pudhil process sangto.\n\nType *menu* for Main Menu.'
+        reply = '📷 *CCTV / SALES*\n\nCamera quantity, brand, model kiwa requirement pathva.\n\nAmhi quotation sathi tumchi enquiry note karu.\n\nType *menu* for Main Menu.'
       } else if (normalized === '4') {
+        reply = '🔧 *AMC SERVICE*\n\nAMC service sathi Customer/Company Name + Location pathva.\n\nAmhi tumhala pudhil process sangto.\n\nType *menu* for Main Menu.'
+      } else if (normalized === '5') {
         reply = '💳 *PAYMENT QUERY*\n\nInvoice Number kiwa Customer/Company Name pathva.\n\nOur office team payment status check karel.\n\n📞 7350060071'
+      } else if (normalized === '6') {
+        reply = '🧰 *MORE SERVICES*\n\nComputer Repair, Networking, Laptop/Desktop, AMC & IT services sathi *7350060071* var contact kara.'
       } else {
-        reply = 'Krupaya *Hi* pathva kiwa menu madhun option select kara.\n\n1️⃣ Service / Complaint\n2️⃣ CCTV / Sales\n3️⃣ AMC Service\n4️⃣ Payment Query'
+        reply = 'Krupaya *Hi* pathva kiwa menu madhun option select kara.\n\n1️⃣ Service / Complaint\n2️⃣ Instant CCTV Quote\n3️⃣ CCTV / Sales\n4️⃣ AMC Service\n5️⃣ Payment Query\n6️⃣ More Services'
       }
 
       if (reply) {
