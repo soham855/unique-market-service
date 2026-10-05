@@ -310,25 +310,13 @@ function recipientJid(phone) {
   return `${digits}@s.whatsapp.net`
 }
 
-async function resolveWhatsAppJid(jid) {
+function resolveWhatsAppJid(jid) {
   const inputJid = String(jid || '').trim()
   if (!inputJid || !inputJid.endsWith('@s.whatsapp.net')) throw new Error('Invalid WhatsApp recipient')
-  try {
-    const result = await sock.onWhatsApp(inputJid)
-    const contact = Array.isArray(result) ? result[0] : null
-    const resolvedJid = String(contact?.jid || inputJid).trim()
-    console.log('WhatsApp recipient check:', JSON.stringify({
-      requestedJid: inputJid,
-      resolvedJid,
-      exists: contact?.exists ?? null
-    }))
-    if (contact?.exists === false) throw new Error('WhatsApp number is not registered: ' + inputJid)
-    return resolvedJid
-  } catch (err) {
-    console.error('WhatsApp recipient check failed:', String(err?.message || err))
-    if (String(err?.message || '').startsWith('WhatsApp number is not registered:')) throw err
-    return inputJid
-  }
+  // Fast path: do NOT call sock.onWhatsApp() before every message.
+  // That network lookup was adding avoidable latency to every auto-reply.
+  // WhatsApp/BAILEYS can send directly to a normalized phone-number JID.
+  return inputJid
 }
 
 async function sendText(jid, message) {
