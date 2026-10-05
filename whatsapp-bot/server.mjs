@@ -837,6 +837,121 @@ function startVisitReminderPoller() {
   setInterval(() => processVisitReminders().catch(err => console.error('visit reminder poll failed:', String(err?.message || err))), 60000)
 }
 
+let businessReminderPollerStarted = false
+let businessReminderProcessingInFlight = null
+
+async function processBusinessReminders() {
+  if (!SUPABASE_SERVICE_ROLE_KEY || status !== 'connected' || !sock) return
+  if (businessReminderProcessingInFlight) return businessReminderProcessingInFlight
+
+  businessReminderProcessingInFlight = (async () => {
+    const now = new Date()
+    const today = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
+    today.setHours(0, 0, 0, 0)
+
+    // PAYMENT: remind only genuinely unpaid challans, at most once every 3 days.
+    try {
+      const from = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString()
+      const params = new URLSearchParams({
+        select: 'id,challan_no,customer_id,challan_date,subtotal,paid_amount,payment_status,party_name,whatsapp_payment_reminder_last_sent_at',
+        challan_date: 'gte.' + from.slice(0, 10),
+        limit: '50'
+      })
+      const challans = await supabaseRestRequest('/challans?' + params.toString())
+      for (const challan of challans || []) {
+        const paymentStatus = String(challan.payment_status || '').toLowerCase().trim()
+        const total = Number(challan.subtotal || 0)
+        const paid = Number(challan.paid_amount || 0)
+        const outstanding = Math.max(0, total - paid)
+        if (!challan.id || outstanding <= 0 || ['paid','completed','settled'].includes(paymentStatus)) continue
+        const createdOrDate = new Date(challan.challan_date || now)
+        if (!Number.isFinite(createdOrDate.getTime()) || now - createdOrDate < 3 * 24 * 60 * 60 * 1000) continue
+        if (challan.whatsapp_payment_reminder_last_sent_at && now - new Date(challan.whatsapp_payment_reminder_last_sent_at) < 3 * 24 * 60 * 60 * 1000) continue
+
+        const customers = await supabaseRestRequest('/customers?select=name,mobile,company_name&id=eq.' + encodeURIComponent(challan.customer_id || '') + '&limit=1')
+        const customer = customers?.[0]
+        const phone = String(customer?.mobile || '').replace(/\D/g, '')
+        const jid = recipientJid(phone)
+        if (!jid || phone === '8554887026') continue
+
+        const settings = await supabaseRestRequest('/payment_settings?select=upi_id,account_name,qr_image_url,is_enabled&is_enabled=eq.true&limit=1').catch(() => [])
+        const ps = settings?.[0]
+        const message = [
+          '💳 *UNIQUE MARKET | PAYMENT REMINDER*','',
+          'Hello ' + (customer?.name || challan.party_name || 'Customer') + ' 👋,',
+          'Your payment is still pending.',
+          '',
+          '🧾 *Challan:* ' + (challan.challan_no || challan.id),
+          '💰 *Outstanding:* ₹' + outstanding.toFixed(2),
+          ps?.upi_id ? '📲 *UPI:* ' + ps.upi_id : '',
+          ps?.account_name ? '🏦 *Account Name:* ' + ps.account_name : '',
+          '',
+          'Please complete the pending payment and share the UTR here.',
+          '📞 *7350060071*'
+        ].filter(Boolean).join('\n')
+        await sendText(jid, message)
+        await supabaseRestRequest('/challans?id=eq.' + encodeURIComponent(challan.id), {
+          method:'PATCH', headers:{Prefer:'return=minimal'},
+          body:JSON.stringify({ whatsapp_payment_reminder_last_sent_at: now.toISOString() })
+        })
+      }
+    } catch (err) {
+      console.error('WhatsApp payment reminder processing failed:', String(err?.message || err))
+    }
+
+    // AMC: 30d / 15d / 3d / expired reminders, exactly once per milestone.
+    try {
+      const params = new URLSearchParams({
+        select: 'id,customer_id,plan_name,expiry_date,status,whatsapp_amc_30d_sent_at,whatsapp_amc_15d_sent_at,whatsapp_amc_3d_sent_at,whatsapp_amc_expired_sent_at',
+        limit: '100'
+      })
+      const amcs = await supabaseRestRequest('/amc?' + params.toString())
+      for (const amc of amcs || []) {
+        if (!amc?.id || !amc.expiry_date) continue
+        const expiry = new Date(amc.expiry_date + 'T00:00:00+05:30')
+        if (!Number.isFinite(expiry.getTime())) continue
+        const days = Math.ceil((expiry - now) / (24 * 60 * 60 * 1000))
+        const customerRows = await supabaseRestRequest('/customers?select=name,mobile,company_name&id=eq.' + encodeURIComponent(amc.customer_id || '') + '&limit=1')
+        const customer = customerRows?.[0]
+        const phone = String(customer?.mobile || '').replace(/\D/g, '')
+        const jid = recipientJid(phone)
+        if (!jid || phone === '8554887026') continue
+
+        let milestone = null, column = null, textLabel = ''
+        if (days <= 0 && !amc.whatsapp_amc_expired_sent_at) {
+          milestone='expired'; column='whatsapp_amc_expired_sent_at'; textLabel='expired'
+        } else if (days <= 3 && !amc.whatsapp_amc_3d_sent_at) {
+          milestone='3d'; column='whatsapp_amc_3d_sent_at'; textLabel='3 days'
+        } else if (days <= 15 && !amc.whatsapp_amc_15d_sent_at) {
+          milestone='15d'; column='whatsapp_amc_15d_sent_at'; textLabel='15 days'
+        } else if (days <= 30 && !amc.whatsapp_amc_30d_sent_at) {
+          milestone='30d'; column='whatsapp_amc_30d_sent_at'; textLabel='30 days'
+        }
+        if (!milestone) continue
+
+        const message = days <= 0
+          ? ['⚠️ *UNIQUE MARKET | AMC EXPIRED*','', 'Hello ' + (customer?.name || 'Customer') + ' 👋,', 'Your AMC has expired.', '', '🔧 *Plan:* ' + (amc.plan_name || 'AMC'), '📅 *Expiry:* ' + amc.expiry_date, '', 'Please contact Unique Market for AMC renewal.', '📞 *7350060071*'].join('\n')
+          : ['🔧 *UNIQUE MARKET | AMC REMINDER*','', 'Hello ' + (customer?.name || 'Customer') + ' 👋,', 'Your AMC expires in *' + textLabel + '*.', '', '🔧 *Plan:* ' + (amc.plan_name || 'AMC'), '📅 *Expiry:* ' + amc.expiry_date, '', 'Renew your AMC to continue service coverage.', '📞 *7350060071*'].join('\n')
+        await sendText(jid, message)
+        await supabaseRestRequest('/amc?id=eq.' + encodeURIComponent(amc.id), {
+          method:'PATCH', headers:{Prefer:'return=minimal'},
+          body:JSON.stringify({ [column]: now.toISOString() })
+        })
+      }
+    } catch (err) {
+      console.error('WhatsApp AMC reminder processing failed:', String(err?.message || err))
+    }
+  })().finally(() => { businessReminderProcessingInFlight = null })
+  return businessReminderProcessingInFlight
+}
+
+function startBusinessReminderPoller() {
+  if (businessReminderPollerStarted) return
+  businessReminderPollerStarted = true
+  setInterval(() => processBusinessReminders().catch(err => console.error('business reminder poll failed:', String(err?.message || err))), 60000)
+}
+
+
 function startEventPoller() {
   if (eventPollerStarted) return
   eventPollerStarted = true
@@ -1041,6 +1156,7 @@ async function startWhatsApp() {
       syncAuthToSupabase().catch(err => console.error('WhatsApp auth sync after open failed:', String(err?.message || err)))
       startEventPoller()
       startVisitReminderPoller()
+      startBusinessReminderPoller()
       setTimeout(() => processNotificationEvents().catch(err => logger.error({ err: describeSupabaseError(err) }, 'initial event processing failed')), 500)
       console.log('WhatsApp connected')
     }
