@@ -1093,6 +1093,11 @@ async function startWhatsApp() {
 
       const normalized = text.toLowerCase()
       let reply = null
+
+      // Main-menu option 2 must ALWAYS open the instant quote web form.
+      // Clear any stale interactive session before routing this menu option.
+      if (normalized === '2') clearComplaintSession(conversationKey)
+
       const active = complaintSessions.get(conversationKey); const quote = quoteSessions.get(conversationKey)
 
       if (/^(cancel|stop|0|menu|back)$/i.test(normalized)) {
@@ -1249,7 +1254,6 @@ async function startWhatsApp() {
         complaintSessions.set(conversationKey, { step: 'problem', problem: '', name: '', location: '', locationMode: null, latitude: null, longitude: null, priority: 'normal' })
         reply = '🛠️ *SERVICE COMPLAINT*\n\nTumchya CCTV/IT system madhla problem short madhe type kara.\n\nExample: *Camera band aahe* / *DVR recording nahi* / *CCTV mobile var nahi.*'
       } else if (normalized === '2') {
-        clearComplaintSession(conversationKey)
         reply = '📷 *INSTANT CCTV QUOTE*\n\nQuote details fill karanyasathi ha form open kara:\n\n👉 https://unique-market-whatsapp-zgw1.onrender.com/quote-form?phone=' + encodeURIComponent(String(from || '').replace(/\\D/g, '')) + '\n\nForm submit kelyavar requirement directly Unique Market la receive hoil.'
       } else if (normalized === '3') {
         reply = '📷 *CCTV / SALES*\n\nCamera quantity, brand, model kiwa requirement pathva.\n\nAmhi quotation sathi tumchi enquiry note karu.\n\nType *menu* for Main Menu.'
