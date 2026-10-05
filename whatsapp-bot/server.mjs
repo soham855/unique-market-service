@@ -5,6 +5,7 @@ import makeWASocket, {
   useMultiFileAuthState,
   fetchLatestWaWebVersion,
   Browsers,
+  downloadMediaMessage,
 } from '@whiskeysockets/baileys'
 import { Boom } from '@hapi/boom'
 import pino from 'pino'
@@ -108,6 +109,229 @@ let whatsappLeaseRenewTimer = null
 // record is persisted in Supabase as soon as the Service flow is completed.
 const complaintSessions = new Map()
 const quoteSessions = new Map()
+
+// Isolated WhatsApp broadcast module. It uses its own Supabase table and
+// in-memory campaign session so existing complaint/quote flows remain untouched.
+const broadcastSessions = new Map()
+let broadcastRunning = false
+const BROADCAST_MAX_RECIPIENTS = 500
+const BROADCAST_MAX_MEDIA_BYTES = 12 * 1024 * 1024
+const BROADCAST_DELAY_MS = 2200
+
+function normalizeBroadcastPhone(value) {
+  let digits = String(value || '').replace(/\\D/g, '')
+  if (digits.length === 10) digits = '91' + digits
+  if (digits.startsWith('0') && digits.length === 11) digits = '91' + digits.slice(1)
+  return digits
+}
+
+function isBroadcastControlChat(msg, remoteJid) {
+  if (!msg?.key?.fromMe) return false
+  const ownPn = PHONE_NUMBER + '@s.whatsapp.net'
+  const ownId = String(sock?.user?.id || '')
+  const ownUser = ownId ? ownId.split(':')[0] + '@s.whatsapp.net' : ''
+  const ownLid = String(sock?.user?.lid || '')
+  const alt = String(msg.key?.remoteJidAlt || '')
+  return [remoteJid, alt].some(v => v && (v === ownPn || v === ownUser || v === ownLid))
+}
+
+async function upsertBroadcastContact(phone, name = '', tags = [], optIn = false) {
+  if (!supabase) throw new Error('Supabase is not configured')
+  const normalized = normalizeBroadcastPhone(phone)
+  if (normalized.length < 12) throw new Error('Invalid WhatsApp number')
+  const cleanTags = [...new Set((Array.isArray(tags) ? tags : []).map(v => String(v || '').trim().toLowerCase()).filter(Boolean))]
+  const payload = {
+    phone: normalized,
+    name: String(name || '').trim() || null,
+    tags: cleanTags,
+    marketing_opt_in: Boolean(optIn),
+    active: true,
+    ...(optIn ? { opted_in_at: new Date().toISOString(), opted_out_at: null } : {})
+  }
+  const rows = await supabaseRestRequest('/whatsapp_broadcast_contacts?on_conflict=phone', {
+    method: 'POST',
+    headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
+    body: JSON.stringify(payload)
+  })
+  return Array.isArray(rows) ? rows[0] || null : null
+}
+
+async function setBroadcastOptIn(phone, optIn, name = '', tags = []) {
+  if (!supabase) throw new Error('Supabase is not configured')
+  const normalized = normalizeBroadcastPhone(phone)
+  if (normalized.length < 12) throw new Error('Invalid WhatsApp number')
+  const payload = {
+    phone: normalized,
+    name: String(name || '').trim() || null,
+    tags: [...new Set(tags.map(v => String(v || '').trim().toLowerCase()).filter(Boolean))],
+    marketing_opt_in: Boolean(optIn),
+    active: Boolean(optIn),
+    opted_in_at: optIn ? new Date().toISOString() : null,
+    opted_out_at: optIn ? null : new Date().toISOString()
+  }
+  const rows = await supabaseRestRequest('/whatsapp_broadcast_contacts?on_conflict=phone', {
+    method: 'POST',
+    headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
+    body: JSON.stringify(payload)
+  })
+  return Array.isArray(rows) ? rows[0] || null : null
+}
+
+async function getBroadcastRecipients(target) {
+  if (!supabase) throw new Error('Supabase is not configured')
+  const rows = await supabaseRestRequest('/whatsapp_broadcast_contacts?select=phone,name,tags&marketing_opt_in=eq.true&active=eq.true&limit=5000')
+  const contacts = Array.isArray(rows) ? rows : []
+  if (target?.type === 'selected') {
+    const wanted = new Set((target.numbers || []).map(normalizeBroadcastPhone))
+    return contacts.filter(c => wanted.has(normalizeBroadcastPhone(c.phone)))
+  }
+  if (target?.type === 'tag') {
+    const tag = String(target.tag || '').toLowerCase()
+    return contacts.filter(c => Array.isArray(c.tags) && c.tags.map(v => String(v).toLowerCase()).includes(tag))
+  }
+  return contacts
+}
+
+async function sendBroadcastContent(jid, campaign) {
+  const to = resolveWhatsAppJid(jid)
+  if (campaign.mediaType === 'image') {
+    return sock.sendMessage(to, { image: campaign.media, caption: campaign.text || undefined })
+  }
+  if (campaign.mediaType === 'video') {
+    return sock.sendMessage(to, { video: campaign.media, caption: campaign.text || undefined })
+  }
+  if (campaign.mediaType === 'document') {
+    return sock.sendMessage(to, { document: campaign.media, mimetype: campaign.mimetype || 'application/octet-stream', fileName: campaign.fileName || 'Unique-Market.pdf', caption: campaign.text || undefined })
+  }
+  return sock.sendMessage(to, { text: campaign.text })
+}
+
+function broadcastHelp() {
+  return '📢 *UNIQUE MARKET | BROADCAST*\\n\\n1️⃣ All opted-in\\n2️⃣ CCTV customers\\n3️⃣ IT customers\\n4️⃣ Dealers\\n5️⃣ Selected numbers\\n\\nOnly customers who have explicitly opted in will receive marketing messages.\\n\\nType *cancel* to stop.'
+}
+
+async function runBroadcastCampaign(controlJid, session) {
+  if (broadcastRunning) throw new Error('Another broadcast is already running')
+  broadcastRunning = true
+  try {
+    const recipients = await getBroadcastRecipients(session.target)
+    if (!recipients.length) {
+      await sendText(controlJid, '⚠️ Broadcast sathi ekahi opted-in contact available nahi.')
+      return
+    }
+    if (recipients.length > BROADCAST_MAX_RECIPIENTS) {
+      await sendText(controlJid, '⚠️ Ya campaign madhe ' + recipients.length + ' contacts aahet. Safety limit ' + BROADCAST_MAX_RECIPIENTS + ' aahe. Target list split kara.')
+      return
+    }
+    await sendText(controlJid, '🚀 *Broadcast started*\\n\\n👥 Recipients: ' + recipients.length + '\\n⏳ Sending with controlled delay...')
+    let sent = 0, failed = 0
+    for (const contact of recipients) {
+      try {
+        await sendBroadcastContent(contact.phone + '@s.whatsapp.net', session)
+        sent++
+      } catch (err) {
+        failed++
+        console.error('Broadcast send failed:', JSON.stringify({ phone: contact.phone, error: String(err?.message || err) }))
+      }
+      if (sent + failed < recipients.length) await new Promise(resolve => setTimeout(resolve, BROADCAST_DELAY_MS))
+    }
+    await sendText(controlJid, '✅ *Broadcast completed*\\n\\n📤 Sent: ' + sent + '\\n❌ Failed: ' + failed + '\\n👥 Total: ' + recipients.length)
+  } finally {
+    broadcastRunning = false
+  }
+}
+
+async function handleBroadcastControlMessage(controlJid, text, mediaInfo = null) {
+  const key = 'broadcast-control'
+  const normalized = String(text || '').trim().toLowerCase()
+  let session = broadcastSessions.get(key)
+
+  if (/^(cancel|broadcast cancel|stop broadcast)$/i.test(String(text || '').trim())) {
+    broadcastSessions.delete(key)
+    await sendText(controlJid, '🛑 Broadcast cancelled.')
+    return true
+  }
+
+  if (!session && /^broadcast$/i.test(String(text || '').trim())) {
+    broadcastSessions.set(key, { step: 'target' })
+    await sendText(controlJid, broadcastHelp())
+    return true
+  }
+
+  // Contact management is isolated from the existing customer table.
+  if (/^add\\s+/i.test(String(text || '').trim())) {
+    const parts = String(text).trim().split(/\\s+/)
+    const phone = normalizeBroadcastPhone(parts[1])
+    if (phone.length < 12) { await sendText(controlJid, '❌ Invalid number. Example: *add 9876543210*'); return true }
+    await upsertBroadcastContact(phone, '', [], false)
+    await sendText(controlJid, '✅ Number list madhe add zala, pan *opt-in nahi*. Customer ne *START* pathavlyavarach broadcast sathi eligible hoil.')
+    return true
+  }
+  if (/^list$/i.test(String(text || '').trim())) {
+    const rows = await supabaseRestRequest('/whatsapp_broadcast_contacts?select=phone,name,tags,marketing_opt_in,active&order=created_at.desc&limit=50')
+    const active = (Array.isArray(rows) ? rows : []).filter(x => x.marketing_opt_in && x.active)
+    await sendText(controlJid, '📋 *Broadcast contacts*\\n\\nTotal opted-in: *' + active.length + '*\\n\\n' + (active.slice(0, 20).map((x,i) => (i+1)+'. '+x.phone+' '+(x.name||'')).join('\\n') || 'No opted-in contacts yet.'))
+    return true
+  }
+
+  if (!session) return false
+
+  if (session.step === 'target') {
+    if (normalized === '1') session.target = { type: 'all' }
+    else if (normalized === '2') session.target = { type: 'tag', tag: 'cctv' }
+    else if (normalized === '3') session.target = { type: 'tag', tag: 'it' }
+    else if (normalized === '4') session.target = { type: 'tag', tag: 'dealer' }
+    else if (normalized === '5') { session.step = 'selected'; await sendText(controlJid, '📱 Selected WhatsApp numbers comma-separated pathva.\\nExample: *9876543210,9898989898*'); return true }
+    else { await sendText(controlJid, broadcastHelp()); return true }
+    session.step = 'message'
+    await sendText(controlJid, '📝 Ata *text message* type kara kiwa 📷 *photo / 🎥 video / 📄 PDF* pathva.\\n\\nMedia caption asel tar media sobat caption type kara.\\n\\nType *cancel* to stop.')
+    return true
+  }
+
+  if (session.step === 'selected') {
+    const numbers = String(text || '').split(/[,\\s]+/).map(normalizeBroadcastPhone).filter(n => n.length >= 12)
+    if (!numbers.length) { await sendText(controlJid, '❌ Valid WhatsApp numbers pathva.'); return true }
+    session.target = { type: 'selected', numbers: [...new Set(numbers)] }
+    session.step = 'message'
+    await sendText(controlJid, '📝 Ata text kiwa 📷 photo / 🎥 video / 📄 PDF pathva.')
+    return true
+  }
+
+  if (session.step === 'message') {
+    if (mediaInfo) {
+      session.mediaType = mediaInfo.type
+      session.media = mediaInfo.buffer
+      session.mimetype = mediaInfo.mimetype
+      session.fileName = mediaInfo.fileName
+      session.text = String(mediaInfo.caption || '').trim()
+    } else if (String(text || '').trim()) {
+      session.mediaType = null
+      session.media = null
+      session.mimetype = null
+      session.fileName = null
+      session.text = String(text).trim()
+    } else {
+      await sendText(controlJid, '❌ Message empty aahe. Text kiwa media pathva.')
+      return true
+    }
+    const recipients = await getBroadcastRecipients(session.target)
+    const targetLabel = session.target.type === 'all' ? 'All opted-in' : session.target.type === 'tag' ? session.target.tag.toUpperCase() : 'Selected numbers'
+    session.step = 'confirm'
+    await sendText(controlJid, '📢 *BROADCAST PREVIEW*\\n\\n🎯 Target: *' + targetLabel + '*\\n👥 Eligible contacts: *' + recipients.length + '*\\n' + (session.mediaType ? '📎 Media: *' + session.mediaType + '*\\n' : '') + '📝 Message: ' + (session.text || '(no caption)') + '\\n\\n⚠️ Only opted-in contacts receive this.\\n\\nType *SEND* to confirm or *CANCEL* to stop.')
+    return true
+  }
+
+  if (session.step === 'confirm') {
+    if (normalized === 'send') {
+      broadcastSessions.delete(key)
+      await runBroadcastCampaign(controlJid, session)
+      return true
+    }
+    await sendText(controlJid, 'Type *SEND* to start or *CANCEL* to stop.')
+    return true
+  }
+  return true
+}
 
 async function findOrCreateWhatsAppCustomer(phone, name, location) {
   const mobile = String(phone || '').replace(/\D/g, '')
@@ -1050,8 +1274,9 @@ async function startWhatsApp() {
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
     if (type !== 'notify') return
     for (const msg of messages || []) {
-      if (msg.key?.fromMe) continue
       const remoteJid = String(msg.key?.remoteJid || '').trim()
+      const controlSelfMessage = isBroadcastControlChat(msg, remoteJid)
+      if (msg.key?.fromMe && !controlSelfMessage) continue
       // WhatsApp may deliver 1:1 incoming messages with an @lid JID.
       // Prefer every PN source available on the message, then fall back to
       // Baileys' persistent LID -> PN mapping store.
@@ -1077,7 +1302,25 @@ async function startWhatsApp() {
       // the outgoing recipient because sendText requires a phone-number JID.
       const conversationKey = from || remoteJid
       const locationMessage = msg.message?.locationMessage || null
-      const text = String(msg.message?.conversation || msg.message?.extendedTextMessage?.text || '').trim()
+      const mediaNode = msg.message?.imageMessage || msg.message?.videoMessage || msg.message?.documentMessage || null
+      const mediaType = msg.message?.imageMessage ? 'image' : msg.message?.videoMessage ? 'video' : msg.message?.documentMessage ? 'document' : null
+      const text = String(msg.message?.conversation || msg.message?.extendedTextMessage?.text || mediaNode?.caption || '').trim()
+      if (controlSelfMessage) {
+        try {
+          let mediaInfo = null
+          if (mediaNode && mediaType) {
+            const buffer = await downloadMediaMessage(msg, 'buffer', {}, { logger, reuploadRequest: sock.updateMediaMessage })
+            if (buffer.length > BROADCAST_MAX_MEDIA_BYTES) throw new Error('Media is larger than 12MB')
+            mediaInfo = { type: mediaType, buffer, mimetype: mediaNode.mimetype || null, fileName: mediaNode.fileName || null, caption: mediaNode.caption || text }
+          }
+          const handled = await handleBroadcastControlMessage(PHONE_NUMBER + '@s.whatsapp.net', text, mediaInfo)
+          if (handled) continue
+        } catch (err) {
+          console.error('Broadcast control error:', String(err?.message || err))
+          await sendText(PHONE_NUMBER + '@s.whatsapp.net', '⚠️ Broadcast error: ' + String(err?.message || err))
+          continue
+        }
+      }
       console.log('WhatsApp incoming message:', JSON.stringify({
         from: from || null,
         conversationKey,
