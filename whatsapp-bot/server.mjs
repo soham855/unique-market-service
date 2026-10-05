@@ -1095,15 +1095,16 @@ async function startWhatsApp() {
       let reply = null
 
       // HARD ROUTE: option 2 always opens the web quote form.
-      // Return immediately so no complaint/quote session can intercept it.
-      if (normalized === '2') {
+      // Do this before ALL menu/session routing. Never let option 2 reach the main menu.
+      if (text.trim() === '2') {
         clearComplaintSession(conversationKey)
-        const quoteReply = formatWhatsAppBranding('📷 *INSTANT CCTV QUOTE*\\n\\nQuote details fill karanyasathi ha form open kara:\\n\\n👉 https://unique-market-whatsapp-zgw1.onrender.com/quote-form?phone=' + encodeURIComponent(String(from || '').replace(/\\\\D/g, '')) + '\\n\\nForm submit kelyavar requirement directly Unique Market la receive hoil.')
+        const phone = String(from || '').replace(/\D/g, '')
+        const quoteReply = '📷 *INSTANT CCTV QUOTE*\n\nQuote details fill karanyasathi ha form open kara:\n\n👉 https://unique-market-whatsapp-zgw1.onrender.com/quote-form?phone=' + encodeURIComponent(phone) + '\n\nForm submit kelyavar requirement directly Unique Market la receive hoil.\n\n🔷 *UNIQUE MARKET*\n📞 7350060071'
         try {
           await sendText(from, quoteReply)
-          console.log('WhatsApp instant quote form reply sent:', JSON.stringify({ to: from, text: quoteReply }))
+          console.log('WhatsApp HARD option 2 reply sent:', JSON.stringify({ to: from, phone, messageId: msg.key?.id || null }))
         } catch (err) {
-          console.error('WhatsApp instant quote form reply failed:', String(err?.message || err))
+          console.error('WhatsApp HARD option 2 reply failed:', String(err?.message || err))
         }
         continue
       }
