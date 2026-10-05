@@ -617,11 +617,27 @@ async function processNotificationEvents() {
         }
       }
       const targets = []
-      const officeJid = recipientJid(PHONE_NUMBER)
-      if (officeJid) targets.push(officeJid)
-      const customerJid = recipientJid(customerPhone || event.phone)
-      if (customerJid && !targets.includes(customerJid)) targets.push(customerJid)
-      if (WA_GROUP_JID && !targets.includes(WA_GROUP_JID)) targets.push(WA_GROUP_JID)
+      const normalizedCustomerPhone = String(customerPhone || event.phone || '').replace(/\D/g, '')
+      const isLegacyAutomationNumber = normalizedCustomerPhone === '8554887026'
+      if (event.event_type === 'status_changed') {
+        const customerJid = isLegacyAutomationNumber ? null : recipientJid(normalizedCustomerPhone)
+        if (customerJid) targets.push(customerJid)
+      } else {
+        const officeJid = recipientJid(PHONE_NUMBER)
+        if (officeJid) targets.push(officeJid)
+        const customerJid = isLegacyAutomationNumber ? null : recipientJid(normalizedCustomerPhone)
+        if (customerJid && !targets.includes(customerJid)) targets.push(customerJid)
+        if (WA_GROUP_JID && !targets.includes(WA_GROUP_JID)) targets.push(WA_GROUP_JID)
+      }
+
+      if (isLegacyAutomationNumber) {
+        await supabaseRestRequest(`/whatsapp_notification_events?id=eq.${encodeURIComponent(event.id)}`, {
+          method: 'PATCH',
+          headers: { Prefer: 'return=minimal' },
+          body: JSON.stringify({ status: 'failed', error_message: 'Legacy WhatsApp automation number blocked' })
+        })
+        continue
+      }
 
       if (!targets.length) {
         await supabaseRestRequest(`/whatsapp_notification_events?id=eq.${encodeURIComponent(event.id)}`, {
