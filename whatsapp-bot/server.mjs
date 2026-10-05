@@ -1243,7 +1243,9 @@ async function startWhatsApp() {
             reply = '✅ *SERVICE REQUEST REGISTERED*\n\n🎫 *Complaint No:* ' + result.ticket + '\n👤 *Customer:* ' + active.name + '\n📍 *Location:* ' + active.location + '\n🛠️ *Problem:* ' + active.problem + '\n⚡ *Priority:* ' + priorityText + '\n\nOur team will contact you shortly.\n\nType *menu* for Main Menu.'
           } catch (err) {
             console.error('WhatsApp complaint creation failed:', String(err?.message || err))
-            reply = '⚠️ Complaint register kartana temporary problem ala. Krupaya thodya velane punha try kara kiwa *7350060071* var contact kara.'
+            // Reset the failed complaint flow so the next menu option works normally.
+            clearComplaintSession(conversationKey)
+            reply = '⚠️ Complaint register kartana temporary problem ala. Complaint session reset keli aahe. Punha *1* pathvun complaint register kara kiwa *2* pathvun CCTV Quote ghya.\n\n📞 *7350060071*'
           }
         }
       } else if (/^(hi+|hello+|hey+|namaskar|नमस्कार)$/i.test(normalized)) {
