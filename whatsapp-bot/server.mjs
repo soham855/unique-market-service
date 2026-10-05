@@ -853,9 +853,9 @@ async function processBusinessReminders() {
     try {
       const from = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString()
       const params = new URLSearchParams({
-        select: 'id,challan_no,customer_id,challan_date,subtotal,paid_amount,payment_status,party_name,whatsapp_payment_reminder_last_sent_at',
+        select: 'id,challan_no,customer_id,challan_date,due_date,subtotal,paid_amount,payment_status,party_name,whatsapp_payment_reminder_last_sent_at',
         challan_date: 'gte.' + from.slice(0, 10),
-        limit: '50'
+        limit: '100'
       })
       const challans = await supabaseRestRequest('/challans?' + params.toString())
       for (const challan of challans || []) {
@@ -864,8 +864,10 @@ async function processBusinessReminders() {
         const paid = Number(challan.paid_amount || 0)
         const outstanding = Math.max(0, total - paid)
         if (!challan.id || outstanding <= 0 || ['paid','completed','settled'].includes(paymentStatus)) continue
-        const createdOrDate = new Date(challan.challan_date || now)
-        if (!Number.isFinite(createdOrDate.getTime()) || now - createdOrDate < 3 * 24 * 60 * 60 * 1000) continue
+        const dueDate = challan.due_date ? new Date(challan.due_date + 'T00:00:00+05:30') : null
+        // Send the first payment reminder only after 2 full days past the due date.
+        // Older challans without a due_date are intentionally skipped until a due date is set.
+        if (!dueDate || !Number.isFinite(dueDate.getTime()) || now - dueDate < 2 * 24 * 60 * 60 * 1000) continue
         if (challan.whatsapp_payment_reminder_last_sent_at && now - new Date(challan.whatsapp_payment_reminder_last_sent_at) < 3 * 24 * 60 * 60 * 1000) continue
 
         const customers = await supabaseRestRequest('/customers?select=name,mobile,company_name&id=eq.' + encodeURIComponent(challan.customer_id || '') + '&limit=1')
