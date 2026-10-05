@@ -217,8 +217,7 @@ async function acquireWhatsAppLease() {
   try {
     const result = await supabase.rpc('acquire_whatsapp_bot_lease', {
       p_holder_id: INSTANCE_ID,
-      p_ttl_seconds: WHATSAPP_LEASE_TTL_SECONDS
-    })
+      p_ttl_seconds: WHATSAPP_LEASE_TTL_SECONDS    })
     if (result.error) throw result.error
     whatsappLeaseHeld = result.data === true
     if (!whatsappLeaseHeld) {
@@ -437,8 +436,7 @@ function buildComplaintPdfBuffer(complaint, customer) {
     '50 50 Td',
     '(' + pdfEscape('Unique Market | CCTV | IT Security | Service & AMC') + ') Tj',
     '/F1 9 Tf',
-    '0 -16 Td',
-    '(' + pdfEscape('7350060071  |  Station Road, Hotel Rajdoot, Ichalkaranji') + ') Tj',
+    '0 -16 Td',    '(' + pdfEscape('7350060071  |  Station Road, Hotel Rajdoot, Ichalkaranji') + ') Tj',
     'ET'
   )
 
@@ -657,8 +655,7 @@ async function processNotificationEvents() {
         console.log('WhatsApp duplicate pending event skipped:', JSON.stringify({ eventId: event.id, complaintId: event.complaint_id, eventType: event.event_type }))
         try {
           await supabaseRestRequest(`/whatsapp_notification_events?id=eq.${encodeURIComponent(event.id)}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ status: 'failed', error_message: 'Duplicate event skipped; same complaint/event type already queued' }) })
-        } catch (dupErr) { console.error('WhatsApp duplicate event cleanup failed:', String(dupErr?.message || dupErr)) }
-        continue
+        } catch (dupErr) { console.error('WhatsApp duplicate event cleanup failed:', String(dupErr?.message || dupErr)) }        continue
       }
       seenEventGroups.add(groupKey)
       let customerPhone = event.customer_phone || ''
@@ -877,8 +874,7 @@ async function processVisitReminders() {
           reminder: window.key,
           error: String(err?.message || err)
         }))
-      }
-    }
+      }    }
   })().finally(() => { visitReminderProcessingInFlight = null })
 
   return visitReminderProcessingInFlight
@@ -1096,9 +1092,9 @@ async function startWhatsApp() {
       if ((!text && !locationMessage) || !conversationKey || remoteJid.endsWith('@g.us')) continue
 
       const normalized = text.toLowerCase()
-      // Instant Quote now uses the web form. If an old interactive quote session is active, force option 2 back to the form link.\n      if (normalized === '2' && quoteSessions.has(conversationKey)) clearComplaintSession(conversationKey)\n      let reply = null
-      const active = complaintSessions.get(conversationKey)
-      const quote = quoteSessions.get(conversationKey)
+      // Instant Quote now uses the web form. If an old interactive quote session is active, force option 2 back to the form link.\n      if (normalized === '2' && quoteSessions.has(conversationKey)) clearComplaintSession(conversationKey)
+      let reply = null
+      const active = complaintSessions.get(conversationKey)      const quote = quoteSessions.get(conversationKey)
 
       if (/^(cancel|stop|0|menu|back)$/i.test(normalized)) {
         clearComplaintSession(conversationKey)
@@ -1317,8 +1313,7 @@ async function startWhatsApp() {
 
       // 515 is WhatsApp's normal post-pairing restart signal. Persist credentials
       // first, then schedule a fresh socket outside the close-event handler.
-      if (!isLoggedOut && !reconnecting) {
-        reconnecting = true
+      if (!isLoggedOut && !reconnecting) {        reconnecting = true
         Promise.resolve(saveCredsPromise)
           .catch(err => console.error('WhatsApp credential flush before reconnect failed:', String(err?.message || err)))
           .finally(async () => {
