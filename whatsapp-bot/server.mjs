@@ -1092,9 +1092,11 @@ async function startWhatsApp() {
       if ((!text && !locationMessage) || !conversationKey || remoteJid.endsWith('@g.us')) continue
 
       const normalized = text.toLowerCase()
-      // Instant Quote now uses the web form. If an old interactive quote session is active, force option 2 back to the form link.\n      if (normalized === '2' && quoteSessions.has(conversationKey)) clearComplaintSession(conversationKey)
+      // Instant Quote now uses the web form. If an old interactive quote session is active, force option 2 back to the form link.
+      if (normalized === '2' && quoteSessions.has(conversationKey)) clearComplaintSession(conversationKey)
       let reply = null
-      const active = complaintSessions.get(conversationKey)      const quote = quoteSessions.get(conversationKey)
+      const active = complaintSessions.get(conversationKey)
+      const quote = quoteSessions.get(conversationKey)
 
       if (/^(cancel|stop|0|menu|back)$/i.test(normalized)) {
         clearComplaintSession(conversationKey)
