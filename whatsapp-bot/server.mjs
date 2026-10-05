@@ -1094,6 +1094,20 @@ async function startWhatsApp() {
       const normalized = text.toLowerCase()
       let reply = null
 
+      // HARD ROUTE: option 2 always opens the web quote form.
+      // Return immediately so no complaint/quote session can intercept it.
+      if (normalized === '2') {
+        clearComplaintSession(conversationKey)
+        const quoteReply = formatWhatsAppBranding('📷 *INSTANT CCTV QUOTE*\\n\\nQuote details fill karanyasathi ha form open kara:\\n\\n👉 https://unique-market-whatsapp-zgw1.onrender.com/quote-form?phone=' + encodeURIComponent(String(from || '').replace(/\\\\D/g, '')) + '\\n\\nForm submit kelyavar requirement directly Unique Market la receive hoil.')
+        try {
+          await sendText(from, quoteReply)
+          console.log('WhatsApp instant quote form reply sent:', JSON.stringify({ to: from, text: quoteReply }))
+        } catch (err) {
+          console.error('WhatsApp instant quote form reply failed:', String(err?.message || err))
+        }
+        continue
+      }
+
       // Main-menu option 2 must ALWAYS open the instant quote web form.
       // Clear any stale interactive session before routing this menu option.
       if (normalized === '2') clearComplaintSession(conversationKey)
