@@ -1,3 +1,4 @@
+import logging
 import os
 import aiohttp
 from dotenv import load_dotenv
@@ -5,6 +6,8 @@ from livekit.agents import Agent, AgentServer, AgentSession, JobContext, RunCont
 from livekit.plugins import google
 
 load_dotenv()
+
+logger = logging.getLogger("unique-market-voice")
 
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
@@ -83,15 +86,21 @@ class UniqueMarketAgent(Agent):
         ticket = row.get("ticket_no") or row.get("complaint_no") or row.get("id")
         return f"Service request created successfully. Ticket number: {ticket}"
 
-server = AgentServer()
+# Render free instances can report CPU load above 1.0 because the worker
+# load is measured across the process pool. A 2.0 threshold prevents the
+# worker from rejecting the first test call while still allowing the normal
+# process-pool protection to work.
+server = AgentServer(
+    load_threshold=2.0,
+    num_idle_processes=1,
+)
 
 @server.rtc_session(agent_name="unique-market-voice")
 async def entrypoint(ctx: JobContext):
+    logger.info("UM VOICE: entrypoint started room=%s job=%s", ctx.room.name, ctx.job.id)
     await ctx.connect()
+    logger.info("UM VOICE: LiveKit room connected")
 
-    # Gemini 2.5 Flash Live is the stable native-audio model for this
-    # LiveKit Google plugin version. Gemini 3.1 Live has a known greeting/
-    # generate_reply compatibility issue on older 1.8.x plugin builds.
     session = AgentSession(
         llm=google.realtime.RealtimeModel(
             model="gemini-2.5-flash-native-audio-preview-12-2025",
@@ -100,15 +109,18 @@ async def entrypoint(ctx: JobContext):
             instructions=SYSTEM_PROMPT,
         ),
     )
+    logger.info("UM VOICE: Gemini realtime session created")
 
     await session.start(
         room=ctx.room,
         agent=UniqueMarketAgent(),
     )
+    logger.info("UM VOICE: AgentSession started; sending greeting")
 
     await session.generate_reply(
         instructions="Greet the customer in a natural Marathi/Hindi/English mix and ask how you can help with CCTV, IT service, or AMC."
     )
+    logger.info("UM VOICE: greeting requested")
 
 if __name__ == "__main__":
     cli.run_app(server)
