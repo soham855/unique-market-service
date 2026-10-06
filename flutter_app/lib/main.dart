@@ -128,13 +128,21 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   Map<String,dynamic>? customer;
   List<Map<String,dynamic>> tickets = [];
   bool loading = true;
+  int unreadNotifications = 0;
+  Timer? _homeTimer;
   late final PushNotificationService pushService;
 
-  @override void initState() { super.initState(); pushService = PushNotificationService(Supabase.instance.client); pushService.initialize(); load(); }
+  @override void initState() { super.initState(); pushService = PushNotificationService(Supabase.instance.client); pushService.initialize(); load(); _homeTimer = Timer.periodic(const Duration(seconds: 10), (_) => load()); }
+  @override void dispose() { _homeTimer?.cancel(); super.dispose(); }
   Future<void> load() async {
     try {
       customer = await service.customer();
       tickets = await service.tickets();
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user != null) {
+        final rows = await Supabase.instance.client.from('notifications').select('id').eq('user_id', user.id).isFilter('read_at', null);
+        unreadNotifications = rows.length;
+      }
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -146,7 +154,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Unique Market', style: TextStyle(fontWeight: FontWeight.w800)), actions: [IconButton(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerNotificationsPage(service: pushService))), icon: const Icon(Icons.notifications_none_outlined)), IconButton(onPressed: load, icon: const Icon(Icons.refresh)), PopupMenuButton<String>(onSelected: (v) { if (v == 'logout') logout(); }, itemBuilder: (_) => const [PopupMenuItem(value: 'logout', child: Text('Logout'))])]),
+    appBar: AppBar(title: const Text('Unique Market', style: TextStyle(fontWeight: FontWeight.w800)), actions: [Stack(children: [IconButton(onPressed: () async { await Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerNotificationsPage(service: pushService))); await load(); }, icon: const Icon(Icons.notifications_none_outlined)), if (unreadNotifications > 0) Positioned(right: 7, top: 7, child: Container(padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2), decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(10)), child: Text(unreadNotifications > 99 ? '99+' : unreadNotifications.toString(), style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800))))]), IconButton(onPressed: load, icon: const Icon(Icons.refresh)), PopupMenuButton<String>(onSelected: (v) { if (v == 'logout') logout(); }, itemBuilder: (_) => const [PopupMenuItem(value: 'logout', child: Text('Logout'))])]),
     body: RefreshIndicator(onRefresh: load, child: ListView(padding: const EdgeInsets.all(18), children: [
       Text('Namaskar, ' + (customer?['name']?.toString() ?? 'Customer'), style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900)),
       Text(customer?['customer_code']?.toString() ?? 'Customer Portal', style: const TextStyle(color: Colors.black54)),
