@@ -66,4 +66,38 @@ class CustomerService {
     final result = await client.from('complaints').insert(payload).select().single();
     return Map<String, dynamic>.from(result);
   }
+  Future<Map<String, dynamic>?> visitForComplaint(String complaintId) async {
+    final rows = await client.from('service_visits').select().eq('complaint_id', complaintId).order('created_at', ascending: false).limit(1);
+    if (rows.isEmpty) return null;
+    return Map<String, dynamic>.from(rows.first);
+  }
+
+  Future<List<Map<String, dynamic>>> paymentsForComplaint(String complaintId) async {
+    final rows = await client.from('payments').select().eq('complaint_id', complaintId).order('created_at', ascending: false);
+    return List<Map<String, dynamic>>.from(rows);
+  }
+
+  Future<Map<String, dynamic>> recordPayment({
+    required String complaintId,
+    required double amount,
+    required String mode,
+    String? referenceNo,
+  }) async {
+    final customer = await this.customer();
+    if (customer == null) throw Exception('Customer profile not found');
+    final payload = <String, dynamic>{
+      'customer_id': customer['id'],
+      'complaint_id': complaintId,
+      'amount': amount,
+      'mode': mode,
+      'reference_no': referenceNo,
+      'payment_date': DateTime.now().toUtc().toIso8601String(),
+      'status': 'Pending',
+      'payment_status': 'Pending',
+      'source': 'customer_app',
+    };
+    final result = await client.from('payments').insert(payload).select().single();
+    return Map<String, dynamic>.from(result);
+  }
+
 }
