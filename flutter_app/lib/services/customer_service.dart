@@ -149,4 +149,11 @@ class CustomerService {
     return Map<String,dynamic>.from(row);
   }
 
+  Future<List<Map<String,dynamic>>> amcContracts() async {
+    final customer = await this.customer();
+    if (customer == null) return [];
+    final rows = await client.from('amc_contracts').select().eq('customer_id', customer['profile_id'] ?? customer['id']).order('end_date', ascending: false);
+    return List<Map<String,dynamic>>.from(rows);
+  }
+
 }
