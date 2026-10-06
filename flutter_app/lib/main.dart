@@ -794,7 +794,14 @@ class _SettingsPageState extends State<SettingsPage>{
     SwitchListTile(title:const Text('Remember Me'),subtitle:const Text('Keep me signed in for 15 days'),value:remember,onChanged:(v){setState(()=>remember=v);save('remember_me',v);}),
     SwitchListTile(title:const Text('Notifications'),subtitle:const Text('Service and payment updates'),value:notifications,onChanged:(v)async{setState(()=>notifications=v);await save('notifications',v);try{await PushNotificationService(Supabase.instance.client).setNotificationsEnabled(v);}catch(_){}}),
     ListTile(title:const Text('Language'),subtitle:Text(language),onTap:()async{final v=await showDialog<String>(context:context,builder:(_)=>SimpleDialog(title:const Text('Language'),children:[SimpleDialogOption(onPressed:()=>Navigator.pop(context,'English'),child:const Text('English')),SimpleDialogOption(onPressed:()=>Navigator.pop(context,'Marathi'),child:const Text('Marathi'))]));if(v!=null){setState(()=>language=v);save('language',v);}}),
-    const Divider(),ListTile(leading:const Icon(Icons.phone_outlined),title:const Text('Call Unique Market'),subtitle:const Text('7350060071')),
-    ListTile(leading:const Icon(Icons.logout_outlined),title:const Text('Logout'),onTap:()async{await Supabase.instance.client.auth.signOut();if(context.mounted)Navigator.pushAndRemoveUntil(context,MaterialPageRoute(builder:(_)=>const LoginPage()),(_)=>false);})
+    const Divider(),
+    ListTile(leading:const Icon(Icons.phone_outlined),title:const Text('Call Unique Market'),subtitle:const Text('7350060071'),onTap:()async{try{await launchUrl(Uri(scheme:'tel',path:'7350060071'));}catch(_){}}),
+    ListTile(leading:const Icon(Icons.logout_outlined),title:const Text('Logout'),onTap:()async{
+      final ok=await showDialog<bool>(context:context,builder:(_)=>AlertDialog(title:const Text('Logout?'),content:const Text('You will need to verify OTP again to sign in.'),actions:[TextButton(onPressed:()=>Navigator.pop(context,false),child:const Text('CANCEL')),FilledButton(onPressed:()=>Navigator.pop(context,true),child:const Text('LOGOUT'))]));
+      if(ok!=true)return;
+      await Supabase.instance.client.auth.signOut();
+      final p=await SharedPreferences.getInstance();await p.remove('remember_until_ms');
+      if(context.mounted)Navigator.pushAndRemoveUntil(context,MaterialPageRoute(builder:(_)=>const LoginPage()),(_)=>false);
+    })
   ]));
 }
