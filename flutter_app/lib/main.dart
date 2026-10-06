@@ -432,6 +432,10 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
               const SizedBox(height: 12),
               ServiceReviewCard(service: service, complaintId: widget.ticket['id'].toString()),
             ],
+            if (status == 'Completed') ...[
+              const SizedBox(height: 12),
+              ServiceReviewCard(service: service, complaintId: t['id'].toString()),
+            ],
             const SizedBox(height: 12),
             if (status == 'Completed') _sectionCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               const Text('Invoice', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
