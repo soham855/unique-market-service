@@ -14,6 +14,16 @@ class AuthService {
 
   Future<String?> resolveRole(String userId) async {
     final row = await client.from('profiles').select('role').eq('id', userId).maybeSingle();
-    return row?['role']?.toString().toLowerCase();
+    if (row != null) return row['role']?.toString().toLowerCase();
+
+    final phone = client.auth.currentUser?.phone;
+    if (phone == null || phone.isEmpty) return null;
+    final digits = phone.replaceAll(RegExp(r'\\D'), '');
+    final local = digits.length > 10 ? digits.substring(digits.length - 10) : digits;
+    final techRows = await client.from('technicians').select('id,name,mobile,status').eq('mobile', local).limit(1);
+    if (techRows.isEmpty) return null;
+    final tech = Map<String,dynamic>.from(techRows.first);
+    await client.from('profiles').insert({'id': userId, 'full_name': tech['name'], 'phone': phone, 'role': 'technician'});
+    return 'technician';
   }
 }
