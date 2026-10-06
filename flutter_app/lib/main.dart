@@ -164,6 +164,8 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
         const SizedBox(width: 12),
         Expanded(child: _homeCard(Icons.confirmation_num_outlined, 'My Tickets', () => Navigator.push(context, MaterialPageRoute(builder: (_) => TicketListPage(tickets: tickets))))),
       ]),
+      const SizedBox(height: 12),
+      _homeCard(Icons.verified_user_outlined, 'AMC Contracts', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AmcContractsPage()))),
       const SizedBox(height: 24),
       const Text('Recent Service', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
       const SizedBox(height: 10),
@@ -189,6 +191,26 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
       const SizedBox(height: 4), const Text('Open', style: TextStyle(color: Colors.black45)),
     ])),
   ));
+}
+
+class AmcContractsPage extends StatefulWidget {
+  const AmcContractsPage({super.key});
+  @override State<AmcContractsPage> createState()=>_AmcContractsPageState();
+}
+class _AmcContractsPageState extends State<AmcContractsPage>{
+  final service=CustomerService(); List<Map<String,dynamic>> items=[]; bool loading=true; Timer? timer;
+  @override void initState(){super.initState();load();timer=Timer.periodic(const Duration(seconds:10),(_)=>load());}
+  @override void dispose(){timer?.cancel();super.dispose();}
+  Future<void> load()async{try{items=await service.amcContracts();}catch(_){items=[];}if(mounted)setState(()=>loading=false);}
+  @override Widget build(BuildContext context)=>Scaffold(
+    appBar:AppBar(title:const Text('AMC Contracts'),actions:[IconButton(onPressed:load,icon:const Icon(Icons.refresh))]),
+    body:loading?const Center(child:CircularProgressIndicator()):RefreshIndicator(onRefresh:load,child:ListView(padding:const EdgeInsets.all(16),children:[
+      if(items.isEmpty) const Card(child:Padding(padding:EdgeInsets.all(24),child:Center(child:Text('No AMC contracts found.')))),
+      ...items.map((a){final status=(a['status']??'').toString();final start=(a['start_date']??'').toString();final end=(a['end_date']??'').toString();return Card(margin:const EdgeInsets.only(bottom:12),child:Padding(padding:const EdgeInsets.all(16),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+        Row(children:[const Icon(Icons.shield_outlined),const SizedBox(width:10),Expanded(child:Text(status.isEmpty?'AMC Contract':status,style:const TextStyle(fontSize:17,fontWeight:FontWeight.w800)))]),
+        const SizedBox(height:12),Text('Start: '+(start.isEmpty?'—':start)),Text('Expiry: '+(end.isEmpty?'—':end)),if((a['notes']??'').toString().isNotEmpty)Padding(padding:const EdgeInsets.only(top:8),child:Text('Notes: '+a['notes'].toString())),
+      ])));})
+    ])));
 }
 
 class CustomerNotificationsPage extends StatefulWidget {
