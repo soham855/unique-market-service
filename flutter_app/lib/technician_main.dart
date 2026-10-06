@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -109,7 +110,9 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
   bool loading = true;
   int tab = 0;
   late final PushNotificationService pushService;
-  @override void initState() { super.initState(); pushService = PushNotificationService(Supabase.instance.client); pushService.initialize(); load(); }
+  Timer? _timer;
+  @override void initState() { super.initState(); pushService = PushNotificationService(Supabase.instance.client); pushService.initialize(); load(); _timer = Timer.periodic(const Duration(seconds:10), (_) => load()); }
+  @override void dispose() { _timer?.cancel(); super.dispose(); }
   Future<void> load() async {
     try { tech = await service.technician(); jobs = await service.jobs(); } catch (_) {}
     if (mounted) setState(() => loading = false);
