@@ -12,7 +12,7 @@ class AdminService {
 
   Future<Map<String,dynamic>> summary() async {
     final complaints = await client.from('complaints').select('id,status');
-    final technicians = await client.from('profiles').select('id,name,mobile,role').eq('role','technician');
+    final technicians = await client.from('profiles').select('id,full_name,phone,role').eq('role','technician');
     final payments = await client.from('payments').select('amount,payment_status,status');
     int countStatus(String s) => complaints.where((r) => (r['status']?.toString() ?? '') == s).length;
     double collected = 0;
@@ -43,7 +43,7 @@ class AdminService {
   }
 
   Future<List<Map<String,dynamic>>> technicians() async {
-    final rows = await client.from('profiles').select('id,name,mobile,role').eq('role','technician').order('name');
+    final rows = await client.from('profiles').select('id,full_name,phone,role').eq('role','technician').order('full_name');
     return List<Map<String,dynamic>>.from(rows);
   }
 
