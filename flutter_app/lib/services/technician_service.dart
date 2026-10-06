@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:geolocator/geolocator.dart';
 
 class TechnicianService {
   final SupabaseClient client;
@@ -25,6 +26,23 @@ class TechnicianService {
     return List<Map<String, dynamic>>.from(rows);
   }
 
+  Future<Position> currentPosition() async {
+    if (!await Geolocator.isLocationServiceEnabled()) throw Exception('Turn on Location/GPS first.');
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) permission = await Geolocator.requestPermission();
+    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) throw Exception('Location permission is required.');
+    return Geolocator.getCurrentPosition(locationSettings: const LocationSettings(accuracy: LocationAccuracy.high));
+  }
+
+  Future<double?> verifyCustomerLocation(Map<String, dynamic> job, {double maxMeters = 150}) async {
+    final lat = double.tryParse(job['latitude']?.toString() ?? '');
+    final lon = double.tryParse(job['longitude']?.toString() ?? '');
+    if (lat == null || lon == null) throw Exception('Customer GPS location is not available for this job.');
+    final pos = await currentPosition();
+    final distance = Geolocator.distanceBetween(pos.latitude, pos.longitude, lat, lon);
+    if (distance > maxMeters) throw Exception('You are ' + distance.toStringAsFixed(0) + ' m away. Reach within ' + maxMeters.toStringAsFixed(0) + ' m of the customer location.');
+    return distance;
+  }
   Future<void> updateStatus(String complaintId, String status) async {
     final user = client.auth.currentUser;
     if (user == null) throw Exception('Technician session expired.');
