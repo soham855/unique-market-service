@@ -91,7 +91,8 @@ class AdminService {
   }
 
   Future<void> updatePayment(String id, String status) async {
-    final payment = await client.from('payments').select('id,amount,complaint_id,customer_id').eq('id', id).single();
+    final payment = await client.from('payments').select('id,amount,complaint_id,customer_id,mode,reference_no').eq('id', id).single();
+    final complaint = payment['complaint_id'] == null ? null : await client.from('complaints').select('ticket_no,customer_name').eq('id', payment['complaint_id']).maybeSingle();
     await client.from('payments').update({'status': status, 'payment_status': status}).eq('id', id);
     final customer = await client.from('customers').select('profile_id').eq('id', payment['customer_id']).maybeSingle();
     final profileId = customer?['profile_id']?.toString();
@@ -100,14 +101,14 @@ class AdminService {
       await client.from('notifications').insert({
         'user_id': profileId, 'complaint_id': payment['complaint_id'],
         'title': approved ? 'Payment Approved' : 'Payment Rejected',
-        'message': approved ? 'Your payment of ₹' + (payment['amount'] ?? 0).toString() + ' has been approved.' : 'Your payment of ₹' + (payment['amount'] ?? 0).toString() + ' was rejected. Please contact Unique Market.',
+        'message': approved ? 'Payment of ₹' + (payment['amount'] ?? 0).toString() + ' for ticket ' + (complaint?['ticket_no'] ?? payment['complaint_id']).toString() + ' has been approved.' : 'Payment of ₹' + (payment['amount'] ?? 0).toString() + ' for ticket ' + (complaint?['ticket_no'] ?? payment['complaint_id']).toString() + ' was rejected. Please contact Unique Market.',
         'type': 'payment_update',
       });
     }
   }
 
   Future<List<Map<String,dynamic>>> payments({String? status}) async {
-    var q = client.from('payments').select().order('created_at', ascending: false);
+    var q = client.from('payments').select('id,amount,payment_date,payment_status,status,mode,reference_no,complaint_id,customer_id,created_at').order('created_at', ascending: false);
     if (status != null && status != 'All') q = q.eq('payment_status', status);
     final rows = await q;
     return List<Map<String,dynamic>>.from(rows);
