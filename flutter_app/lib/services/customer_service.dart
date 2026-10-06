@@ -91,7 +91,7 @@ class CustomerService {
       'amount': amount,
       'mode': mode,
       'reference_no': referenceNo,
-      'payment_date': DateTime.now().toUtc().toIso8601String(),
+      'payment_date': DateTime.now().toUtc().toIso8601String().substring(0, 10),
       'status': 'Pending',
       'payment_status': 'Pending',
       'source': 'customer_app',
