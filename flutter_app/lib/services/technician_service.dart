@@ -173,5 +173,14 @@ class TechnicianService {
 
     await client.from('service_visits').update({'completed_at': DateTime.now().toUtc().toIso8601String(), 'work_done': workDone, 'parts_used': partsUsed}).eq('id', visitId).eq('technician_id', tech['id']);
     await updateStatus(complaintId, 'Completed');
+    final complaint = await client.from('complaints').select('customer_id,ticket_no').eq('id', complaintId).maybeSingle();
+    final customerId = complaint?['customer_id'];
+    if (customerId != null) {
+      final customer = await client.from('customers').select('profile_id').eq('id', customerId).maybeSingle();
+      final profileId = customer?['profile_id']?.toString();
+      if (profileId != null && profileId.isNotEmpty) {
+        await client.from('notifications').insert({'user_id': profileId, 'complaint_id': complaintId, 'title': 'Service Completed', 'message': 'Ticket ' + (complaint?['ticket_no'] ?? complaintId).toString() + ' has been completed. Please review the service and payment.', 'type': 'service_completed'});
+      }
+    }
   }
 }
