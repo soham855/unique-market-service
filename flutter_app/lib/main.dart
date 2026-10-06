@@ -282,6 +282,7 @@ class CustomerNotificationsPage extends StatefulWidget {
 class _CustomerNotificationsPageState extends State<CustomerNotificationsPage>{
   List<Map<String,dynamic>> items=[]; bool loading=true; Timer? _timer;
   @override void initState(){super.initState();load(); _timer=Timer.periodic(const Duration(seconds:10), (_) => load());}
+  @override void dispose(){_timer?.cancel();super.dispose();}
   Future<void> load()async{
     final user=Supabase.instance.client.auth.currentUser;
     if(user==null){if(mounted)setState(()=>loading=false);return;}
@@ -291,16 +292,41 @@ class _CustomerNotificationsPageState extends State<CustomerNotificationsPage>{
     }catch(_){}
     if(mounted)setState(()=>loading=false);
   }
+  Future<void> openNotification(Map<String,dynamic> n)async{
+    final id=n['id']?.toString();
+    if(id!=null&&id.isNotEmpty)await markRead(id);
+    if(!mounted)return;
+    final complaintId=n['complaint_id']?.toString();
+    if(complaintId==null||complaintId.isEmpty)return;
+    try{
+      final ticket=await Supabase.instance.client.from('complaints').select().eq('id',complaintId).maybeSingle();
+      if(ticket!=null&&mounted){
+        await Navigator.push(context,MaterialPageRoute(builder:(_)=>TicketDetailsPage(ticket:Map<String,dynamic>.from(ticket))));
+      }
+    }catch(e){
+      if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Could not open ticket.')));
+    }
+  }
   Future<void> markRead(String id)async{try{await Supabase.instance.client.from('notifications').update({'read_at':DateTime.now().toUtc().toIso8601String()}).eq('id',id);await load();}catch(_){}}
+  String _time(dynamic value){
+    final d=DateTime.tryParse((value??'').toString());
+    if(d==null)return '';
+    final local=d.toLocal();
+    final h=local.hour%12==0?12:local.hour%12;
+    final m=local.minute.toString().padLeft(2,'0');
+    final period=local.hour>=12?'PM':'AM';
+    return '${local.day.toString().padLeft(2,'0')}/${local.month.toString().padLeft(2,'0')}/${local.year}  $h:$m $period';
+  }
   @override Widget build(BuildContext context)=>Scaffold(
     appBar:AppBar(title:const Text('Notifications'),actions:[IconButton(onPressed:load,icon:const Icon(Icons.refresh))]),
     body:loading?const Center(child:CircularProgressIndicator()):RefreshIndicator(onRefresh:load,child:ListView(padding:const EdgeInsets.all(12),children:[
       if(items.isEmpty)const Card(child:Padding(padding:EdgeInsets.all(28),child:Center(child:Text('No notifications yet.')))),
-      ...items.map((n){final unread=n['read_at']==null;return Card(child:ListTile(
+      ...items.map((n){final unread=n['read_at']==null;final hasTicket=n['complaint_id']!=null;return Card(child:ListTile(
         leading:CircleAvatar(child:Icon(unread?Icons.notifications_active_outlined:Icons.notifications_none_outlined)),
         title:Text((n['title']??'Unique Market').toString(),style:TextStyle(fontWeight:unread?FontWeight.w900:FontWeight.w600)),
-        subtitle:Text((n['message']??'').toString()+'\n'+(n['created_at']??'').toString(),maxLines:3),
-        onTap:()=>markRead(n['id'].toString()),
+        subtitle:Text((n['message']??'').toString()+'\n'+_time(n['created_at']),maxLines:3),
+        trailing:hasTicket?const Icon(Icons.chevron_right):null,
+        onTap:()=>openNotification(n),
       ));})
     ])),
   );
