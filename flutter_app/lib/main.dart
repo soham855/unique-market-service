@@ -264,7 +264,9 @@ class TicketListPage extends StatelessWidget {
   const TicketListPage({super.key, required this.tickets});
   @override Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('My Tickets')),
-    body: ListView.builder(padding: const EdgeInsets.all(16), itemCount: tickets.length, itemBuilder: (_, i) => TicketTile(ticket: tickets[i])),
+    body: tickets.isEmpty
+      ? const Center(child: Text('No tickets yet.'))
+      : ListView.builder(padding: const EdgeInsets.all(16), itemCount: tickets.length, itemBuilder: (_, i) => TicketTile(ticket: tickets[i])),
   );
 }
 
@@ -278,6 +280,172 @@ class TicketTile extends StatelessWidget {
       title: Text((ticket['ticket_no'] ?? ticket['complaint_no'] ?? 'Ticket').toString(), style: const TextStyle(fontWeight: FontWeight.w800)),
       subtitle: Text((ticket['title'] ?? ticket['description'] ?? '').toString(), maxLines: 2, overflow: TextOverflow.ellipsis),
       trailing: Text((ticket['status'] ?? 'New').toString(), style: const TextStyle(fontWeight: FontWeight.w700)),
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TicketDetailsPage(ticket: ticket))),
     ),
+  );
+}
+
+class TicketDetailsPage extends StatefulWidget {
+  final Map<String,dynamic> ticket;
+  const TicketDetailsPage({super.key, required this.ticket});
+  @override State<TicketDetailsPage> createState() => _TicketDetailsPageState();
+}
+
+class _TicketDetailsPageState extends State<TicketDetailsPage> {
+  final service = CustomerService(Supabase.instance.client);
+  Map<String,dynamic>? visit;
+  List<Map<String,dynamic>> payments = [];
+  bool loading = true;
+
+  @override void initState() { super.initState(); load(); }
+
+  Future<void> load() async {
+    try {
+      final v = await service.visitForComplaint(widget.ticket['id'].toString());
+      final p = await service.paymentsForComplaint(widget.ticket['id'].toString());
+      if (mounted) setState(() { visit = v; payments = p; loading = false; });
+    } catch (e) {
+      if (mounted) setState(() => loading = false);
+    }
+  }
+
+  @override Widget build(BuildContext context) {
+    final t = widget.ticket;
+    final status = (t['status'] ?? 'New').toString();
+    final techName = visit?['technician_name']?.toString() ?? 'Technician will be assigned';
+    return Scaffold(
+      appBar: AppBar(title: const Text('Ticket Details')),
+      body: loading
+        ? const Center(child: CircularProgressIndicator())
+        : RefreshIndicator(
+          onRefresh: load,
+          child: ListView(padding: const EdgeInsets.all(16), children: [
+            _sectionCard(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text((t['ticket_no'] ?? t['complaint_no'] ?? 'Ticket').toString(), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 8),
+                _statusChip(status),
+                const SizedBox(height: 16),
+                _row('Service', t['service_type'] ?? '-'),
+                _row('Problem', t['category'] ?? '-'),
+                _row('Description', t['description'] ?? '-'),
+                _row('Address', t['address'] ?? t['location_text'] ?? '-'),
+              ]),
+            ),
+            const SizedBox(height: 12),
+            _sectionCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('Service Status', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 14),
+              _timeline(status),
+            ])),
+            const SizedBox(height: 12),
+            _sectionCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('Technician & Visit', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 12),
+              _row('Technician', techName),
+              _row('Technician ID', visit?['technician_id'] ?? '-'),
+              _row('Visit', t['scheduled_visit_at'] ?? t['scheduled_visit_date'] ?? 'Not scheduled'),
+              _row('Visit status', visit?['status'] ?? status),
+              if (visit?['diagnosis'] != null) _row('Diagnosis', visit!['diagnosis']),
+              if (visit?['work_done'] != null) _row('Work done', visit!['work_done']),
+              const SizedBox(height: 8),
+              Wrap(spacing: 8, children: [
+                OutlinedButton.icon(onPressed: () => _callSupport(context), icon: const Icon(Icons.phone_outlined), label: const Text('Call')),
+                OutlinedButton.icon(onPressed: () => _whatsapp(context), icon: const Icon(Icons.chat_outlined), label: const Text('WhatsApp')),
+              ]),
+            ])),
+            const SizedBox(height: 12),
+            _sectionCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('Payment', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 8),
+              if (payments.isEmpty) const Text('No payment recorded yet.', style: TextStyle(color: Colors.black54)),
+              ...payments.map((p) => ListTile(contentPadding: EdgeInsets.zero, leading: const Icon(Icons.receipt_long_outlined), title: Text('₹' + (p['amount'] ?? 0).toString()), subtitle: Text((p['mode'] ?? '-') .toString() + ' • ' + (p['payment_status'] ?? p['status'] ?? 'Pending').toString()))),
+              const SizedBox(height: 4),
+              FilledButton.icon(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PaymentPage(complaint: t))).then((_) => load()), icon: const Icon(Icons.payments_outlined), label: const Text('Make / Update Payment')),
+            ])),
+          ]),
+        ),
+    );
+  }
+
+  Widget _sectionCard({required Widget child}) => Card(child: Padding(padding: const EdgeInsets.all(18), child: child));
+  Widget _row(String label, dynamic value) => Padding(padding: const EdgeInsets.only(bottom: 9), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [SizedBox(width: 105, child: Text(label, style: const TextStyle(color: Colors.black54))), Expanded(child: Text(value?.toString() ?? '-', style: const TextStyle(fontWeight: FontWeight.w600)))]));
+  Widget _statusChip(String s) => Chip(label: Text(s), avatar: const Icon(Icons.circle, size: 10));
+  Widget _timeline(String status) {
+    const steps = ['New','Assigned','Scheduled','On The Way','Reached','In Service','Completed'];
+    final normalized = status.toLowerCase().replaceAll('_',' ');
+    int active = steps.indexWhere((s) => normalized.contains(s.toLowerCase()));
+    if (active < 0) active = status.toLowerCase() == 'assigned' ? 1 : 0;
+    return Column(children: steps.asMap().entries.map((e) {
+      final done = e.key <= active;
+      return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Column(children: [Icon(done ? Icons.check_circle : Icons.radio_button_unchecked, size: 22), if (e.key < steps.length-1) Container(width: 2, height: 28, color: Colors.black12)]),
+        const SizedBox(width: 12), Padding(padding: const EdgeInsets.only(top: 2), child: Text(e.value, style: TextStyle(fontWeight: done ? FontWeight.w800 : FontWeight.w500))),
+      ]);
+    }).toList());
+  }
+  void _callSupport(BuildContext context) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Call Unique Market: 7350060071'))); }
+  void _whatsapp(BuildContext context) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('WhatsApp: 7350060071'))); }
+}
+
+class PaymentPage extends StatefulWidget {
+  final Map<String,dynamic> complaint;
+  const PaymentPage({super.key, required this.complaint});
+  @override State<PaymentPage> createState() => _PaymentPageState();
+}
+
+class _PaymentPageState extends State<PaymentPage> {
+  final amount = TextEditingController();
+  final utr = TextEditingController();
+  String mode = 'UPI';
+  bool busy = false;
+
+  Future<void> submit() async {
+    final value = double.tryParse(amount.text.trim());
+    if (value == null || value <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a valid amount.')));
+      return;
+    }
+    if (mode == 'UPI' && utr.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter UTR / reference number after payment.')));
+      return;
+    }
+    setState(() => busy = true);
+    try {
+      await CustomerService(Supabase.instance.client).recordPayment(
+        complaintId: widget.complaint['id'].toString(),
+        amount: value,
+        mode: mode,
+        referenceNo: utr.text.trim().isEmpty ? null : utr.text.trim(),
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Payment submitted for verification.')));
+      Navigator.pop(context);
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    } finally { if (mounted) setState(() => busy = false); }
+  }
+
+  @override Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Payment')),
+    body: ListView(padding: const EdgeInsets.all(18), children: [
+      const Text('Service Payment', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900)),
+      const SizedBox(height: 6),
+      Text('Ticket: ' + (widget.complaint['ticket_no'] ?? widget.complaint['complaint_no'] ?? '-').toString(), style: const TextStyle(color: Colors.black54)),
+      const SizedBox(height: 20),
+      TextField(controller: amount, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Amount', prefixText: '₹ ')),
+      const SizedBox(height: 16),
+      const Text('Payment Mode', style: TextStyle(fontWeight: FontWeight.w700)),
+      const SizedBox(height: 8),
+      Wrap(spacing: 8, children: ['UPI','Cash'].map((m) => ChoiceChip(label: Text(m), selected: mode == m, onSelected: (_) => setState(() => mode = m)).toList()),
+      if (mode == 'UPI') ...[
+        const SizedBox(height: 16),
+        const Card(child: Padding(padding: EdgeInsets.all(16), child: Text('Pay using your UPI app, then enter the UTR / reference number below.'))),
+        const SizedBox(height: 12),
+        TextField(controller: utr, decoration: const InputDecoration(labelText: 'UTR / Reference Number')),
+      ],
+      const SizedBox(height: 24),
+      SizedBox(height: 54, child: FilledButton(onPressed: busy ? null : submit, child: busy ? const CircularProgressIndicator(color: Colors.white) : const Text('SUBMIT PAYMENT'))),
+    ]),
   );
 }
