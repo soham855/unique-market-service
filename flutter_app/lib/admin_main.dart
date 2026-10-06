@@ -113,6 +113,8 @@ class _AdminHomePageState extends State<AdminHomePage> {
     body:loading?const Center(child:CircularProgressIndicator()):RefreshIndicator(onRefresh:load,child:ListView(padding:const EdgeInsets.all(16),children:[
       const Text('UNIQUE MARKET',style:TextStyle(fontSize:13,fontWeight:FontWeight.w800,letterSpacing:1.4)),const SizedBox(height:4),const Text('Operations Dashboard',style:TextStyle(fontSize:26,fontWeight:FontWeight.w900)),
       const SizedBox(height:18),_grid(),
+      const SizedBox(height:14),
+      Card(child:ListTile(leading:const CircleAvatar(child:Icon(Icons.autorenew)),title:const Text('AMC Renewal Requests',style:TextStyle(fontWeight:FontWeight.w800)),subtitle:const Text('View and manage customer AMC renewals'),trailing:const Icon(Icons.chevron_right),onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const AdminAmcRenewalsPage())).then((_){load();}))),
       const SizedBox(height:22),const Text('Live Complaints',style:TextStyle(fontSize:20,fontWeight:FontWeight.w800)),const SizedBox(height:10),
       ...complaints.take(10).map((c)=>AdminComplaintTile(complaint:c,technicians:technicians,onChanged:load)),
       if(complaints.isEmpty)const Card(child:Padding(padding:EdgeInsets.all(22),child:Text('No complaints found.'))),
