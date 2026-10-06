@@ -17,7 +17,12 @@ class TechnicianService {
     if (p == null) return null;
     final mobile = p['mobile']?.toString();
     if (mobile == null || mobile.isEmpty) return null;
-    return await client.from('technicians').select().eq('mobile', mobile).maybeSingle();
+    final byMobile = await client.from('technicians').select().eq('mobile', mobile).maybeSingle();
+    if (byMobile != null) return byMobile;
+    final name = p['full_name']?.toString().trim();
+    if (name == null || name.isEmpty) return null;
+    final rows = await client.from('technicians').select().ilike('name', name).limit(1);
+    return rows.isEmpty ? null : Map<String,dynamic>.from(rows.first);
   }
 
   Future<List<Map<String, dynamic>>> jobs() async {
