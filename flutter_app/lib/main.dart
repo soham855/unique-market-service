@@ -208,11 +208,13 @@ class _AmcContractsPageState extends State<AmcContractsPage>{
       if(items.isEmpty) const Card(child:Padding(padding:EdgeInsets.all(24),child:Center(child:Text('No AMC contracts found.')))),
       ...items.map((a){final status=(a['status']??'').toString();final start=(a['start_date']??'').toString();final end=(a['end_date']??'').toString();return Card(margin:const EdgeInsets.only(bottom:12),child:Padding(padding:const EdgeInsets.all(16),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         Row(children:[const Icon(Icons.shield_outlined),const SizedBox(width:10),Expanded(child:Text(status.isEmpty?'AMC Contract':status,style:const TextStyle(fontSize:17,fontWeight:FontWeight.w800)))]),
-        const SizedBox(height:12),Text('Start: '+(start.isEmpty?'—':start)),Text('Expiry: '+(end.isEmpty?'—':end)),if((a['notes']??'').toString().isNotEmpty)Padding(padding:const EdgeInsets.only(top:8),child:Text('Notes: '+a['notes'].toString())),
+        const SizedBox(height:12),Text('Start: '+(start.isEmpty?'—':start)),Text('Expiry: '+(end.isEmpty?'—':end)),if((a['notes']??'').toString().isNotEmpty)Padding(padding:const EdgeInsets.only(top:8),child:Text('Notes: '+a['notes'].toString())),const SizedBox(height:12),_RenewButton(service:service,amcId:a['id'].toString()),
       ])));})
     ])));
 }
 
+class _RenewButton extends StatefulWidget { final CustomerService service; final String amcId; const _RenewButton({required this.service,required this.amcId}); @override State<_RenewButton> createState()=>_RenewButtonState(); }
+class _RenewButtonState extends State<_RenewButton>{ bool busy=false; String status=''; @override void initState(){super.initState();load();} Future<void> load()async{final r=await widget.service.amcRenewalRequest(widget.amcId);if(mounted)setState(()=>status=(r?['status']??'').toString());} Future<void> request()async{setState(()=>busy=true);try{await widget.service.requestAmcRenewal(widget.amcId,notes:'Customer requested AMC renewal.');if(mounted){setState(()=>status='pending');ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('AMC renewal request sent.')));}}catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('Could not send request: $e')));}finally{if(mounted)setState(()=>busy=false);}} @override Widget build(BuildContext context){if(status.isNotEmpty)return Text('Renewal request: '+status.toUpperCase(),style:const TextStyle(fontWeight:FontWeight.w700));return SizedBox(width:double.infinity,child:OutlinedButton.icon(onPressed:busy?null:request,icon:busy?const SizedBox(width:16,height:16,child:CircularProgressIndicator(strokeWidth:2)):const Icon(Icons.autorenew),label:const Text('REQUEST AMC RENEWAL')));}}
 class CustomerNotificationsPage extends StatefulWidget {
   final PushNotificationService service;
   const CustomerNotificationsPage({super.key, required this.service});
