@@ -10,6 +10,7 @@ import 'package:printing/printing.dart';
 import 'config/supabase_config.dart';
 import 'services/auth_service.dart';
 import 'services/technician_service.dart';
+import 'services/push_notification_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -107,7 +108,8 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
   Map<String,dynamic>? tech;
   bool loading = true;
   int tab = 0;
-  @override void initState() { super.initState(); load(); }
+  late final PushNotificationService pushService;
+  @override void initState() { super.initState(); pushService = PushNotificationService(Supabase.instance.client); pushService.initialize(); load(); }
   Future<void> load() async {
     try { tech = await service.technician(); jobs = await service.jobs(); } catch (_) {}
     if (mounted) setState(() => loading = false);
@@ -122,6 +124,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
     final completed = jobs.where((j) => j['status'] == 'Completed').length;
     return Scaffold(
       appBar: AppBar(title: const Text('Technician', style: TextStyle(fontWeight: FontWeight.w800)), actions: [
+        IconButton(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TechnicianNotificationsPage(service: pushService))), icon: const Icon(Icons.notifications_none_outlined)),
         IconButton(onPressed: load, icon: const Icon(Icons.refresh)),
         PopupMenuButton<String>(onSelected: (v) { if (v == 'logout') logout(); }, itemBuilder: (_) => const [PopupMenuItem(value: 'logout', child: Text('Logout'))])
       ]),
@@ -292,6 +295,38 @@ class TechnicianServiceReportPage extends StatelessWidget {
       SizedBox(height:52,child:FilledButton.icon(onPressed:()=>exportPdf(context),icon:const Icon(Icons.picture_as_pdf),label:const Text('VIEW / SHARE PDF REPORT'))),
     ]));
   }
+}
+
+class TechnicianNotificationsPage extends StatefulWidget {
+  final PushNotificationService service;
+  const TechnicianNotificationsPage({super.key, required this.service});
+  @override State<TechnicianNotificationsPage> createState()=>_TechnicianNotificationsPageState();
+}
+class _TechnicianNotificationsPageState extends State<TechnicianNotificationsPage>{
+  List<Map<String,dynamic>> items=[]; bool loading=true;
+  @override void initState(){super.initState(); load();}
+  Future<void> load()async{
+    final user=Supabase.instance.client.auth.currentUser;
+    if(user==null){if(mounted)setState(()=>loading=false);return;}
+    try{
+      final rows=await Supabase.instance.client.from('notifications').select().eq('user_id',user.id).order('created_at',ascending:false).limit(100);
+      items=List<Map<String,dynamic>>.from(rows);
+    }catch(_){}
+    if(mounted)setState(()=>loading=false);
+  }
+  Future<void> markRead(String id)async{try{await Supabase.instance.client.from('notifications').update({'read_at':DateTime.now().toUtc().toIso8601String()}).eq('id',id);}catch(_){}}
+  @override Widget build(BuildContext context)=>Scaffold(
+    appBar:AppBar(title:const Text('Notifications'),actions:[IconButton(onPressed:load,icon:const Icon(Icons.refresh))]),
+    body:loading?const Center(child:CircularProgressIndicator()):RefreshIndicator(onRefresh:load,child:ListView(padding:const EdgeInsets.all(12),children:[
+      if(items.isEmpty)const Card(child:Padding(padding:EdgeInsets.all(28),child:Center(child:Text('No notifications yet.')))),
+      ...items.map((n){final unread=n['read_at']==null;return Card(child:ListTile(
+        leading:CircleAvatar(child:Icon(unread?Icons.notifications_active_outlined:Icons.notifications_none_outlined)),
+        title:Text((n['title']??'Unique Market').toString(),style:TextStyle(fontWeight:unread?FontWeight.w900:FontWeight.w600)),
+        subtitle:Text((n['message']??'').toString()+'\n'+(n['created_at']??'').toString(),maxLines:3),
+        onTap:()=>markRead(n['id'].toString()),
+      ));})
+    ])),
+  );
 }
 
 class TechnicianSchedulePage extends StatefulWidget {
