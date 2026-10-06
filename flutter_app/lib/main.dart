@@ -5,6 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import 'config/supabase_config.dart';
 import 'services/auth_service.dart';
 import 'services/customer_service.dart';
+import 'services/push_notification_service.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
@@ -126,8 +127,9 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   Map<String,dynamic>? customer;
   List<Map<String,dynamic>> tickets = [];
   bool loading = true;
+  late final PushNotificationService pushService;
 
-  @override void initState() { super.initState(); load(); }
+  @override void initState() { super.initState(); pushService = PushNotificationService(Supabase.instance.client); pushService.initialize(); load(); }
   Future<void> load() async {
     try {
       customer = await service.customer();
@@ -143,7 +145,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Unique Market', style: TextStyle(fontWeight: FontWeight.w800)), actions: [IconButton(onPressed: load, icon: const Icon(Icons.refresh)), PopupMenuButton<String>(onSelected: (v) { if (v == 'logout') logout(); }, itemBuilder: (_) => const [PopupMenuItem(value: 'logout', child: Text('Logout'))])]),
+    appBar: AppBar(title: const Text('Unique Market', style: TextStyle(fontWeight: FontWeight.w800)), actions: [IconButton(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerNotificationsPage(service: pushService))), icon: const Icon(Icons.notifications_none_outlined)), IconButton(onPressed: load, icon: const Icon(Icons.refresh)), PopupMenuButton<String>(onSelected: (v) { if (v == 'logout') logout(); }, itemBuilder: (_) => const [PopupMenuItem(value: 'logout', child: Text('Logout'))])]),
     body: RefreshIndicator(onRefresh: load, child: ListView(padding: const EdgeInsets.all(18), children: [
       Text('Namaskar, ' + (customer?['name']?.toString() ?? 'Customer'), style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900)),
       Text(customer?['customer_code']?.toString() ?? 'Customer Portal', style: const TextStyle(color: Colors.black54)),
@@ -178,6 +180,38 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
       const SizedBox(height: 4), const Text('Open', style: TextStyle(color: Colors.black45)),
     ])),
   ));
+}
+
+class CustomerNotificationsPage extends StatefulWidget {
+  final PushNotificationService service;
+  const CustomerNotificationsPage({super.key, required this.service});
+  @override State<CustomerNotificationsPage> createState()=>_CustomerNotificationsPageState();
+}
+class _CustomerNotificationsPageState extends State<CustomerNotificationsPage>{
+  List<Map<String,dynamic>> items=[]; bool loading=true;
+  @override void initState(){super.initState();load();}
+  Future<void> load()async{
+    final user=Supabase.instance.client.auth.currentUser;
+    if(user==null){if(mounted)setState(()=>loading=false);return;}
+    try{
+      final rows=await Supabase.instance.client.from('notifications').select().eq('user_id',user.id).order('created_at',ascending:false).limit(100);
+      items=List<Map<String,dynamic>>.from(rows);
+    }catch(_){}
+    if(mounted)setState(()=>loading=false);
+  }
+  Future<void> markRead(String id)async{try{await Supabase.instance.client.from('notifications').update({'read_at':DateTime.now().toUtc().toIso8601String()}).eq('id',id);}catch(_){}}
+  @override Widget build(BuildContext context)=>Scaffold(
+    appBar:AppBar(title:const Text('Notifications'),actions:[IconButton(onPressed:load,icon:const Icon(Icons.refresh))]),
+    body:loading?const Center(child:CircularProgressIndicator()):RefreshIndicator(onRefresh:load,child:ListView(padding:const EdgeInsets.all(12),children:[
+      if(items.isEmpty)const Card(child:Padding(padding:EdgeInsets.all(28),child:Center(child:Text('No notifications yet.')))),
+      ...items.map((n){final unread=n['read_at']==null;return Card(child:ListTile(
+        leading:CircleAvatar(child:Icon(unread?Icons.notifications_active_outlined:Icons.notifications_none_outlined)),
+        title:Text((n['title']??'Unique Market').toString(),style:TextStyle(fontWeight:unread?FontWeight.w900:FontWeight.w600)),
+        subtitle:Text((n['message']??'').toString()+'\n'+(n['created_at']??'').toString(),maxLines:3),
+        onTap:()=>markRead(n['id'].toString()),
+      ));})
+    ])),
+  );
 }
 
 class RaiseComplaintPage extends StatefulWidget {
