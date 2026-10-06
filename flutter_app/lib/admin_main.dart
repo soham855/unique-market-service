@@ -63,7 +63,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
   final service=AdminService(Supabase.instance.client);
   Map<String,dynamic>? summary; List<Map<String,dynamic>> complaints=[]; List<Map<String,dynamic>> technicians=[]; int tab=0; bool loading=true;
   @override void initState(){super.initState();load();}
-  Future<void> load() async { try { final s=await service.summary(); final c=await service.complaints(); final t=await service.technicians(); if(mounted)setState(()=>{summary=s,complaints=c,technicians=t,loading=false}); } catch(e){if(mounted)setState(()=>loading=false);}}
+  Future<void> load() async { try { final s=await service.summary(); final c=await service.complaints(); final t=await service.technicians(); if(mounted)setState(() { summary=s; complaints=c; technicians=t; loading=false; }); } catch(e){if(mounted)setState(()=>loading=false);}}
   Future<void> logout() async {await Supabase.instance.client.auth.signOut();if(mounted)Navigator.pushAndRemoveUntil(context,MaterialPageRoute(builder:(_)=>const AdminLoginPage()),(_)=>false);}
   @override Widget build(BuildContext context)=>Scaffold(
     appBar:AppBar(title:const Text('Admin Dashboard',style:TextStyle(fontWeight:FontWeight.w800)),actions:[IconButton(onPressed:load,icon:const Icon(Icons.refresh)),PopupMenuButton<String>(onSelected:(v){if(v=='logout')logout();},itemBuilder:(_)=>const[PopupMenuItem(value:'logout',child:Text('Logout'))])]),
@@ -120,7 +120,7 @@ class _AdminComplaintSheetState extends State<AdminComplaintSheet>{
 
 class ComplaintsPage extends StatefulWidget { final AdminService service; const ComplaintsPage({super.key,required this.service}); @override State<ComplaintsPage> createState()=>_ComplaintsPageState(); }
 class _ComplaintsPageState extends State<ComplaintsPage>{String status='All';List<Map<String,dynamic>> rows=[];bool loading=true;final tabs=['All','New','Assigned','Scheduled','On The Way','Reached','In Service','Completed'];
- @override void initState(){super.initState();load();}Future<void>load()async{try{rows=await widget.service.complaints(status:status);if(mounted)setState(()=>loading=false);}catch(_){if(mounted)setState(()=>loading=false);}}
+ @override void initState(){super.initState();load();}Future<void>load()async{try{rows=await widget.service.complaints(status:status);final techs=await widget.service.technicians();if(mounted)setState(()=>{rows=rows; loading=false;});}catch(_){if(mounted)setState(()=>loading=false);}}
  @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const Text('Complaints')),body:Column(children:[SingleChildScrollView(scrollDirection:Axis.horizontal,padding:const EdgeInsets.all(12),child:Row(children:tabs.map((s)=>Padding(padding:const EdgeInsets.only(right:8),child:ChoiceChip(label:Text(s),selected:status==s,onSelected:(_){setState(()=>status=s);load();}))).toList())),Expanded(child:loading?const Center(child:CircularProgressIndicator()):RefreshIndicator(onRefresh:load,child:ListView(padding:const EdgeInsets.fromLTRB(12,0,12,18),children:rows.map((c)=>AdminComplaintTile(complaint:c,technicians:[],onChanged:load)).toList())))]));
 }
 
