@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -20,6 +21,8 @@ class PushNotificationService {
 
   Future<bool> initialize() async {
     try {
+      final prefs=await SharedPreferences.getInstance();
+      if (!(prefs.getBool('notifications') ?? true)) return false;
       if (Firebase.apps.isEmpty) await Firebase.initializeApp();
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
       final messaging = FirebaseMessaging.instance;
@@ -42,6 +45,16 @@ class PushNotificationService {
       'token': token,
       'platform': Platform.isAndroid ? 'android' : Platform.isIOS ? 'ios' : 'other',
     }, onConflict: 'user_id,token');
+  }
+
+  Future<void> setNotificationsEnabled(bool enabled) async {
+    final prefs=await SharedPreferences.getInstance();
+    await prefs.setBool('notifications', enabled);
+    if (enabled) {
+      await initialize();
+    } else {
+      await removeCurrentToken();
+    }
   }
 
   Future<void> removeCurrentToken() async {
