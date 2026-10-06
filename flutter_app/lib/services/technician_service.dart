@@ -15,7 +15,7 @@ class TechnicianService {
   Future<Map<String, dynamic>?> technician() async {
     final p = await profile();
     if (p == null) return null;
-    final mobile = p['mobile']?.toString();
+    final mobile = (p['phone'] ?? p['mobile'])?.toString();
     if (mobile == null || mobile.isEmpty) return null;
     final byMobile = await client.from('technicians').select().eq('mobile', mobile).maybeSingle();
     if (byMobile != null) return byMobile;
