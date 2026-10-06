@@ -120,7 +120,7 @@ class _AdminComplaintSheetState extends State<AdminComplaintSheet>{
 
 class ComplaintsPage extends StatefulWidget { final AdminService service; const ComplaintsPage({super.key,required this.service}); @override State<ComplaintsPage> createState()=>_ComplaintsPageState(); }
 class _ComplaintsPageState extends State<ComplaintsPage>{String status='All';List<Map<String,dynamic>> rows=[];bool loading=true;final tabs=['All','New','Assigned','Scheduled','On The Way','Reached','In Service','Completed'];
- @override void initState(){super.initState();load();}Future<void>load()async{try{rows=await widget.service.complaints(status:status);final techs=await widget.service.technicians();if(mounted)setState(()=>{rows=rows; loading=false;});}catch(_){if(mounted)setState(()=>loading=false);}}
+ @override void initState(){super.initState();load();}Future<void>load()async{try{rows=await widget.service.complaints(status:status);final techs=await widget.service.technicians();if(mounted)setState(() { loading=false; });}catch(_){if(mounted)setState(()=>loading=false);}}
  @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const Text('Complaints')),body:Column(children:[SingleChildScrollView(scrollDirection:Axis.horizontal,padding:const EdgeInsets.all(12),child:Row(children:tabs.map((s)=>Padding(padding:const EdgeInsets.only(right:8),child:ChoiceChip(label:Text(s),selected:status==s,onSelected:(_){setState(()=>status=s);load();}))).toList())),Expanded(child:loading?const Center(child:CircularProgressIndicator()):RefreshIndicator(onRefresh:load,child:ListView(padding:const EdgeInsets.fromLTRB(12,0,12,18),children:rows.map((c)=>AdminComplaintTile(complaint:c,technicians:[],onChanged:load)).toList())))]));
 }
 
