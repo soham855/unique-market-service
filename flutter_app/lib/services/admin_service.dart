@@ -59,13 +59,28 @@ class AdminService {
     await client.from('complaints').update(data).eq('id', complaintId);
   }
 
-  Future<List<Map<String,dynamic>>> customers() async {
-    final rows = await client.from('customers').select().order('created_at', ascending: false);
+  Future<List<Map<String,dynamic>>> reportComplaints() async {
+    final rows = await client.from('complaints').select('id,ticket_no,complaint_no,status,service_type,category,technician_id,created_at,completed_at');
     return List<Map<String,dynamic>>.from(rows);
   }
 
-  Future<List<Map<String,dynamic>>> payments() async {
-    final rows = await client.from('payments').select().order('created_at', ascending: false);
+  Future<List<Map<String,dynamic>>> reportPayments() async {
+    final rows = await client.from('payments').select('id,amount,payment_date,payment_status,status,mode,complaint_id,customer_id,created_at');
+    return List<Map<String,dynamic>>.from(rows);
+  }
+
+  Future<List<Map<String,dynamic>>> reportVisits() async {
+    final rows = await client.from('service_visits').select('id,complaint_id,technician_id,started_at,completed_at,created_at');
+    return List<Map<String,dynamic>>.from(rows);
+  }
+
+  Future<List<Map<String,dynamic>>> reportTechnicians() async {
+    final rows = await client.from('technicians').select('id,name,status');
+    return List<Map<String,dynamic>>.from(rows);
+  }
+
+  Future<List<Map<String,dynamic>>> customers() async {
+    final rows = await client.from('customers').select().order('created_at', ascending: false);
     return List<Map<String,dynamic>>.from(rows);
   }
 
