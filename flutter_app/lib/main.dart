@@ -31,12 +31,31 @@ class UniqueMarketApp extends StatelessWidget {
   );
 }
 
-class SessionGate extends StatelessWidget {
+class SessionGate extends StatefulWidget {
   const SessionGate({super.key});
-  @override
-  Widget build(BuildContext context) => Supabase.instance.client.auth.currentSession == null
-      ? const LoginPage()
-      : const CustomerHomePage();
+  @override State<SessionGate> createState()=>_SessionGateState();
+}
+class _SessionGateState extends State<SessionGate>{
+  bool loading=true, allowed=false;
+  @override void initState(){super.initState();check();}
+  Future<void> check()async{
+    final session=Supabase.instance.client.auth.currentSession;
+    if(session==null){if(mounted)setState(()=>loading=false);return;}
+    final prefs=await SharedPreferences.getInstance();
+    final remember=prefs.getBool('remember_me')??true;
+    final until=prefs.getInt('remember_until_ms');
+    if(!remember || (until!=null && DateTime.now().millisecondsSinceEpoch>until)){
+      await Supabase.instance.client.auth.signOut();
+      await prefs.remove('remember_until_ms');
+      if(mounted)setState(()=>loading=false);
+      return;
+    }
+    if(mounted)setState((){allowed=true;loading=false;});
+  }
+  @override Widget build(BuildContext context){
+    if(loading)return const Scaffold(body:Center(child:CircularProgressIndicator()));
+    return allowed?const CustomerHomePage():const LoginPage();
+  }
 }
 
 class LoginPage extends StatefulWidget {
@@ -78,6 +97,11 @@ class _LoginPageState extends State<LoginPage> {
       }
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('remember_me', remember);
+      if (remember) {
+        await prefs.setInt('remember_until_ms', DateTime.now().add(const Duration(days: 15)).millisecondsSinceEpoch);
+      } else {
+        await prefs.remove('remember_until_ms');
+      }
       if (mounted) Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const CustomerHomePage()), (_) => false);
     } catch (e) {
       setState(() => busy = false);
@@ -150,6 +174,8 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   }
   Future<void> logout() async {
     await Supabase.instance.client.auth.signOut();
+    final prefs=await SharedPreferences.getInstance();
+    await prefs.remove('remember_until_ms');
     if (mounted) Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const LoginPage()), (_) => false);
   }
 
