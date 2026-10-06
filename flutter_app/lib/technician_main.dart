@@ -239,7 +239,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
         if (i == 0) { setState(() => tab = 0); return; }
         if (i == 1) {
           setState(() => tab = 1);
-          await Navigator.push(context, MaterialPageRoute(builder: (_) => TechnicianHistoryPage(service: service)));
+          await Navigator.push(context, MaterialPageRoute(builder: (_) => TechnicianJobsPage(service: service)));
           if (mounted) { setState(() => tab = 0); load(); }
           return;
         }
@@ -265,6 +265,85 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
   Widget _metric(String title, String value, IconData icon) => Card(child: Padding(padding: const EdgeInsets.all(14), child: Column(children: [Icon(icon, color: const Color(0xFF0B63F6)), const SizedBox(height: 7), Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)), Text(title, style: const TextStyle(color: Colors.black54))])));
 }
 
+
+class TechnicianJobsPage extends StatefulWidget {
+  final TechnicianService service;
+  const TechnicianJobsPage({super.key, required this.service});
+  @override State<TechnicianJobsPage> createState() => _TechnicianJobsPageState();
+}
+
+class _TechnicianJobsPageState extends State<TechnicianJobsPage> {
+  List<Map<String,dynamic>> jobs = [];
+  bool loading = true;
+  String filter = 'All';
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    load();
+    _timer = Timer.periodic(const Duration(seconds: 10), (_) => load());
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> load() async {
+    try {
+      jobs = await widget.service.jobs();
+    } catch (_) {}
+    if (mounted) setState(() => loading = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final visible = filter == 'All'
+        ? jobs
+        : jobs.where((j) => (j['status'] ?? '').toString() == filter).toList();
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('My Jobs', style: TextStyle(fontWeight: FontWeight.w800)),
+        actions: [IconButton(onPressed: load, icon: const Icon(Icons.refresh))],
+      ),
+      body: loading
+          ? const Center(child: CircularProgressIndicator())
+          : RefreshIndicator(
+              onRefresh: load,
+              child: ListView(
+                padding: const EdgeInsets.all(14),
+                children: [
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: ['All', 'New', 'Assigned', 'Scheduled', 'On The Way', 'Reached', 'In Service', 'Completed']
+                          .map((s) => Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: ChoiceChip(
+                                  label: Text(s),
+                                  selected: filter == s,
+                                  onSelected: (_) => setState(() => filter = s),
+                                ),
+                              ))
+                          .toList(),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  if (visible.isEmpty)
+                    const Card(child: Padding(
+                      padding: EdgeInsets.all(28),
+                      child: Center(child: Text('No jobs in this status.')),
+                    )),
+                  ...visible.map((j) => JobCard(job: j, onChanged: load)),
+                ],
+              ),
+            ),
+    );
+  }
+}
 
 class TechnicianHistoryPage extends StatefulWidget {
   final TechnicianService service;
