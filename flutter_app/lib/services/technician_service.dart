@@ -57,13 +57,32 @@ class TechnicianService {
     if (status == 'Assigned') data['assigned_at'] = DateTime.now().toUtc().toIso8601String();
     if (status == 'In Service') data['started_at'] = DateTime.now().toUtc().toIso8601String();
     if (status == 'Completed') data['completed_at'] = DateTime.now().toUtc().toIso8601String();
-    await client.from('complaints').update(data).eq('id', complaintId).eq('technician_id', user.id);
+    final updated = await client.from('complaints').update(data).eq('id', complaintId).eq('technician_id', user.id).select('id,ticket_no,customer_id,status').maybeSingle();
+    if (updated != null && updated['customer_id'] != null) {
+      final customer = await client.from('customers').select('profile_id').eq('id', updated['customer_id']).maybeSingle();
+      final profileId = customer?['profile_id']?.toString();
+      if (profileId != null && profileId.isNotEmpty) {
+        await client.from('notifications').insert({
+          'user_id': profileId, 'complaint_id': complaintId,
+          'title': 'Service Update',
+          'message': 'Ticket ' + (updated['ticket_no'] ?? complaintId).toString() + ' status: ' + status + '.',
+          'type': 'complaint_update',
+        });
+      }
+    }
   }
 
   Future<void> acceptJob(String complaintId) async {
     final user = client.auth.currentUser;
     if (user == null) throw Exception('Technician session expired.');
-    await client.from('complaints').update({'technician_id': user.id, 'status': 'Assigned', 'assigned_at': DateTime.now().toUtc().toIso8601String()}).eq('id', complaintId);
+    final updated = await client.from('complaints').update({'technician_id': user.id, 'status': 'Assigned', 'assigned_at': DateTime.now().toUtc().toIso8601String()}).eq('id', complaintId).select('id,ticket_no,customer_id').maybeSingle();
+    if (updated != null && updated['customer_id'] != null) {
+      final customer = await client.from('customers').select('profile_id').eq('id', updated['customer_id']).maybeSingle();
+      final profileId = customer?['profile_id']?.toString();
+      if (profileId != null && profileId.isNotEmpty) {
+        await client.from('notifications').insert({'user_id': profileId,'complaint_id': complaintId,'title':'Job Accepted','message':'Ticket ' + (updated['ticket_no'] ?? complaintId).toString() + ' has been accepted by the technician.','type':'complaint_update'});
+      }
+    }
   }
 
   Future<Map<String, dynamic>> startVisit(String complaintId, {String? diagnosis}) async {
