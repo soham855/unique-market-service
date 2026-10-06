@@ -21,7 +21,7 @@ class AdminService {
       final amount = double.tryParse((p['amount'] ?? 0).toString()) ?? 0;
       final state = (p['payment_status'] ?? p['status'] ?? '').toString().toLowerCase();
       if (state == 'approved' || state == 'paid' || state == 'completed') collected += amount;
-      else pending += amount;
+      else if (state == 'pending') pending += amount;
     }
     return {
       'total': complaints.length,
@@ -111,6 +111,20 @@ class AdminService {
     var q = client.from('payments').select('id,amount,payment_date,payment_status,status,mode,reference_no,complaint_id,customer_id,created_at').order('created_at', ascending: false);
     if (status != null && status != 'All') q = q.eq('payment_status', status);
     final rows = await q;
-    return List<Map<String,dynamic>>.from(rows);
+    final result = List<Map<String,dynamic>>.from(rows);
+    for (final p in result) {
+      final complaintId = p['complaint_id'];
+      if (complaintId != null) {
+        final complaint = await client.from('complaints').select('ticket_no,customer_name').eq('id', complaintId).maybeSingle();
+        p['ticket_no'] = complaint?['ticket_no'];
+        p['customer_name'] = complaint?['customer_name'];
+      }
+      final customerId = p['customer_id'];
+      if (customerId != null && p['customer_name'] == null) {
+        final customer = await client.from('customers').select('name').eq('id', customerId).maybeSingle();
+        p['customer_name'] = customer?['name'];
+      }
+    }
+    return result;
   }
 }
