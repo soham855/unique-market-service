@@ -66,6 +66,13 @@ class CustomerService {
     final result = await client.from('complaints').insert(payload).select().single();
     return Map<String, dynamic>.from(result);
   }
+  Future<Map<String, dynamic>?> complaint(String complaintId) async {
+    final customer = await this.customer();
+    if (customer == null) return null;
+    final row = await client.from('complaints').select().eq('id', complaintId).eq('customer_id', customer['id']).maybeSingle();
+    return row == null ? null : Map<String, dynamic>.from(row);
+  }
+
   Future<Map<String, dynamic>?> visitForComplaint(String complaintId) async {
     final rows = await client.from('service_visits').select().eq('complaint_id', complaintId).order('created_at', ascending: false).limit(1);
     if (rows.isEmpty) return null;
