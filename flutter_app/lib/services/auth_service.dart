@@ -1,22 +1,19 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AuthService {
-  final SupabaseClient _client;
+  final SupabaseClient client;
+  AuthService(this.client);
 
-  AuthService(this._client);
+  Future<void> sendOtp(String phone) => client.auth.signInWithOtp(phone: phone.trim());
 
-  Future<AuthResponse> signIn({required String email, required String password}) {
-    return _client.auth.signInWithPassword(email: email.trim(), password: password);
+  Future<AuthResponse> verifyOtp({required String phone, required String token}) {
+    return client.auth.verifyOTP(phone: phone.trim(), token: token.trim(), type: OtpType.sms);
   }
 
-  Future<void> signOut() => _client.auth.signOut();
+  Future<void> signOut() => client.auth.signOut();
 
   Future<String?> resolveRole(String userId) async {
-    final row = await _client
-        .from('profiles')
-        .select('role')
-        .eq('id', userId)
-        .maybeSingle();
+    final row = await client.from('profiles').select('role').eq('id', userId).maybeSingle();
     return row?['role']?.toString().toLowerCase();
   }
 }
