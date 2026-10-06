@@ -174,7 +174,7 @@ class _TechnicianSchedulePageState extends State<TechnicianSchedulePage>{
     final ad=DateTime.tryParse(a['scheduled_visit_at']?.toString()??'')??DateTime(2099);
     final bd=DateTime.tryParse(b['scheduled_visit_at']?.toString()??'')??DateTime(2099);
     return ad.compareTo(bd);
-  });if(mounted)setState(()=>jobs=all..loading=false);}catch(_){if(mounted)setState(()=>loading=false);}}
+  });if(mounted)setState(()=>{jobs=all;loading=false;});}catch(_){if(mounted)setState(()=>loading=false);}}
   @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const Text('Schedule'),actions:[IconButton(onPressed:load,icon:const Icon(Icons.refresh))]),body:loading?const Center(child:CircularProgressIndicator()):RefreshIndicator(onRefresh:load,child:ListView(padding:const EdgeInsets.all(14),children:[
     if(jobs.isEmpty)const Card(child:Padding(padding:EdgeInsets.all(24),child:Text('No scheduled visits.'))),
     ...jobs.map((j)=>Card(child:ListTile(
