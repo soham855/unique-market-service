@@ -91,7 +91,19 @@ class AdminService {
   }
 
   Future<void> updatePayment(String id, String status) async {
+    final payment = await client.from('payments').select('id,amount,complaint_id,customer_id').eq('id', id).single();
     await client.from('payments').update({'status': status, 'payment_status': status}).eq('id', id);
+    final customer = await client.from('customers').select('profile_id').eq('id', payment['customer_id']).maybeSingle();
+    final profileId = customer?['profile_id']?.toString();
+    if (profileId != null && profileId.isNotEmpty) {
+      final approved = status.toLowerCase() == 'approved';
+      await client.from('notifications').insert({
+        'user_id': profileId, 'complaint_id': payment['complaint_id'],
+        'title': approved ? 'Payment Approved' : 'Payment Rejected',
+        'message': approved ? 'Your payment of ₹' + (payment['amount'] ?? 0).toString() + ' has been approved.' : 'Your payment of ₹' + (payment['amount'] ?? 0).toString() + ' was rejected. Please contact Unique Market.',
+        'type': 'payment_update',
+      });
+    }
   }
 
   Future<List<Map<String,dynamic>>> payments({String? status}) async {
