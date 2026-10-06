@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'config/supabase_config.dart';
 import 'services/auth_service.dart';
 import 'services/technician_service.dart';
@@ -179,7 +180,30 @@ class _TechnicianJobDetailsPageState extends State<TechnicianJobDetailsPage> {
   final work = TextEditingController();
   final parts = TextEditingController();
   bool busy = false;
+  double? distanceMeters;
 
+  Future<void> openNavigation() async {
+    final lat = widget.job['latitude']?.toString();
+    final lon = widget.job['longitude']?.toString();
+    final address = widget.job['address']?.toString() ?? widget.job['location_text']?.toString() ?? '';
+    final uri = (lat != null && lon != null && lat.isNotEmpty && lon.isNotEmpty)
+        ? Uri.parse('https://www.google.com/maps/dir/?api=1&destination=' + lat + ',' + lon)
+        : Uri.parse('https://www.google.com/maps/search/?api=1&query=' + Uri.encodeComponent(address));
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication) && mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not open Maps.')));
+  }
+
+  Future<void> verifyReached() async {
+    setState(() => busy = true);
+    try {
+      final d = await service.verifyCustomerLocation(widget.job);
+      if (mounted) setState(() => distanceMeters = d);
+      await action('Reached');
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
   Future<void> action(String status) async {
     setState(() => busy = true);
     try {
@@ -204,9 +228,14 @@ class _TechnicianJobDetailsPageState extends State<TechnicianJobDetailsPage> {
         const SizedBox(height: 10), _row('Customer', j['customer_name']), _row('Mobile', j['customer_phone']), _row('Service', j['service_type']), _row('Problem', j['category']), _row('Address', j['address'] ?? j['location_text']), _row('Visit', j['scheduled_visit_at'] ?? j['scheduled_visit_date']),
       ]))),
       const SizedBox(height: 12),
+      if (distanceMeters != null) Card(child: ListTile(leading: const Icon(Icons.gps_fixed), title: const Text('GPS Verified'), subtitle: Text(distanceMeters!.toStringAsFixed(0) + ' m from customer location'))),
       if (status == 'New') _button('ACCEPT JOB', Icons.check, 'Assigned')
       else if (status == 'Assigned' || status == 'Scheduled') _button("I'M ON THE WAY", Icons.navigation_outlined, 'On The Way')
-      else if (status == 'On The Way') _button('REACHED CUSTOMER', Icons.location_on_outlined, 'Reached')
+      else if (status == 'On The Way') ...[
+        OutlinedButton.icon(onPressed: busy ? null : openNavigation, icon: const Icon(Icons.map_outlined), label: const Text('NAVIGATE TO CUSTOMER')),
+        const SizedBox(height: 10),
+        _button('VERIFY LOCATION & REACH', Icons.location_on_outlined, 'Reached')
+      ]
       else if (status == 'Reached') ...[
         TextField(controller: diagnosis, maxLines: 3, decoration: const InputDecoration(labelText: 'Diagnosis')),
         const SizedBox(height: 12), _button('START SERVICE', Icons.play_arrow_outlined, 'In Service')
@@ -218,6 +247,6 @@ class _TechnicianJobDetailsPageState extends State<TechnicianJobDetailsPage> {
     ]));
   }
 
-  Widget _button(String label, IconData icon, String status) => SizedBox(height: 54, child: FilledButton.icon(onPressed: busy ? null : () => action(status), icon: Icon(icon), label: Text(label)));
+  Widget _button(String label, IconData icon, String status) => SizedBox(height: 54, child: FilledButton.icon(onPressed: busy ? null : (status == 'Reached' ? verifyReached : () => action(status)), icon: Icon(icon), label: Text(label)));
   Widget _row(String label, dynamic value) => Padding(padding: const EdgeInsets.only(bottom: 10), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [SizedBox(width: 95, child: Text(label, style: const TextStyle(color: Colors.black54))), Expanded(child: Text(value?.toString() ?? '-', style: const TextStyle(fontWeight: FontWeight.w600)))]));
 }
