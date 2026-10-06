@@ -5,6 +5,8 @@ import 'package:geolocator/geolocator.dart';
 import 'config/supabase_config.dart';
 import 'services/auth_service.dart';
 import 'services/customer_service.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -448,4 +450,63 @@ class _PaymentPageState extends State<PaymentPage> {
       SizedBox(height: 54, child: FilledButton(onPressed: busy ? null : submit, child: busy ? const CircularProgressIndicator(color: Colors.white) : const Text('SUBMIT PAYMENT'))),
     ]),
   );
+}
+
+class InvoicePage extends StatelessWidget {
+  final Map<String,dynamic> complaint;
+  final List<Map<String,dynamic>> payments;
+  const InvoicePage({super.key, required this.complaint, required this.payments});
+  double get paid => payments.fold(0.0, (sum, p) => sum + (double.tryParse((p['amount'] ?? 0).toString()) ?? 0));
+  Future<void> printInvoice() async {
+    final t=complaint; final doc=pw.Document();
+    doc.addPage(pw.Page(build:(_)=>pw.Padding(padding:const pw.EdgeInsets.all(24),child:pw.Column(crossAxisAlignment:pw.CrossAxisAlignment.start,children:[
+      pw.Text('UNIQUE MARKET',style:pw.TextStyle(fontSize:24,fontWeight:pw.FontWeight.bold)),pw.Text('CCTV | IT Security | Service & AMC'),
+      pw.Text('Station Road, Hotel Rajdoot, Ichalkaranji | 7350060071'),pw.Divider(),
+      pw.Text('SERVICE INVOICE',style:pw.TextStyle(fontSize:18,fontWeight:pw.FontWeight.bold)),
+      pw.Text('Ticket: '+(t['ticket_no']??t['complaint_no']??'-').toString()),pw.Text('Service: '+(t['service_type']??'-').toString()),
+      pw.Text('Problem: '+(t['category']??'-').toString()),pw.Text('Customer: '+(t['customer_name']??'-').toString()),
+      pw.Text('Address: '+(t['address']??'-').toString()),pw.SizedBox(height:18),
+      pw.Text('Amount Paid: Rs. '+paid.toStringAsFixed(2),style:pw.TextStyle(fontSize:16,fontWeight:pw.FontWeight.bold)),
+      pw.SizedBox(height:28),pw.Text('Thank you for choosing Unique Market.')
+    ])));
+    await Printing.layoutPdf(onLayout:(_)=>doc.save());
+  }
+  @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const Text('Invoice')),body:ListView(padding:const EdgeInsets.all(18),children:[
+    Card(child:Padding(padding:const EdgeInsets.all(20),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+      const Text('UNIQUE MARKET',style:TextStyle(fontSize:25,fontWeight:FontWeight.w900)),const Text('SERVICE INVOICE',style:TextStyle(fontWeight:FontWeight.w700)),const Divider(height:28),
+      Text('Ticket: '+(complaint['ticket_no']??complaint['complaint_no']??'-').toString()),Text('Service: '+(complaint['service_type']??'-').toString()),
+      Text('Problem: '+(complaint['category']??'-').toString()),Text('Amount Paid: ₹'+paid.toStringAsFixed(2),style:const TextStyle(fontSize:18,fontWeight:FontWeight.w900)),
+      const SizedBox(height:18),const Text('Station Road, Hotel Rajdoot, Ichalkaranji'),const Text('7350060071')
+    ]))),const SizedBox(height:16),FilledButton.icon(onPressed:printInvoice,icon:const Icon(Icons.picture_as_pdf_outlined),label:const Text('VIEW / PRINT PDF'))
+  ]));
+}
+
+class ProfilePage extends StatefulWidget { const ProfilePage({super.key}); @override State<ProfilePage> createState()=>_ProfilePageState(); }
+class _ProfilePageState extends State<ProfilePage>{
+  final service=CustomerService(Supabase.instance.client); Map<String,dynamic>? customer;
+  @override void initState(){super.initState();load();} Future<void> load()async{final c=await service.customer();if(mounted)setState(()=>customer=c);}
+  @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const Text('Profile')),body:ListView(padding:const EdgeInsets.all(18),children:[
+    const CircleAvatar(radius:42,child:Icon(Icons.person_outline,size:42)),const SizedBox(height:14),
+    Center(child:Text(customer?['name']?.toString()??'Customer',style:const TextStyle(fontSize:23,fontWeight:FontWeight.w900))),
+    Center(child:Text(customer?['customer_code']?.toString()??'',style:const TextStyle(color:Colors.black54))),const SizedBox(height:24),
+    Card(child:Column(children:[
+      ListTile(leading:const Icon(Icons.phone_outlined),title:const Text('Mobile'),subtitle:Text(customer?['mobile']?.toString()??'-')),
+      ListTile(leading:const Icon(Icons.business_outlined),title:const Text('Company'),subtitle:Text(customer?['company_name']?.toString()??'-')),
+      ListTile(leading:const Icon(Icons.location_on_outlined),title:const Text('Address'),subtitle:Text(customer?['address']?.toString()??'-'))
+    ])),const SizedBox(height:12),
+    ListTile(leading:const Icon(Icons.settings_outlined),title:const Text('Settings'),onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const SettingsPage())))
+  ]));
+}
+class SettingsPage extends StatefulWidget { const SettingsPage({super.key}); @override State<SettingsPage> createState()=>_SettingsPageState(); }
+class _SettingsPageState extends State<SettingsPage>{
+  bool remember=true,notifications=true;String language='English';
+  @override void initState(){super.initState();load();} Future<void> load()async{final p=await SharedPreferences.getInstance();if(mounted)setState((){remember=p.getBool('remember_me')??true;language=p.getString('language')??'English';notifications=p.getBool('notifications')??true;});}
+  Future<void> save(String k,dynamic v)async{final p=await SharedPreferences.getInstance();if(v is bool)await p.setBool(k,v);if(v is String)await p.setString(k,v);}
+  @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const Text('Settings')),body:ListView(children:[
+    SwitchListTile(title:const Text('Remember Me'),subtitle:const Text('Keep me signed in for 15 days'),value:remember,onChanged:(v){setState(()=>remember=v);save('remember_me',v);}),
+    SwitchListTile(title:const Text('Notifications'),subtitle:const Text('Service and payment updates'),value:notifications,onChanged:(v){setState(()=>notifications=v);save('notifications',v);}),
+    ListTile(title:const Text('Language'),subtitle:Text(language),onTap:()async{final v=await showDialog<String>(context:context,builder:(_)=>SimpleDialog(title:const Text('Language'),children:[SimpleDialogOption(onPressed:()=>Navigator.pop(context,'English'),child:const Text('English')),SimpleDialogOption(onPressed:()=>Navigator.pop(context,'Marathi'),child:const Text('Marathi'))]));if(v!=null){setState(()=>language=v);save('language',v);}}),
+    const Divider(),ListTile(leading:const Icon(Icons.phone_outlined),title:const Text('Call Unique Market'),subtitle:const Text('7350060071')),
+    ListTile(leading:const Icon(Icons.logout_outlined),title:const Text('Logout'),onTap:()async{await Supabase.instance.client.auth.signOut();if(context.mounted)Navigator.pushAndRemoveUntil(context,MaterialPageRoute(builder:(_)=>const LoginPage()),(_)=>false);})
+  ]));
 }
