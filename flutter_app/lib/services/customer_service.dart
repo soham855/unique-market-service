@@ -76,7 +76,16 @@ class CustomerService {
   Future<Map<String, dynamic>?> visitForComplaint(String complaintId) async {
     final rows = await client.from('service_visits').select().eq('complaint_id', complaintId).order('created_at', ascending: false).limit(1);
     if (rows.isEmpty) return null;
-    return Map<String, dynamic>.from(rows.first);
+    final visit = Map<String, dynamic>.from(rows.first);
+    final technicianId = visit['technician_id']?.toString();
+    if (technicianId != null && technicianId.isNotEmpty) {
+      final tech = await client.from('technicians').select('name,mobile').eq('id', technicianId).maybeSingle();
+      if (tech != null) {
+        visit['technician_name'] = tech['name'];
+        visit['technician_mobile'] = tech['mobile'];
+      }
+    }
+    return visit;
   }
 
   Future<List<Map<String, dynamic>>> paymentsForComplaint(String complaintId) async {
