@@ -257,7 +257,7 @@ class AmcContractsPage extends StatefulWidget {
   @override State<AmcContractsPage> createState()=>_AmcContractsPageState();
 }
 class _AmcContractsPageState extends State<AmcContractsPage>{
-  final service=CustomerService(); List<Map<String,dynamic>> items=[]; bool loading=true; Timer? timer;
+  final service=CustomerService(Supabase.instance.client); List<Map<String,dynamic>> items=[]; bool loading=true; Timer? timer;
   @override void initState(){super.initState();load();timer=Timer.periodic(const Duration(seconds:10),(_)=>load());}
   @override void dispose(){timer?.cancel();super.dispose();}
   Future<void> load()async{try{items=await service.amcContracts();}catch(_){items=[];}if(mounted)setState(()=>loading=false);}
@@ -541,10 +541,6 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
               const SizedBox(height: 12),
               ServiceReviewCard(service: service, complaintId: widget.ticket['id'].toString()),
             ],
-            if (status == 'Completed') ...[
-              const SizedBox(height: 12),
-              ServiceReviewCard(service: service, complaintId: t['id'].toString()),
-            ],
             const SizedBox(height: 12),
             if (status == 'Completed') _sectionCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               const Text('Invoice', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
@@ -616,7 +612,7 @@ class _ServiceReviewCardState extends State<ServiceReviewCard>{
     const SizedBox(height:10),SizedBox(width:double.infinity,child:FilledButton.icon(onPressed:saving?null:save,icon:saving?const SizedBox(width:18,height:18,child:CircularProgressIndicator(strokeWidth:2)):const Icon(Icons.send_outlined),label:Text(rating>0?'SAVE REVIEW':'SELECT A RATING'))),
   ])));
 }
-class PaymentPage extends StatefulWidclass CustomerPaymentsPage extends StatefulWidget {
+class CustomerPaymentsPage extends StatefulWidget {
   const CustomerPaymentsPage({super.key});
   @override State<CustomerPaymentsPage> createState()=>_CustomerPaymentsPageState();
 }
@@ -643,7 +639,7 @@ class _CustomerPaymentsPageState extends State<CustomerPaymentsPage>{
     ));})
   ])));
 }
-get {
+class PaymentPage extends StatefulWidget {
   final Map<String,dynamic> complaint;
   const PaymentPage({super.key, required this.complaint});
   @override State<PaymentPage> createState() => _PaymentPageState();
