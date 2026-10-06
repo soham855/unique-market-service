@@ -91,7 +91,24 @@ class AdminService {
   }
 
   Future<void> updateAmcRenewalRequest(String id, String status) async {
+    final request = await client.from('amc_renewal_requests').select('id,customer_id,amc_contract_id').eq('id', id).single();
     await client.from('amc_renewal_requests').update({'status': status}).eq('id', id);
+    final customer = await client.from('customers').select('profile_id').eq('id', request['customer_id']).maybeSingle();
+    final profileId = customer?['profile_id']?.toString();
+    if (profileId != null && profileId.isNotEmpty) {
+      final s = status.toLowerCase();
+      String title = 'AMC Renewal Update';
+      String message = 'Your AMC renewal request status is ' + s + '.';
+      if (s == 'contacted') message = 'Our team has received your AMC renewal request and will contact you.';
+      if (s == 'approved') message = 'Your AMC renewal request has been approved. Our team will contact you for the renewal details.';
+      if (s == 'rejected') message = 'Your AMC renewal request was rejected. Please contact Unique Market for assistance.';
+      await client.from('notifications').insert({
+        'user_id': profileId,
+        'title': title,
+        'message': message,
+        'type': 'amc_renewal',
+      });
+    }
   }
 
   Future<List<Map<String,dynamic>>> customers() async {
