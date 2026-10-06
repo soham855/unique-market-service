@@ -47,6 +47,8 @@ jobs:
         run: |
           MANIFEST=android/app/src/main/AndroidManifest.xml
           grep -q 'android.permission.POST_NOTIFICATIONS' "$MANIFEST" || sed -i '/<manifest[^>]*>/a\\    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>' "$MANIFEST"
+          grep -q 'android.permission.ACCESS_FINE_LOCATION' "$MANIFEST" || sed -i '/<manifest[^>]*>/a\\    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>' "$MANIFEST"
+          grep -q 'android.permission.ACCESS_COARSE_LOCATION' "$MANIFEST" || sed -i '/<manifest[^>]*>/a\\    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>' "$MANIFEST"
 
       - name: Configure Google Services plugin
         run: |
