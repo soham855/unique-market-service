@@ -125,4 +125,28 @@ class CustomerService {
     return rows.isEmpty ? null : Map<String, dynamic>.from(rows.first);
   }
 
+  Future<Map<String,dynamic>?> reviewForComplaint(String complaintId) async {
+    final customer = await this.customer();
+    if (customer == null) return null;
+    final row = await client.from('service_reviews').select().eq('complaint_id', complaintId).eq('customer_id', customer['id']).maybeSingle();
+    return row == null ? null : Map<String,dynamic>.from(row);
+  }
+
+  Future<Map<String,dynamic>> saveReview({
+    required String complaintId,
+    required int rating,
+    String? feedback,
+  }) async {
+    final customer = await this.customer();
+    if (customer == null) throw Exception('Customer profile not found');
+    final payload = <String,dynamic>{
+      'complaint_id': complaintId,
+      'customer_id': customer['id'],
+      'rating': rating,
+      'feedback': feedback?.trim().isEmpty == true ? null : feedback?.trim(),
+    };
+    final row = await client.from('service_reviews').upsert(payload, onConflict: 'complaint_id,customer_id').select().single();
+    return Map<String,dynamic>.from(row);
+  }
+
 }
