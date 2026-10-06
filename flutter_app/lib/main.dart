@@ -428,6 +428,10 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
                 if (status == 'Completed') const ListTile(contentPadding: EdgeInsets.zero, leading: Icon(Icons.check_circle, color: Colors.green), title: Text('Service Completed')),
               ])),
             ],
+            if (status == 'Completed') ...[
+              const SizedBox(height: 12),
+              ServiceReviewCard(service: service, complaintId: widget.ticket['id'].toString()),
+            ],
             const SizedBox(height: 12),
             if (status == 'Completed') _sectionCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               const Text('Invoice', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
@@ -470,6 +474,25 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
   void _whatsapp(BuildContext context) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('WhatsApp: 7350060071'))); }
 }
 
+class ServiceReviewCard extends StatefulWidget {
+  final CustomerService service; final String complaintId;
+  const ServiceReviewCard({super.key,required this.service,required this.complaintId});
+  @override State<ServiceReviewCard> createState()=>_ServiceReviewCardState();
+}
+class _ServiceReviewCardState extends State<ServiceReviewCard>{
+  int rating=0; final feedback=TextEditingController(); bool loading=true,saving=false;
+  @override void initState(){super.initState();load();}
+  @override void dispose(){feedback.dispose();super.dispose();}
+  Future<void>load()async{try{final r=await widget.service.reviewForComplaint(widget.complaintId);if(r!=null&&mounted){setState(()=>{rating=(r['rating'] as num).toInt(),feedback.text=(r['feedback']??'').toString(),loading=false});}else if(mounted)setState(()=>loading=false);}catch(_){if(mounted)setState(()=>loading=false);}}
+  Future<void>save()async{if(rating<1)return;setState(()=>saving=true);try{await widget.service.saveReview(complaintId:widget.complaintId,rating:rating,feedback:feedback.text);if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Thank you for your feedback.')));}catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('Could not save feedback: $e')));}finally{if(mounted)setState(()=>saving=false);}}
+  @override Widget build(BuildContext context)=>Card(child:Padding(padding:const EdgeInsets.all(18),child:loading?const Center(child:CircularProgressIndicator()):Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+    const Text('Service Review',style:TextStyle(fontSize:18,fontWeight:FontWeight.w800)),
+    const SizedBox(height:6),Text(rating>0?'Thank you for rating our service.':'How was your service experience?',style:const TextStyle(color:Colors.black54)),
+    const SizedBox(height:10),Row(mainAxisAlignment:MainAxisAlignment.center,children:List.generate(5,(i)=>IconButton(onPressed:()=>setState(()=>rating=i+1),icon:Icon(i<rating?Icons.star:Icons.star_border,size:32),tooltip:'${i+1} star'))),
+    TextField(controller:feedback,maxLines:3,decoration:const InputDecoration(labelText:'Feedback (optional)',hintText:'Tell us what we can improve')),
+    const SizedBox(height:10),SizedBox(width:double.infinity,child:FilledButton.icon(onPressed:saving?null:save,icon:saving?const SizedBox(width:18,height:18,child:CircularProgressIndicator(strokeWidth:2)):const Icon(Icons.send_outlined),label:Text(rating>0?'SAVE REVIEW':'SELECT A RATING'))),
+  ])));
+}
 class PaymentPage extends StatefulWidget {
   final Map<String,dynamic> complaint;
   const PaymentPage({super.key, required this.complaint});
