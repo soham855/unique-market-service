@@ -463,92 +463,58 @@ class PaymentPage extends StatefulWidget {
   const PaymentPage({super.key, required this.complaint});
   @override State<PaymentPage> createState() => _PaymentPageState();
 }
-
 class _PaymentPageState extends State<PaymentPage> {
-  final amount = TextEditingController();
-  final utr = TextEditingController();
-  String mode = 'UPI';
-  bool busy = false;
-
-  Future<void> submit() async {
-    final value = double.tryParse(amount.text.trim());
-    if (value == null || value <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a valid amount.')));
-      return;
-    }
-    if (mode == 'UPI' && utr.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter UTR / reference number after payment.')));
-      return;
-    }
-    setState(() => busy = true);
-    try {
-      await CustomerService(Supabase.instance.client).recordPayment(
-        complaintId: widget.complaint['id'].toString(),
-        amount: value,
-        mode: mode,
-        referenceNo: utr.text.trim().isEmpty ? null : utr.text.trim(),
-      );
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Payment submitted for verification.')));
-      Navigator.pop(context);
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
-    } finally { if (mounted) setState(() => busy = false); }
+  final amount=TextEditingController(), utr=TextEditingController();
+  String mode='UPI'; bool busy=false,loading=true; Map<String,dynamic>? report; List<Map<String,dynamic>> payments=[];
+  double _num(dynamic v)=>double.tryParse((v??0).toString())??0;
+  double get serviceTotal=>_num(report?['labour_amount'])+_num(report?['other_amount']);
+  double get approvedPaid=>payments.fold(0.0,(s,p){final st=(p['payment_status']??p['status']??'').toString().toLowerCase();return s+(['approved','paid','completed'].contains(st)?_num(p['amount']):0);});
+  double get due=>(serviceTotal-approvedPaid).clamp(0,double.infinity);
+  @override void initState(){super.initState();load();}
+  Future<void> load()async{try{final id=widget.complaint['id'].toString();final svc=CustomerService(Supabase.instance.client);report=await svc.serviceReport(id);payments=await svc.paymentsForComplaint(id);if(amount.text.trim().isEmpty&&due>0)amount.text=due.toStringAsFixed(2);}catch(_){}if(mounted)setState(()=>loading=false);}
+  Future<void> submit()async{
+    final value=double.tryParse(amount.text.trim());
+    if(value==null||value<=0){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Enter a valid amount.')));return;}
+    if(serviceTotal>0&&value>due+0.01){ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('Maximum payable balance is ₹${due.toStringAsFixed(2)}.')));return;}
+    if(mode=='UPI'&&utr.text.trim().isEmpty){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Enter UTR / reference number after payment.')));return;}
+    setState(()=>busy=true);try{await CustomerService(Supabase.instance.client).recordPayment(complaintId:widget.complaint['id'].toString(),amount:value,mode:mode,referenceNo:utr.text.trim().isEmpty?null:utr.text.trim());if(!mounted)return;ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Payment submitted. Admin verification is pending.')));Navigator.pop(context);}catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(e.toString())));}finally{if(mounted)setState(()=>busy=false);}
   }
-
-  @override Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Payment')),
-    body: ListView(padding: const EdgeInsets.all(18), children: [
-      const Text('Service Payment', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900)),
-      const SizedBox(height: 6),
-      Text('Ticket: ' + (widget.complaint['ticket_no'] ?? widget.complaint['complaint_no'] ?? '-').toString(), style: const TextStyle(color: Colors.black54)),
-      const SizedBox(height: 20),
-      TextField(controller: amount, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Amount', prefixText: '₹ ')),
-      const SizedBox(height: 16),
-      const Text('Payment Mode', style: TextStyle(fontWeight: FontWeight.w700)),
-      const SizedBox(height: 8),
-      Wrap(spacing: 8, children: ['UPI','Cash'].map((m) => ChoiceChip(label: Text(m), selected: mode == m, onSelected: (_) => setState(() => mode = m)).toList()),
-      if (mode == 'UPI') ...[
-        const SizedBox(height: 16),
-        const Card(child: Padding(padding: EdgeInsets.all(16), child: Text('Pay using your UPI app, then enter the UTR / reference number below.'))),
-        const SizedBox(height: 12),
-        TextField(controller: utr, decoration: const InputDecoration(labelText: 'UTR / Reference Number')),
-      ],
-      const SizedBox(height: 24),
-      SizedBox(height: 54, child: FilledButton(onPressed: busy ? null : submit, child: busy ? const CircularProgressIndicator(color: Colors.white) : const Text('SUBMIT PAYMENT'))),
-    ]),
-  );
-}
-
-class InvoicePage extends StatelessWidget {
-  final Map<String,dynamic> complaint;
-  final List<Map<String,dynamic>> payments;
-  const InvoicePage({super.key, required this.complaint, required this.payments});
-  double get paid => payments.fold(0.0, (sum, p) => sum + (double.tryParse((p['amount'] ?? 0).toString()) ?? 0));
-  Future<void> printInvoice() async {
-    final t=complaint; final doc=pw.Document();
-    doc.addPage(pw.Page(build:(_)=>pw.Padding(padding:const pw.EdgeInsets.all(24),child:pw.Column(crossAxisAlignment:pw.CrossAxisAlignment.start,children:[
-      pw.Text('UNIQUE MARKET',style:pw.TextStyle(fontSize:24,fontWeight:pw.FontWeight.bold)),pw.Text('CCTV | IT Security | Service & AMC'),
-      pw.Text('Station Road, Hotel Rajdoot, Ichalkaranji | 7350060071'),pw.Divider(),
-      pw.Text('SERVICE INVOICE',style:pw.TextStyle(fontSize:18,fontWeight:pw.FontWeight.bold)),
-      pw.Text('Ticket: '+(t['ticket_no']??t['complaint_no']??'-').toString()),pw.Text('Service: '+(t['service_type']??'-').toString()),
-      pw.Text('Problem: '+(t['category']??'-').toString()),pw.Text('Customer: '+(t['customer_name']??'-').toString()),
-      pw.Text('Address: '+(t['address']??'-').toString()),pw.SizedBox(height:18),
-      pw.Text('Amount Paid: Rs. '+paid.toStringAsFixed(2),style:pw.TextStyle(fontSize:16,fontWeight:pw.FontWeight.bold)),
-      pw.SizedBox(height:28),pw.Text('Thank you for choosing Unique Market.')
-    ])));
-    await Printing.layoutPdf(onLayout:(_)=>doc.save());
-  }
-  @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const Text('Invoice')),body:ListView(padding:const EdgeInsets.all(18),children:[
-    Card(child:Padding(padding:const EdgeInsets.all(20),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-      const Text('UNIQUE MARKET',style:TextStyle(fontSize:25,fontWeight:FontWeight.w900)),const Text('SERVICE INVOICE',style:TextStyle(fontWeight:FontWeight.w700)),const Divider(height:28),
-      Text('Ticket: '+(complaint['ticket_no']??complaint['complaint_no']??'-').toString()),Text('Service: '+(complaint['service_type']??'-').toString()),
-      Text('Problem: '+(complaint['category']??'-').toString()),Text('Amount Paid: ₹'+paid.toStringAsFixed(2),style:const TextStyle(fontSize:18,fontWeight:FontWeight.w900)),
-      const SizedBox(height:18),const Text('Station Road, Hotel Rajdoot, Ichalkaranji'),const Text('7350060071')
-    ]))),const SizedBox(height:16),FilledButton.icon(onPressed:printInvoice,icon:const Icon(Icons.picture_as_pdf_outlined),label:const Text('VIEW / PRINT PDF'))
+  @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const Text('Payment'),actions:[IconButton(onPressed:loading?null:load,icon:const Icon(Icons.refresh))]),body:loading?const Center(child:CircularProgressIndicator()):ListView(padding:const EdgeInsets.all(18),children:[
+    const Text('Service Payment',style:TextStyle(fontSize:24,fontWeight:FontWeight.w900)),const SizedBox(height:6),Text('Ticket: '+(widget.complaint['ticket_no']??widget.complaint['complaint_no']??'-').toString(),style:const TextStyle(color:Colors.black54)),const SizedBox(height:18),
+    Card(child:Padding(padding:const EdgeInsets.all(16),child:Column(children:[_amountRow('Service Charges',serviceTotal),_amountRow('Approved Paid',approvedPaid),const Divider(),_amountRow('Balance Due',due,bold:true)]))),
+    const SizedBox(height:18),if(serviceTotal<=0)const Card(child:Padding(padding:EdgeInsets.all(14),child:Text('Final service charges are not available yet. You can still submit a payment amount.'))),const SizedBox(height:8),
+    TextField(controller:amount,keyboardType:const TextInputType.numberWithOptions(decimal:true),decoration:const InputDecoration(labelText:'Amount',prefixText:'₹ ')),const SizedBox(height:16),
+    const Text('Payment Mode',style:TextStyle(fontWeight:FontWeight.w700)),const SizedBox(height:8),
+    Wrap(spacing:8,children:['UPI','Cash'].map((m)=>ChoiceChip(label:Text(m),selected:mode==m,onSelected:(_)=>setState(()=>mode=m))).toList()),
+    if(mode=='UPI')...[
+      const SizedBox(height:16),const Card(child:Padding(padding:EdgeInsets.all(16),child:Text('Pay using your UPI app, then enter the UTR / reference number below.'))),const SizedBox(height:12),
+      TextField(controller:utr,decoration:const InputDecoration(labelText:'UTR / Reference Number'))],
+    if(payments.any((p)=>(p['payment_status']??p['status']??'').toString().toLowerCase()=='pending'))const Padding(padding:EdgeInsets.only(top:12),child:Text('A payment is already awaiting admin verification.',style:TextStyle(color:Colors.orange))),
+    const SizedBox(height:24),SizedBox(height:54,child:FilledButton(onPressed:busy?null:submit,child:busy?const CircularProgressIndicator(color:Colors.white):const Text('SUBMIT PAYMENT')))
   ]));
+  Widget _amountRow(String label,double value,{bool bold=false})=>Padding(padding:const EdgeInsets.symmetric(vertical:4),child:Row(mainAxisAlignment:MainAxisAlignment.spaceBetween,children:[Text(label,style:TextStyle(fontWeight:bold?FontWeight.w900:FontWeight.w500)),Text('₹'+value.toStringAsFixed(2),style:TextStyle(fontWeight:bold?FontWeight.w900:FontWeight.w700))]));
 }
 
+class InvoicePage extends StatefulWidget {
+  final Map<String,dynamic> complaint; final List<Map<String,dynamic>> payments;
+  const InvoicePage({super.key,required this.complaint,required this.payments});
+  @override State<InvoicePage> createState()=>_InvoicePageState();
+}
+class _InvoicePageState extends State<InvoicePage>{
+  Map<String,dynamic>? report;bool loading=true;
+  double _num(dynamic v)=>double.tryParse((v??0).toString())??0;
+  double get total=>_num(report?['labour_amount'])+_num(report?['other_amount']);
+  double get paid=>widget.payments.fold(0.0,(s,p){final st=(p['payment_status']??p['status']??'').toString().toLowerCase();return s+(['approved','paid','completed'].contains(st)?_num(p['amount']):0);});
+  double get balance=>(total-paid).clamp(0,double.infinity);
+  @override void initState(){super.initState();load();}
+  Future<void> load()async{try{report=await CustomerService(Supabase.instance.client).serviceReport(widget.complaint['id'].toString());}catch(_){}if(mounted)setState(()=>loading=false);}
+  Future<void> printInvoice()async{final t=widget.complaint;final doc=pw.Document();final status=balance<=0&&total>0?'PAID':'PAYMENT PENDING';doc.addPage(pw.Page(build:(_)=>pw.Padding(padding:const pw.EdgeInsets.all(24),child:pw.Column(crossAxisAlignment:pw.CrossAxisAlignment.start,children:[
+    pw.Text('UNIQUE MARKET',style:pw.TextStyle(fontSize:24,fontWeight:pw.FontWeight.bold)),pw.Text('CCTV | IT Security | Service & AMC'),pw.Text('Station Road, Hotel Rajdoot, Ichalkaranji | 7350060071'),pw.Divider(),
+    pw.Text('SERVICE INVOICE',style:pw.TextStyle(fontSize:18,fontWeight:pw.FontWeight.bold)),pw.Text('Ticket: '+(t['ticket_no']??t['complaint_no']??'-').toString()),pw.Text('Service: '+(t['service_type']??'-').toString()),pw.Text('Problem: '+(t['category']??'-').toString()),pw.Text('Customer: '+(t['customer_name']??'-').toString()),pw.Text('Address: '+(t['address']??'-').toString()),pw.SizedBox(height:18),
+    pw.Text('Service Charges: Rs. '+total.toStringAsFixed(2)),pw.Text('Approved Paid: Rs. '+paid.toStringAsFixed(2)),pw.Text('Balance Due: Rs. '+balance.toStringAsFixed(2)),pw.Text('Payment Status: '+status,style:pw.TextStyle(fontSize:16,fontWeight:pw.FontWeight.bold)),pw.SizedBox(height:18),pw.Text('Thank you for choosing Unique Market.')
+  ])));await Printing.layoutPdf(onLayout:(_)=>doc.save());}
+  @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const Text('Invoice'),actions:[IconButton(onPressed:load,icon:const Icon(Icons.refresh))]),body:loading?const Center(child:CircularProgressIndicator()):ListView(padding:const EdgeInsets.all(18),children:[
+    Card(child:Padding(padding:const EdgeInsets.all(20),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[const Text('UNIQUE MARKET',style:TextStyle(fontSize:25,fontWeight:FontWeight.w900)),const Text('SERVICE INVOICE',style:TextStyle(fontWeight:FontWeight.w700)),const Divider(height:28),Text('Ticket: '+(widget.complaint['ticket_no']??widget.complaint['complaint_no']??'-').toString()),Text('Service: '+(widget.complaint['service_type']??'-').toString()),Text('Service Charges: ₹'+total.toStringAsFixed(2)),Text('Approved Paid: ₹'+paid.toStringAsFixed(2)),Text('Balance Due: ₹'+balance.toStringAsFixed(2),style:const TextStyle(fontSize:18,fontWeight:FontWeight.w900)),Text('Payment Status: '+(balance<=0&&total>0?'PAID':'PAYMENT PENDING'),style:const TextStyle(fontWeight:FontWeight.w800)),const SizedBox(height:18),const Text('Station Road, Hotel Rajdoot, Ichalkaranji'),const Text('7350060071')]))),const SizedBox(height:16),FilledButton.icon(onPressed:printInvoice,icon:const Icon(Icons.picture_as_pdf_outlined),label:const Text('VIEW / PRINT PDF'))]));}
 class ProfilePage extends StatefulWidget { const ProfilePage({super.key}); @override State<ProfilePage> createState()=>_ProfilePageState(); }
 class _ProfilePageState extends State<ProfilePage>{
   final service=CustomerService(Supabase.instance.client); Map<String,dynamic>? customer;
