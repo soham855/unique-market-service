@@ -28,6 +28,8 @@ jobs:
           java-version: '21'
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
       - name: Add Android platform
         run: npx cap add android
       - name: Sync Capacitor
@@ -42,29 +44,13 @@ jobs:
             echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/release.keystore
           fi
       - name: Build release AAB
-        env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           cd android
           chmod +x gradlew
-          if [ -n "$ANDROID_KEYSTORE_BASE64" ] && [ -n "$ANDROID_KEYSTORE_PASSWORD" ] && [ -n "$ANDROID_KEY_ALIAS" ] && [ -n "$ANDROID_KEY_PASSWORD" ] && [ -f app/release.keystore ]; then
-            ./gradlew bundleRelease -Pandroid.injected.signing.store.file="$GITHUB_WORKSPACE/android/app/release.keystore" -Pandroid.injected.signing.store.password="$ANDROID_KEYSTORE_PASSWORD" -Pandroid.injected.signing.key.alias="$ANDROID_KEY_ALIAS" -Pandroid.injected.signing.key.password="$ANDROID_KEY_PASSWORD"
-          else
-            echo "Release signing secrets are not configured. Building unsigned release AAB for testing only."
-            ./gradlew bundleRelease
-          fi
+          ./gradlew bundleRelease
       - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:
           name: instant-services-release-aab
           path: android/app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
-      - name: Upload mapping file if generated
-        uses: actions/upload-artifact@v4
-        with:
-          name: instant-services-mapping
-          path: android/app/build/outputs/mapping/release/mapping.txt
-          if-no-files-found: ignore
