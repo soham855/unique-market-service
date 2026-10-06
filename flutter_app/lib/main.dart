@@ -167,7 +167,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
       NavigationDestination(icon: Icon(Icons.confirmation_num_outlined), label: 'Tickets'),
       NavigationDestination(icon: Icon(Icons.payments_outlined), label: 'Payments'),
       NavigationDestination(icon: Icon(Icons.person_outline), label: 'Profile'),
-    ], onDestinationSelected: (i) { if (i == 1) Navigator.push(context, MaterialPageRoute(builder: (_) => TicketListPage(tickets: tickets))); }),
+    ], onDestinationSelected: (i) { if (i == 1) Navigator.push(context, MaterialPageRoute(builder: (_) => TicketListPage(tickets: tickets))); else if (i == 2) { if (tickets.isNotEmpty) Navigator.push(context, MaterialPageRoute(builder: (_) => PaymentPage(complaint: tickets.first))); } else if (i == 3) Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfilePage())); }),
   );
 
   Widget _homeCard(IconData icon, String title, VoidCallback onTap) => Card(child: InkWell(
