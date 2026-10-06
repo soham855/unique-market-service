@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -63,8 +64,9 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
 class AdminHomePage extends StatefulWidget { const AdminHomePage({super.key}); @override State<AdminHomePage> createState()=>_AdminHomePageState(); }
 class _AdminHomePageState extends State<AdminHomePage> {
   final service=AdminService(Supabase.instance.client);
-  Map<String,dynamic>? summary; List<Map<String,dynamic>> complaints=[]; List<Map<String,dynamic>> technicians=[]; int tab=0; bool loading=true;
-  @override void initState(){super.initState();load();}
+  Map<String,dynamic>? summary; List<Map<String,dynamic>> complaints=[]; List<Map<String,dynamic>> technicians=[]; int tab=0; bool loading=true; Timer? _timer;
+  @override void initState(){super.initState();load();_timer=Timer.periodic(const Duration(seconds:10),(_)=>load());}
+  @override void dispose(){_timer?.cancel();super.dispose();}
   Future<void> load() async { try { final s=await service.summary(); final c=await service.complaints(); final t=await service.technicians(); if(mounted)setState(() { summary=s; complaints=c; technicians=t; loading=false; }); } catch(e){if(mounted)setState(()=>loading=false);}}
   Future<void> logout() async {await Supabase.instance.client.auth.signOut();if(mounted)Navigator.pushAndRemoveUntil(context,MaterialPageRoute(builder:(_)=>const AdminLoginPage()),(_)=>false);}
   @override Widget build(BuildContext context)=>Scaffold(
