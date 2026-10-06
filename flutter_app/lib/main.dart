@@ -209,7 +209,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
       NavigationDestination(icon: Icon(Icons.confirmation_num_outlined), label: 'Tickets'),
       NavigationDestination(icon: Icon(Icons.payments_outlined), label: 'Payments'),
       NavigationDestination(icon: Icon(Icons.person_outline), label: 'Profile'),
-    ], onDestinationSelected: (i) { if (i == 1) Navigator.push(context, MaterialPageRoute(builder: (_) => TicketListPage(tickets: tickets))); else if (i == 2) { if (tickets.isNotEmpty) Navigator.push(context, MaterialPageRoute(builder: (_) => PaymentPage(complaint: tickets.first))); } else if (i == 3) Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfilePage())); }),
+    ], onDestinationSelected: (i) { if (i == 1) Navigator.push(context, MaterialPageRoute(builder: (_) => TicketListPage(tickets: tickets))); else if (i == 2) Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomerPaymentsPage())); else if (i == 3) Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfilePage())); }),
   );
 
   Widget _homeCard(IconData icon, String title, VoidCallback onTap) => Card(child: InkWell(
@@ -616,7 +616,34 @@ class _ServiceReviewCardState extends State<ServiceReviewCard>{
     const SizedBox(height:10),SizedBox(width:double.infinity,child:FilledButton.icon(onPressed:saving?null:save,icon:saving?const SizedBox(width:18,height:18,child:CircularProgressIndicator(strokeWidth:2)):const Icon(Icons.send_outlined),label:Text(rating>0?'SAVE REVIEW':'SELECT A RATING'))),
   ])));
 }
-class PaymentPage extends StatefulWidget {
+class PaymentPage extends StatefulWidclass CustomerPaymentsPage extends StatefulWidget {
+  const CustomerPaymentsPage({super.key});
+  @override State<CustomerPaymentsPage> createState()=>_CustomerPaymentsPageState();
+}
+class _CustomerPaymentsPageState extends State<CustomerPaymentsPage>{
+  final service=CustomerService(Supabase.instance.client);
+  List<Map<String,dynamic>> tickets=[];
+  Map<String,List<Map<String,dynamic>>> paymentMap={};
+  bool loading=true; Timer? timer;
+  @override void initState(){super.initState();load();timer=Timer.periodic(const Duration(seconds:10),(_)=>load());}
+  @override void dispose(){timer?.cancel();super.dispose();}
+  double _num(dynamic v)=>double.tryParse((v??0).toString())??0;
+  double _paid(List<Map<String,dynamic>> ps)=>ps.fold(0.0,(s,p){final st=(p['payment_status']??p['status']??'').toString().toLowerCase();return s+(['approved','paid','completed'].contains(st)?_num(p['amount']):0);});
+  String _status(List<Map<String,dynamic>> ps){if(ps.isEmpty)return 'No payment';final states=ps.map((p)=>(p['payment_status']??p['status']??'pending').toString().toLowerCase()).toSet();if(states.contains('pending'))return 'Verification pending';if(states.every((s)=>['approved','paid','completed'].contains(s)))return 'Paid';if(states.contains('rejected'))return 'Rejected';return 'Pending';}
+  Future<void> load()async{try{tickets=await service.tickets();final m=<String,List<Map<String,dynamic>>>{};for(final t in tickets){final id=t['id']?.toString();if(id!=null&&id.isNotEmpty)m[id]=await service.paymentsForComplaint(id);}paymentMap=m;}catch(_){}if(mounted)setState(()=>loading=false);}
+  @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const Text('Payments'),actions:[IconButton(onPressed:load,icon:const Icon(Icons.refresh))]),body:loading?const Center(child:CircularProgressIndicator()):RefreshIndicator(onRefresh:load,child:ListView(padding:const EdgeInsets.all(16),children:[
+    const Text('Service Payments',style:TextStyle(fontSize:25,fontWeight:FontWeight.w900)),const SizedBox(height:6),const Text('Payment status and history for all service tickets.',style:TextStyle(color:Colors.black54)),const SizedBox(height:16),
+    if(tickets.isEmpty)const Card(child:Padding(padding:EdgeInsets.all(26),child:Center(child:Text('No service tickets yet.')))),
+    ...tickets.map((t){final id=t['id']?.toString()??'';final ps=paymentMap[id]??[];final status=_status(ps);return Card(margin:const EdgeInsets.only(bottom:12),child:ListTile(
+      leading:const CircleAvatar(child:Icon(Icons.receipt_long_outlined)),
+      title:Text((t['ticket_no']??t['complaint_no']??'Ticket').toString(),style:const TextStyle(fontWeight:FontWeight.w800)),
+      subtitle:Text((t['service_type']??t['category']??'Service').toString()+'\n'+status),
+      trailing:const Icon(Icons.chevron_right),
+      onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>PaymentPage(complaint:t))).then((_)=>load()),
+    ));})
+  ])));
+}
+get {
   final Map<String,dynamic> complaint;
   const PaymentPage({super.key, required this.complaint});
   @override State<PaymentPage> createState() => _PaymentPageState();
