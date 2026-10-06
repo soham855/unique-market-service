@@ -9,6 +9,7 @@ import 'services/customer_service.dart';
 import 'services/push_notification_service.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -498,8 +499,18 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
       ]);
     }).toList());
   }
-  void _callSupport(BuildContext context) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Call Unique Market: 7350060071'))); }
-  void _whatsapp(BuildContext context) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('WhatsApp: 7350060071'))); }
+  Future<void> _callSupport(BuildContext context) async {
+    final uri=Uri(scheme:'tel',path:'7350060071');
+    if(!await launchUrl(uri)) {
+      if(context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Could not open phone dialer.')));
+    }
+  }
+  Future<void> _whatsapp(BuildContext context) async {
+    final uri=Uri.parse('https://wa.me/917350060071');
+    if(!await launchUrl(uri,mode:LaunchMode.externalApplication)) {
+      if(context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Could not open WhatsApp.')));
+    }
+  }
 }
 
 class ServiceReviewCard extends StatefulWidget {
