@@ -72,4 +72,11 @@ class AdminService {
   Future<void> updatePayment(String id, String status) async {
     await client.from('payments').update({'status': status, 'payment_status': status}).eq('id', id);
   }
+
+  Future<List<Map<String,dynamic>>> payments({String? status}) async {
+    var q = client.from('payments').select().order('created_at', ascending: false);
+    if (status != null && status != 'All') q = q.eq('payment_status', status);
+    final rows = await q;
+    return List<Map<String,dynamic>>.from(rows);
+  }
 }
