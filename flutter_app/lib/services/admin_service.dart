@@ -85,6 +85,15 @@ class AdminService {
     return List<Map<String,dynamic>>.from(rows);
   }
 
+  Future<List<Map<String,dynamic>>> amcRenewalRequests() async {
+    final rows = await client.from('amc_renewal_requests').select('id,amc_contract_id,customer_id,requested_at,status,notes,amc_contracts(start_date,end_date,status),customers(name,mobile,customer_code)').order('requested_at', ascending:false);
+    return List<Map<String,dynamic>>.from(rows);
+  }
+
+  Future<void> updateAmcRenewalRequest(String id, String status) async {
+    await client.from('amc_renewal_requests').update({'status': status}).eq('id', id);
+  }
+
   Future<List<Map<String,dynamic>>> customers() async {
     final rows = await client.from('customers').select().order('created_at', ascending: false);
     return List<Map<String,dynamic>>.from(rows);
