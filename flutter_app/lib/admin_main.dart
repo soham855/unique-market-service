@@ -61,6 +61,45 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
   ]))))));
 }
 
+class AdminAmcRenewalsPage extends StatefulWidget {
+  const AdminAmcRenewalsPage({super.key});
+  @override State<AdminAmcRenewalsPage> createState()=>_AdminAmcRenewalsPageState();
+}
+class _AdminAmcRenewalsPageState extends State<AdminAmcRenewalsPage>{
+  final service=AdminService(); List<Map<String,dynamic>> items=[]; bool loading=true; Timer? timer;
+  @override void initState(){super.initState();load();timer=Timer.periodic(const Duration(seconds:10),(_)=>load());}
+  @override void dispose(){timer?.cancel();super.dispose();}
+  Future<void> load()async{try{items=await service.amcRenewalRequests();}catch(_){items=[];}if(mounted)setState(()=>loading=false);}
+  Future<void> updateStatus(String id,String status)async{await service.updateAmcRenewalRequest(id,status);await load();}
+  @override Widget build(BuildContext context)=>Scaffold(
+    appBar:AppBar(title:const Text('AMC Renewals'),actions:[IconButton(onPressed:load,icon:const Icon(Icons.refresh))]),
+    body:loading?const Center(child:CircularProgressIndicator()):RefreshIndicator(
+      onRefresh:load,child:ListView(padding:const EdgeInsets.all(14),children:[
+        if(items.isEmpty)const Card(child:Padding(padding:EdgeInsets.all(24),child:Center(child:Text('No AMC renewal requests.')))),
+        ...items.map((r){
+          final customer=Map<String,dynamic>.from((r['customers']??{}) as Map);
+          final contract=Map<String,dynamic>.from((r['amc_contracts']??{}) as Map);
+          final status=(r['status']??'pending').toString();
+          return Card(margin:const EdgeInsets.only(bottom:12),child:Padding(padding:const EdgeInsets.all(16),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+            Text((customer['name']??'Customer').toString(),style:const TextStyle(fontSize:17,fontWeight:FontWeight.w800)),
+            Text('Code: '+(customer['customer_code']??'—').toString()),
+            Text('Mobile: '+(customer['mobile']??'—').toString()),
+            const SizedBox(height:8),
+            Text('AMC: '+(contract['start_date']??'—').toString()+' → '+(contract['end_date']??'—').toString()),
+            Text('Request: '+status.toUpperCase()),
+            if((r['notes']??'').toString().isNotEmpty)Text('Notes: '+r['notes'].toString()),
+            const SizedBox(height:10),
+            if(status=='pending')Row(children:[
+              Expanded(child:OutlinedButton(onPressed:()=>updateStatus(r['id'].toString(),'contacted'),child:const Text('CONTACTED'))),
+              const SizedBox(width:8),
+              Expanded(child:FilledButton(onPressed:()=>updateStatus(r['id'].toString(),'approved'),child:const Text('APPROVE'))),
+              const SizedBox(width:8),
+              Expanded(child:OutlinedButton(onPressed:()=>updateStatus(r['id'].toString(),'rejected'),child:const Text('REJECT'))),
+            ]) else Text(status.toUpperCase(),style:const TextStyle(fontWeight:FontWeight.w800)),
+          ]));
+        }),
+      ]));
+}
 class AdminHomePage extends StatefulWidget { const AdminHomePage({super.key}); @override State<AdminHomePage> createState()=>_AdminHomePageState(); }
 class _AdminHomePageState extends State<AdminHomePage> {
   final service=AdminService(Supabase.instance.client);
