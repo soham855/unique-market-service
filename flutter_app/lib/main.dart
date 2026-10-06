@@ -232,7 +232,7 @@ class _CustomerNotificationsPageState extends State<CustomerNotificationsPage>{
     }catch(_){}
     if(mounted)setState(()=>loading=false);
   }
-  Future<void> markRead(String id)async{try{await Supabase.instance.client.from('notifications').update({'read_at':DateTime.now().toUtc().toIso8601String()}).eq('id',id);}catch(_){}}
+  Future<void> markRead(String id)async{try{await Supabase.instance.client.from('notifications').update({'read_at':DateTime.now().toUtc().toIso8601String()}).eq('id',id);await load();}catch(_){}}
   @override Widget build(BuildContext context)=>Scaffold(
     appBar:AppBar(title:const Text('Notifications'),actions:[IconButton(onPressed:load,icon:const Icon(Icons.refresh))]),
     body:loading?const Center(child:CircularProgressIndicator()):RefreshIndicator(onRefresh:load,child:ListView(padding:const EdgeInsets.all(12),children:[
