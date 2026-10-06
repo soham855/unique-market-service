@@ -137,7 +137,21 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
         else if (jobs.isEmpty) const Card(child: Padding(padding: EdgeInsets.all(24), child: Center(child: Text('No assigned jobs.'))))
         else ...jobs.map((j) => JobCard(job: j, onChanged: load)),
       ])),
-      bottomNavigationBar: NavigationBar(selectedIndex: tab, onDestinationSelected: (i) => setState(() => tab = i), destinations: const [
+      bottomNavigationBar: NavigationBar(selectedIndex: tab, onDestinationSelected: (i) async {
+        if (i == 0) { setState(() => tab = 0); return; }
+        if (i == 1) { setState(() => tab = 1); return; }
+        if (i == 2) {
+          setState(() => tab = 2);
+          await Navigator.push(context, MaterialPageRoute(builder: (_) => TechnicianSchedulePage(service: service)));
+          if (mounted) { setState(() => tab = 0); load(); }
+          return;
+        }
+        if (i == 3) {
+          setState(() => tab = 3);
+          await Navigator.push(context, MaterialPageRoute(builder: (_) => TechnicianProfilePage(technician: tech, onLogout: logout)));
+          if (mounted) { setState(() => tab = 0); load(); }
+        }
+      }, destinations: const [
         NavigationDestination(icon: Icon(Icons.dashboard_outlined), label: 'Home'),
         NavigationDestination(icon: Icon(Icons.work_outline), label: 'Jobs'),
         NavigationDestination(icon: Icon(Icons.schedule_outlined), label: 'Schedule'),
@@ -146,6 +160,56 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
     );
   }
   Widget _metric(String title, String value, IconData icon) => Card(child: Padding(padding: const EdgeInsets.all(14), child: Column(children: [Icon(icon, color: const Color(0xFF0B63F6)), const SizedBox(height: 7), Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)), Text(title, style: const TextStyle(color: Colors.black54))])));
+}
+
+class TechnicianSchedulePage extends StatefulWidget {
+  final TechnicianService service;
+  const TechnicianSchedulePage({super.key,required this.service});
+  @override State<TechnicianSchedulePage> createState()=>_TechnicianSchedulePageState();
+}
+class _TechnicianSchedulePageState extends State<TechnicianSchedulePage>{
+  List<Map<String,dynamic>> jobs=[]; bool loading=true;
+  @override void initState(){super.initState();load();}
+  Future<void>load()async{try{final all=await widget.service.jobs();all.sort((a,b){
+    final ad=DateTime.tryParse(a['scheduled_visit_at']?.toString()??'')??DateTime(2099);
+    final bd=DateTime.tryParse(b['scheduled_visit_at']?.toString()??'')??DateTime(2099);
+    return ad.compareTo(bd);
+  });if(mounted)setState(()=>jobs=all..loading=false);}catch(_){if(mounted)setState(()=>loading=false);}}
+  @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const Text('Schedule'),actions:[IconButton(onPressed:load,icon:const Icon(Icons.refresh))]),body:loading?const Center(child:CircularProgressIndicator()):RefreshIndicator(onRefresh:load,child:ListView(padding:const EdgeInsets.all(14),children:[
+    if(jobs.isEmpty)const Card(child:Padding(padding:EdgeInsets.all(24),child:Text('No scheduled visits.'))),
+    ...jobs.map((j)=>Card(child:ListTile(
+      leading:const CircleAvatar(child:Icon(Icons.event_outlined)),
+      title:Text((j['ticket_no']??j['complaint_no']??'Job').toString(),style:const TextStyle(fontWeight:FontWeight.w800)),
+      subtitle:Text((j['scheduled_visit_at']??j['scheduled_visit_date']??'Schedule not set').toString()+'\n'+(j['customer_name']??'Customer').toString(),maxLines:2),
+      trailing:Chip(label:Text((j['status']??'New').toString())),
+      onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>TechnicianJobDetailsPage(job:j))),
+    )))
+  ])));
+}
+
+class TechnicianProfilePage extends StatelessWidget{
+  final Map<String,dynamic>? technician;
+  final Future<void> Function() onLogout;
+  const TechnicianProfilePage({super.key,required this.technician,required this.onLogout});
+  @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const Text('Technician Profile')),body:ListView(padding:const EdgeInsets.all(18),children:[
+    Card(child:Padding(padding:const EdgeInsets.all(20),child:Column(children:[
+      const CircleAvatar(radius:42,child:Icon(Icons.engineering_outlined,size:42)),
+      const SizedBox(height:12),
+      Text((technician?['name']??'Technician').toString(),style:const TextStyle(fontSize:24,fontWeight:FontWeight.w900)),
+      Text('Technician ID: '+(technician?['id']??'-').toString(),style:const TextStyle(color:Colors.black54)),
+      const SizedBox(height:16),
+      ListTile(leading:const Icon(Icons.phone_outlined),title:Text((technician?['mobile']??'-').toString())),
+      ListTile(leading:const Icon(Icons.verified_user_outlined),title:Text('Status: '+(technician?['status']??'Active').toString())),
+    ]))),
+    const SizedBox(height:12),
+    Card(child:Column(children:[
+      ListTile(leading:const Icon(Icons.business_outlined),title:const Text('UNIQUE MARKET'),subtitle:const Text('CCTV | IT Security | Service & AMC')),
+      const ListTile(leading:Icon(Icons.location_on_outlined),title:Text('Station Road, Hotel Rajdoot, Ichalkaranji')),
+      const ListTile(leading:Icon(Icons.phone),title:Text('7350060071')),
+    ])),
+    const SizedBox(height:12),
+    OutlinedButton.icon(onPressed:()=>onLogout(),icon:const Icon(Icons.logout),label:const Text('LOGOUT')),
+  ]));
 }
 
 class JobCard extends StatelessWidget {
