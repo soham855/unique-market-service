@@ -377,23 +377,63 @@ class TechnicianSchedulePage extends StatefulWidget {
   @override State<TechnicianSchedulePage> createState()=>_TechnicianSchedulePageState();
 }
 class _TechnicianSchedulePageState extends State<TechnicianSchedulePage>{
-  List<Map<String,dynamic>> jobs=[]; bool loading=true;
-  @override void initState(){super.initState();load();}
-  Future<void>load()async{try{final all=await widget.service.jobs();all.sort((a,b){
-    final ad=DateTime.tryParse(a['scheduled_visit_at']?.toString()??'')??DateTime(2099);
-    final bd=DateTime.tryParse(b['scheduled_visit_at']?.toString()??'')??DateTime(2099);
-    return ad.compareTo(bd);
-  });if(mounted)setState(()=>{jobs=all;loading=false;});}catch(_){if(mounted)setState(()=>loading=false);}}
-  @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const Text('Schedule'),actions:[IconButton(onPressed:load,icon:const Icon(Icons.refresh))]),body:loading?const Center(child:CircularProgressIndicator()):RefreshIndicator(onRefresh:load,child:ListView(padding:const EdgeInsets.all(14),children:[
-    if(jobs.isEmpty)const Card(child:Padding(padding:EdgeInsets.all(24),child:Text('No scheduled visits.'))),
-    ...jobs.map((j)=>Card(child:ListTile(
-      leading:const CircleAvatar(child:Icon(Icons.event_outlined)),
+  List<Map<String,dynamic>> jobs=[]; bool loading=true; Timer? _timer;
+  @override void initState(){super.initState();load();_timer=Timer.periodic(const Duration(seconds:10),(_)=>load());}
+  @override void dispose(){_timer?.cancel();super.dispose();}
+  Future<void>load()async{
+    try{
+      final all=await widget.service.jobs();
+      all.sort((a,b){
+        final ad=DateTime.tryParse(a['scheduled_visit_at']?.toString()??'')??DateTime(2099);
+        final bd=DateTime.tryParse(b['scheduled_visit_at']?.toString()??'')??DateTime(2099);
+        return ad.compareTo(bd);
+      });
+      if(mounted)setState(()=>{jobs=all,loading=false});
+    }catch(_){if(mounted)setState(()=>loading=false);}
+  }
+  DateTime? _date(Map<String,dynamic> j)=>DateTime.tryParse(j['scheduled_visit_at']?.toString()??j['scheduled_visit_date']?.toString()??'');
+  bool _isToday(Map<String,dynamic> j){
+    final d=_date(j); if(d==null)return false;
+    final n=DateTime.now(),x=d.toLocal();
+    return x.year==n.year&&x.month==n.month&&x.day==n.day;
+  }
+  List<Map<String,dynamic>> _upcoming(){
+    final now=DateTime.now();
+    return jobs.where((j){final d=_date(j);return d!=null&&d.toLocal().isAfter(now)&&!_isToday(j)&&j['status']!='Completed';}).toList();
+  }
+  Widget _section(String title,List<Map<String,dynamic>> list){
+    if(list.isEmpty)return const SizedBox.shrink();
+    return Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+      Padding(padding:const EdgeInsets.only(top:10,bottom:8),child:Text(title,style:const TextStyle(fontSize:19,fontWeight:FontWeight.w800))),
+      ...list.map((j)=>_jobCard(j)),
+    ]);
+  }
+  Widget _jobCard(Map<String,dynamic> j){
+    final d=_date(j),when=d==null?'Schedule not set':d.toLocal().toString(),status=(j['status']??'New').toString(),urgent=_isToday(j)&&status!='Completed';
+    return Card(child:ListTile(
+      leading:CircleAvatar(child:Icon(urgent?Icons.today:Icons.event_outlined)),
       title:Text((j['ticket_no']??j['complaint_no']??'Job').toString(),style:const TextStyle(fontWeight:FontWeight.w800)),
-      subtitle:Text((j['scheduled_visit_at']??j['scheduled_visit_date']??'Schedule not set').toString()+'\n'+(j['customer_name']??'Customer').toString(),maxLines:2),
-      trailing:Chip(label:Text((j['status']??'New').toString())),
+      subtitle:Text('${j['customer_name']??'Customer'}\\n$when\\n${j['address']??j['location_text']??'Address not available'}',maxLines:3,overflow:TextOverflow.ellipsis),
+      trailing:Column(mainAxisAlignment:MainAxisAlignment.center,crossAxisAlignment:CrossAxisAlignment.end,children:[
+        Chip(label:Text(status)),if(urgent)const Text('TODAY',style:TextStyle(fontSize:10,fontWeight:FontWeight.w900)),
+      ]),
       onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>TechnicianJobDetailsPage(job:j))),
-    )))
-  ])));
+    ));
+  }
+  @override Widget build(BuildContext context)=>Scaffold(
+    appBar:AppBar(title:const Text('Schedule'),actions:[IconButton(onPressed:load,icon:const Icon(Icons.refresh))]),
+    body:loading?const Center(child:CircularProgressIndicator()):RefreshIndicator(onRefresh:load,child:ListView(padding:const EdgeInsets.all(14),children:[
+      Card(child:Padding(padding:const EdgeInsets.all(16),child:Row(children:[
+        const Icon(Icons.schedule_outlined,size:30),const SizedBox(width:12),
+        Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[const Text('Visit Schedule',style:TextStyle(fontSize:18,fontWeight:FontWeight.w800)),Text('${jobs.where((j)=>j['status']!='Completed').length} active job(s)')])),
+        Text('${jobs.where(_isToday).length}',style:const TextStyle(fontSize:28,fontWeight:FontWeight.w900)),
+      ]))),
+      _section('Today',jobs.where((j)=>_isToday(j)&&j['status']!='Completed').toList()),
+      _section('Upcoming',_upcoming()),
+      _section('Other / Unscheduled',jobs.where((j)=>_date(j)==null&&j['status']!='Completed').toList()),
+      if(jobs.where((j)=>j['status']!='Completed').isEmpty)const Card(child:Padding(padding:EdgeInsets.all(24),child:Center(child:Text('No active scheduled visits.')))),
+    ])),
+  );
 }
 
 class TechnicianProfilePage extends StatelessWidget{
