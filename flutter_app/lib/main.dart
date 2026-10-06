@@ -504,25 +504,94 @@ class _PaymentPageState extends State<PaymentPage> {
 }
 
 class InvoicePage extends StatefulWidget {
-  final Map<String,dynamic> complaint; final List<Map<String,dynamic>> payments;
+  final Map<String,dynamic> complaint;
+  final List<Map<String,dynamic>> payments;
   const InvoicePage({super.key,required this.complaint,required this.payments});
   @override State<InvoicePage> createState()=>_InvoicePageState();
 }
 class _InvoicePageState extends State<InvoicePage>{
-  Map<String,dynamic>? report;bool loading=true;
+  final service=CustomerService(Supabase.instance.client);
+  Map<String,dynamic>? report;
+  List<Map<String,dynamic>> payments=[];
+  bool loading=true;
+  Timer? _timer;
   double _num(dynamic v)=>double.tryParse((v??0).toString())??0;
   double get total=>_num(report?['labour_amount'])+_num(report?['other_amount']);
-  double get paid=>widget.payments.fold(0.0,(s,p){final st=(p['payment_status']??p['status']??'').toString().toLowerCase();return s+(['approved','paid','completed'].contains(st)?_num(p['amount']):0);});
+  double get paid=>payments.fold(0.0,(s,p){final st=(p['payment_status']??p['status']??'').toString().toLowerCase();return s+(['approved','paid','completed'].contains(st)?_num(p['amount']):0);});
+  double get pending=>payments.fold(0.0,(s,p){final st=(p['payment_status']??p['status']??'').toString().toLowerCase();return s+(st=='pending'?_num(p['amount']):0);});
   double get balance=>(total-paid).clamp(0,double.infinity);
-  @override void initState(){super.initState();load();}
-  Future<void> load()async{try{report=await CustomerService(Supabase.instance.client).serviceReport(widget.complaint['id'].toString());}catch(_){}if(mounted)setState(()=>loading=false);}
-  Future<void> printInvoice()async{final t=widget.complaint;final doc=pw.Document();final status=balance<=0&&total>0?'PAID':'PAYMENT PENDING';doc.addPage(pw.Page(build:(_)=>pw.Padding(padding:const pw.EdgeInsets.all(24),child:pw.Column(crossAxisAlignment:pw.CrossAxisAlignment.start,children:[
-    pw.Text('UNIQUE MARKET',style:pw.TextStyle(fontSize:24,fontWeight:pw.FontWeight.bold)),pw.Text('CCTV | IT Security | Service & AMC'),pw.Text('Station Road, Hotel Rajdoot, Ichalkaranji | 7350060071'),pw.Divider(),
-    pw.Text('SERVICE INVOICE',style:pw.TextStyle(fontSize:18,fontWeight:pw.FontWeight.bold)),pw.Text('Ticket: '+(t['ticket_no']??t['complaint_no']??'-').toString()),pw.Text('Service: '+(t['service_type']??'-').toString()),pw.Text('Problem: '+(t['category']??'-').toString()),pw.Text('Customer: '+(t['customer_name']??'-').toString()),pw.Text('Address: '+(t['address']??'-').toString()),pw.SizedBox(height:18),
-    pw.Text('Service Charges: Rs. '+total.toStringAsFixed(2)),pw.Text('Approved Paid: Rs. '+paid.toStringAsFixed(2)),pw.Text('Balance Due: Rs. '+balance.toStringAsFixed(2)),pw.Text('Payment Status: '+status,style:pw.TextStyle(fontSize:16,fontWeight:pw.FontWeight.bold)),pw.SizedBox(height:18),pw.Text('Thank you for choosing Unique Market.')
-  ])));await Printing.layoutPdf(onLayout:(_)=>doc.save());}
-  @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const Text('Invoice'),actions:[IconButton(onPressed:load,icon:const Icon(Icons.refresh))]),body:loading?const Center(child:CircularProgressIndicator()):ListView(padding:const EdgeInsets.all(18),children:[
-    Card(child:Padding(padding:const EdgeInsets.all(20),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[const Text('UNIQUE MARKET',style:TextStyle(fontSize:25,fontWeight:FontWeight.w900)),const Text('SERVICE INVOICE',style:TextStyle(fontWeight:FontWeight.w700)),const Divider(height:28),Text('Ticket: '+(widget.complaint['ticket_no']??widget.complaint['complaint_no']??'-').toString()),Text('Service: '+(widget.complaint['service_type']??'-').toString()),Text('Service Charges: ₹'+total.toStringAsFixed(2)),Text('Approved Paid: ₹'+paid.toStringAsFixed(2)),Text('Balance Due: ₹'+balance.toStringAsFixed(2),style:const TextStyle(fontSize:18,fontWeight:FontWeight.w900)),Text('Payment Status: '+(balance<=0&&total>0?'PAID':'PAYMENT PENDING'),style:const TextStyle(fontWeight:FontWeight.w800)),const SizedBox(height:18),const Text('Station Road, Hotel Rajdoot, Ichalkaranji'),const Text('7350060071')]))),const SizedBox(height:16),FilledButton.icon(onPressed:printInvoice,icon:const Icon(Icons.picture_as_pdf_outlined),label:const Text('VIEW / PRINT PDF'))]));}
+
+  @override void initState(){super.initState();load();_timer=Timer.periodic(const Duration(seconds:10),(_)=>load());}
+  @override void dispose(){_timer?.cancel();super.dispose();}
+
+  Future<void> load()async{
+    try{
+      final id=widget.complaint['id'].toString();
+      final results=await Future.wait([service.serviceReport(id),service.paymentsForComplaint(id)]);
+      report=results[0] as Map<String,dynamic>?;
+      payments=List<Map<String,dynamic>>.from(results[1] as List<Map<String,dynamic>>);
+    }catch(_){}
+    if(mounted)setState(()=>loading=false);
+  }
+
+  Future<void> printInvoice()async{
+    final t=widget.complaint;
+    final status=balance<=0&&total>0?'PAID':pending>0?'PAYMENT VERIFICATION PENDING':'PAYMENT PENDING';
+    final doc=pw.Document();
+    doc.addPage(pw.Page(build:(_)=>pw.Padding(padding:const pw.EdgeInsets.all(24),child:pw.Column(crossAxisAlignment:pw.CrossAxisAlignment.start,children:[
+      pw.Text('UNIQUE MARKET',style:pw.TextStyle(fontSize:24,fontWeight:pw.FontWeight.bold)),
+      pw.Text('CCTV | IT Security | Service & AMC'),
+      pw.Text('Station Road, Hotel Rajdoot, Ichalkaranji | 7350060071'),
+      pw.Divider(),
+      pw.Text('SERVICE INVOICE',style:pw.TextStyle(fontSize:18,fontWeight:pw.FontWeight.bold)),
+      pw.Text('Ticket: '+(t['ticket_no']??t['complaint_no']??'-').toString()),
+      pw.Text('Service: '+(t['service_type']??'-').toString()),
+      pw.Text('Problem: '+(t['category']??'-').toString()),
+      pw.Text('Customer: '+(t['customer_name']??'-').toString()),
+      pw.Text('Address: '+(t['address']??'-').toString()),
+      pw.SizedBox(height:18),
+      pw.Text('Service Charges: Rs. '+total.toStringAsFixed(2)),
+      pw.Text('Approved Paid: Rs. '+paid.toStringAsFixed(2)),
+      pw.Text('Pending Verification: Rs. '+pending.toStringAsFixed(2)),
+      pw.Text('Balance Due: Rs. '+balance.toStringAsFixed(2)),
+      pw.Text('Payment Status: '+status,style:pw.TextStyle(fontSize:16,fontWeight:pw.FontWeight.bold)),
+      pw.SizedBox(height:18),
+      pw.Text('Thank you for choosing Unique Market.')
+    ])));
+    await Printing.layoutPdf(onLayout:(_)=>doc.save());
+  }
+
+  @override Widget build(BuildContext context)=>Scaffold(
+    appBar:AppBar(title:const Text('Invoice'),actions:[IconButton(onPressed:loading?null:load,icon:const Icon(Icons.refresh))]),
+    body:loading?const Center(child:CircularProgressIndicator()):RefreshIndicator(
+      onRefresh:load,
+      child:ListView(padding:const EdgeInsets.all(18),children:[
+        Card(child:Padding(padding:const EdgeInsets.all(20),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+          const Text('UNIQUE MARKET',style:TextStyle(fontSize:25,fontWeight:FontWeight.w900)),
+          const Text('SERVICE INVOICE',style:TextStyle(fontWeight:FontWeight.w700)),
+          const Divider(height:28),
+          Text('Ticket: '+(widget.complaint['ticket_no']??widget.complaint['complaint_no']??'-').toString()),
+          Text('Service: '+(widget.complaint['service_type']??'-').toString()),
+          Text('Service Charges: ₹'+total.toStringAsFixed(2)),
+          Text('Approved Paid: ₹'+paid.toStringAsFixed(2)),
+          if(pending>0)Text('Pending Verification: ₹'+pending.toStringAsFixed(2),style:const TextStyle(color:Colors.orange,fontWeight:FontWeight.w700)),
+          Text('Balance Due: ₹'+balance.toStringAsFixed(2),style:const TextStyle(fontSize:18,fontWeight:FontWeight.w900)),
+          Text('Payment Status: '+(balance<=0&&total>0?'PAID':pending>0?'PAYMENT VERIFICATION PENDING':'PAYMENT PENDING'),style:const TextStyle(fontWeight:FontWeight.w800)),
+          const SizedBox(height:18),
+          const Text('Station Road, Hotel Rajdoot, Ichalkaranji'),
+          const Text('7350060071')
+        ]))),
+        const SizedBox(height:16),
+        if(payments.isNotEmpty)Card(child:Padding(padding:const EdgeInsets.all(14),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+          const Text('Payment History',style:TextStyle(fontSize:17,fontWeight:FontWeight.w800)),
+          ...payments.map((p)=>ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.receipt_long_outlined),title:Text('₹'+_num(p['amount']).toStringAsFixed(2)),subtitle:Text((p['mode']??'-').toString()+' • '+(p['payment_status']??p['status']??'Pending').toString()+(p['reference_no']!=null?' • '+p['reference_no'].toString():'')))
+        ]))),
+        const SizedBox(height:16),
+        FilledButton.icon(onPressed:printInvoice,icon:const Icon(Icons.picture_as_pdf_outlined),label:const Text('VIEW / PRINT PDF'))
+      ])
+    )
+  );
+}
 class ProfilePage extends StatefulWidget { const ProfilePage({super.key}); @override State<ProfilePage> createState()=>_ProfilePageState(); }
 class _ProfilePageState extends State<ProfilePage>{
   final service=CustomerService(Supabase.instance.client); Map<String,dynamic>? customer;
