@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -329,26 +330,32 @@ class TicketDetailsPage extends StatefulWidget {
 
 class _TicketDetailsPageState extends State<TicketDetailsPage> {
   final service = CustomerService(Supabase.instance.client);
+  Map<String,dynamic> currentTicket = {};
+  Timer? _refreshTimer;
   Map<String,dynamic>? visit;
   Map<String,dynamic>? report;
   List<Map<String,dynamic>> payments = [];
   bool loading = true;
 
-  @override void initState() { super.initState(); load(); }
+  @override void initState() { super.initState(); currentTicket = Map<String,dynamic>.from(widget.ticket); load(); _refreshTimer = Timer.periodic(const Duration(seconds: 10), (_) => load()); }
+
+  @override void dispose() { _refreshTimer?.cancel(); super.dispose(); }
 
   Future<void> load() async {
     try {
-      final v = await service.visitForComplaint(widget.ticket['id'].toString());
-      final r = await service.serviceReport(widget.ticket['id'].toString());
-      final p = await service.paymentsForComplaint(widget.ticket['id'].toString());
-      if (mounted) setState(() { visit = v; report = r; payments = p; loading = false; });
+      final id = widget.ticket['id'].toString();
+      final c = await service.complaint(id);
+      final v = await service.visitForComplaint(id);
+      final r = await service.serviceReport(id);
+      final p = await service.paymentsForComplaint(id);
+      if (mounted) setState(() { if (c != null) currentTicket = c; visit = v; report = r; payments = p; loading = false; });
     } catch (e) {
       if (mounted) setState(() => loading = false);
     }
   }
 
   @override Widget build(BuildContext context) {
-    final t = widget.ticket;
+    final t = currentTicket.isEmpty ? widget.ticket : currentTicket;
     final status = (t['status'] ?? 'New').toString();
     final techName = visit?['technician_name']?.toString() ?? 'Technician will be assigned';
     return Scaffold(
