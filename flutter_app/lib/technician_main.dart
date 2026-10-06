@@ -33,10 +33,44 @@ class TechnicianApp extends StatelessWidget {
   );
 }
 
-class TechnicianSessionGate extends StatelessWidget {
+class TechnicianSessionGate extends StatefulWidget {
   const TechnicianSessionGate({super.key});
+  @override State<TechnicianSessionGate> createState() => _TechnicianSessionGateState();
+}
+class _TechnicianSessionGateState extends State<TechnicianSessionGate> {
+  bool loading = true;
+  bool allowed = false;
+
   @override
-  Widget build(BuildContext context) => Supabase.instance.client.auth.currentSession == null ? const TechnicianLoginPage() : const TechnicianHomePage();
+  void initState() {
+    super.initState();
+    _checkSession();
+  }
+
+  Future<void> _checkSession() async {
+    final session = Supabase.instance.client.auth.currentSession;
+    if (session == null) {
+      if (mounted) setState(() { loading = false; allowed = false; });
+      return;
+    }
+    final prefs = await SharedPreferences.getInstance();
+    final remember = prefs.getBool('technician_remember_me') ?? true;
+    final until = prefs.getInt('technician_remember_until_ms') ?? 0;
+    if (!remember || until <= DateTime.now().millisecondsSinceEpoch) {
+      await prefs.remove('technician_remember_until_ms');
+      await prefs.remove('technician_remember_me');
+      await Supabase.instance.client.auth.signOut();
+      if (mounted) setState(() { loading = false; allowed = false; });
+      return;
+    }
+    if (mounted) setState(() { loading = false; allowed = true; });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (loading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    return allowed ? const TechnicianHomePage() : const TechnicianLoginPage();
+  }
 }
 
 class TechnicianLoginPage extends StatefulWidget {
@@ -47,6 +81,7 @@ class _TechnicianLoginPageState extends State<TechnicianLoginPage> {
   final mobile = TextEditingController();
   final otp = TextEditingController();
   bool sent = false, busy = false;
+  bool rememberMe = true;
   String phone() {
     var p = mobile.text.trim();
     if (p.startsWith('0')) p = '+91' + p.substring(1);
@@ -72,6 +107,13 @@ class _TechnicianLoginPageState extends State<TechnicianLoginPage> {
         await Supabase.instance.client.auth.signOut();
         throw Exception('This account is not a Technician account.');
       }
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('technician_remember_me', rememberMe);
+      if (rememberMe) {
+        await prefs.setInt('technician_remember_until_ms', DateTime.now().add(const Duration(days: 15)).millisecondsSinceEpoch);
+      } else {
+        await prefs.remove('technician_remember_until_ms');
+      }
       if (mounted) Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const TechnicianHomePage()), (_) => false);
     } catch (e) {
       if (mounted) { setState(() => busy = false); ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()))); }
@@ -90,6 +132,13 @@ class _TechnicianLoginPageState extends State<TechnicianLoginPage> {
         if (!sent) TextField(controller: mobile, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Registered Mobile Number', prefixIcon: Icon(Icons.phone_outlined)))
         else TextField(controller: otp, keyboardType: TextInputType.number, maxLength: 6, decoration: const InputDecoration(labelText: 'OTP', prefixIcon: Icon(Icons.lock_outline))),
         const SizedBox(height: 12),
+        if (sent) CheckboxListTile(
+          contentPadding: EdgeInsets.zero,
+          value: rememberMe,
+          onChanged: busy ? null : (v) => setState(() => rememberMe = v ?? true),
+          title: const Text('Remember Me for 15 days', style: TextStyle(fontWeight: FontWeight.w600)),
+          controlAffinity: ListTileControlAffinity.leading,
+        ),
         SizedBox(width: double.infinity, height: 54, child: FilledButton(onPressed: busy ? null : (sent ? verify : send), child: busy ? const CircularProgressIndicator(color: Colors.white) : Text(sent ? 'VERIFY & CONTINUE' : 'SEND OTP'))),
         if (sent) TextButton(onPressed: () => setState(() => sent = false), child: const Text('Change mobile number')),
         const SizedBox(height: 28), const Text('CCTV | IT Security | Service & AMC', style: TextStyle(fontWeight: FontWeight.w700)),
@@ -131,6 +180,9 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
     if (mounted) setState(() => loading = false);
   }
   Future<void> logout() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('technician_remember_until_ms');
+    await prefs.remove('technician_remember_me');
     await Supabase.instance.client.auth.signOut();
     if (mounted) Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const TechnicianLoginPage()), (_) => false);
   }
