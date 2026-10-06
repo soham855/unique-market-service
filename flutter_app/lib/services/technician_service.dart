@@ -66,12 +66,15 @@ class TechnicianService {
     final user = client.auth.currentUser;
     if (tech == null || user == null) throw Exception('Technician record/session not found.');
 
-    final visit = await client.from('service_visits').insert({
+    final existingVisits = await client.from('service_visits').select('id').eq('complaint_id', complaintId).isFilter('completed_at', null).order('created_at', ascending: false).limit(1);
+    final visit = existingVisits.isNotEmpty
+        ? Map<String, dynamic>.from(existingVisits.first)
+        : Map<String, dynamic>.from(await client.from('service_visits').insert({
       'complaint_id': complaintId,
       'technician_id': tech['id'],
       'started_at': DateTime.now().toUtc().toIso8601String(),
       'diagnosis': diagnosis,
-    }).select('id').single();
+    }).select('id').single());
 
     final existing = await client.from('service_reports').select().eq('complaint_id', complaintId).eq('technician_id', user.id).order('created_at', ascending: false).limit(1);
     Map<String, dynamic> report;
@@ -91,6 +94,20 @@ class TechnicianService {
     }
     await updateStatus(complaintId, 'In Service');
     return report;
+  }
+
+  Future<List<Map<String, dynamic>>> completedJobs() async {
+    final user = client.auth.currentUser;
+    if (user == null) return [];
+    final rows = await client.from('complaints').select().eq('technician_id', user.id).eq('status', 'Completed').order('completed_at', ascending: false);
+    return List<Map<String, dynamic>>.from(rows);
+  }
+
+  Future<List<Map<String, dynamic>>> completedReports() async {
+    final user = client.auth.currentUser;
+    if (user == null) return [];
+    final rows = await client.from('service_reports').select().eq('technician_id', user.id).order('created_at', ascending: false);
+    return List<Map<String, dynamic>>.from(rows);
   }
 
   Future<Map<String, dynamic>?> activeReport(String complaintId) async {
