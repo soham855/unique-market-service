@@ -97,7 +97,8 @@ class AdminService {
     final customer = await client.from('customers').select('profile_id').eq('id', payment['customer_id']).maybeSingle();
     final profileId = customer?['profile_id']?.toString();
     if (profileId != null && profileId.isNotEmpty) {
-      final approved = status.toLowerCase() == 'approved';
+      final normalized = status.toLowerCase();
+      final approved = normalized == 'approved' || normalized == 'paid' || normalized == 'completed';
       await client.from('notifications').insert({
         'user_id': profileId, 'complaint_id': payment['complaint_id'],
         'title': approved ? 'Payment Approved' : 'Payment Rejected',
