@@ -92,6 +92,10 @@ class CustomerService {
   }) async {
     final customer = await this.customer();
     if (customer == null) throw Exception('Customer profile not found');
+    final existing = await client.from('payments').select('id,payment_status,status').eq('complaint_id', complaintId);
+    if (existing.any((p) => (p['payment_status'] ?? p['status'] ?? '').toString().toLowerCase() == 'pending')) {
+      throw Exception('A payment for this ticket is already pending admin verification.');
+    }
     final payload = <String, dynamic>{
       'customer_id': customer['id'],
       'complaint_id': complaintId,
