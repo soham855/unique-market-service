@@ -5,6 +5,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import 'config/supabase_config.dart';
 import 'services/auth_service.dart';
 import 'services/technician_service.dart';
@@ -139,7 +141,12 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
       ])),
       bottomNavigationBar: NavigationBar(selectedIndex: tab, onDestinationSelected: (i) async {
         if (i == 0) { setState(() => tab = 0); return; }
-        if (i == 1) { setState(() => tab = 1); return; }
+        if (i == 1) {
+          setState(() => tab = 1);
+          await Navigator.push(context, MaterialPageRoute(builder: (_) => TechnicianHistoryPage(service: service)));
+          if (mounted) { setState(() => tab = 0); load(); }
+          return;
+        }
         if (i == 2) {
           setState(() => tab = 2);
           await Navigator.push(context, MaterialPageRoute(builder: (_) => TechnicianSchedulePage(service: service)));
@@ -160,6 +167,131 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
     );
   }
   Widget _metric(String title, String value, IconData icon) => Card(child: Padding(padding: const EdgeInsets.all(14), child: Column(children: [Icon(icon, color: const Color(0xFF0B63F6)), const SizedBox(height: 7), Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)), Text(title, style: const TextStyle(color: Colors.black54))])));
+}
+
+
+class TechnicianHistoryPage extends StatefulWidget {
+  final TechnicianService service;
+  const TechnicianHistoryPage({super.key, required this.service});
+  @override State<TechnicianHistoryPage> createState() => _TechnicianHistoryPageState();
+}
+class _TechnicianHistoryPageState extends State<TechnicianHistoryPage> {
+  List<Map<String,dynamic>> jobs = [];
+  List<Map<String,dynamic>> reports = [];
+  bool loading = true;
+  double earnings = 0;
+  @override void initState(){super.initState(); load();}
+  Future<void> load() async {
+    try {
+      jobs = await widget.service.completedJobs();
+      reports = await widget.service.completedReports();
+      earnings = 0;
+      for (final r in reports) {
+        earnings += (num.tryParse(r['labour_amount']?.toString() ?? '') ?? 0).toDouble();
+        earnings += (num.tryParse(r['other_amount']?.toString() ?? '') ?? 0).toDouble();
+      }
+    } catch (_) {}
+    if(mounted)setState(()=>loading=false);
+  }
+  Map<String,dynamic>? reportFor(String id) {
+    for(final r in reports){ if(r['complaint_id']?.toString()==id) return r; }
+    return null;
+  }
+  @override Widget build(BuildContext context)=>Scaffold(
+    appBar: AppBar(title:const Text('Job History & Earnings'),actions:[IconButton(onPressed:load,icon:const Icon(Icons.refresh))]),
+    body: loading ? const Center(child:CircularProgressIndicator()) : RefreshIndicator(
+      onRefresh:load, child:ListView(padding:const EdgeInsets.all(16),children:[
+        Card(child:Padding(padding:const EdgeInsets.all(18),child:Row(children:[
+          const CircleAvatar(radius:26,child:Icon(Icons.currency_rupee)),
+          const SizedBox(width:14), Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+            const Text('Service Earnings',style:TextStyle(color:Colors.black54)),
+            Text('₹${earnings.toStringAsFixed(2)}',style:const TextStyle(fontSize:28,fontWeight:FontWeight.w900)),
+          ])),
+          Column(children:[Text('${jobs.length}',style:const TextStyle(fontSize:22,fontWeight:FontWeight.w900)),const Text('Completed',style:TextStyle(color:Colors.black54))])
+        ]))),
+        const SizedBox(height:12),
+        const Text('Completed Jobs',style:TextStyle(fontSize:20,fontWeight:FontWeight.w800)),
+        const SizedBox(height:8),
+        if(jobs.isEmpty) const Card(child:Padding(padding:EdgeInsets.all(24),child:Center(child:Text('No completed jobs yet.')))),
+        ...jobs.map((j){
+          final r=reportFor(j['id'].toString());
+          final total=(num.tryParse(r?['labour_amount']?.toString()??'')??0)+(num.tryParse(r?['other_amount']?.toString()??'')??0);
+          return Card(child:ListTile(
+            leading:const CircleAvatar(child:Icon(Icons.check_circle_outline)),
+            title:Text((j['ticket_no']??j['complaint_no']??'Completed Job').toString(),style:const TextStyle(fontWeight:FontWeight.w800)),
+            subtitle:Text('${j['customer_name']??'Customer'}\n${j['completed_at']??'-'}',maxLines:2),
+            trailing:Text('₹${total.toStringAsFixed(0)}',style:const TextStyle(fontWeight:FontWeight.w800)),
+            onTap:r==null?null:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>TechnicianServiceReportPage(job:j,report:r))),
+          ));
+        }),
+      ])
+    ),
+  );
+}
+
+class TechnicianServiceReportPage extends StatelessWidget {
+  final Map<String,dynamic> job;
+  final Map<String,dynamic> report;
+  const TechnicianServiceReportPage({super.key,required this.job,required this.report});
+
+  Future<void> exportPdf(BuildContext context) async {
+    final doc=pw.Document();
+    final ticket=(job['ticket_no']??job['complaint_no']??'Service Report').toString();
+    final labour=(num.tryParse(report['labour_amount']?.toString()??'')??0).toDouble();
+    final other=(num.tryParse(report['other_amount']?.toString()??'')??0).toDouble();
+    final total=labour+other;
+    doc.addPage(pw.Page(build:(_)=>pw.Column(crossAxisAlignment:pw.CrossAxisAlignment.start,children:[
+      pw.Text('UNIQUE MARKET',style:pw.TextStyle(fontSize:24,fontWeight:pw.FontWeight.bold)),
+      pw.Text('CCTV | IT Security | Service & AMC'),
+      pw.SizedBox(height:18),
+      pw.Text('COMPLETED SERVICE REPORT',style:pw.TextStyle(fontSize:18,fontWeight:pw.FontWeight.bold)),
+      pw.Divider(),
+      pw.Text('Ticket: $ticket'),
+      pw.Text('Customer: ${job['customer_name']??'-'}'),
+      pw.Text('Mobile: ${job['customer_phone']??'-'}'),
+      pw.Text('Address: ${job['address']??job['location_text']??'-'}'),
+      pw.Text('Service: ${job['service_type']??job['category']??'-'}'),
+      pw.Text('Completed: ${job['completed_at']??'-'}'),
+      pw.SizedBox(height:14),
+      pw.Text('Diagnosis: ${report['diagnosis']??'-'}'),
+      pw.Text('Work Done: ${report['work_summary']??'-'}'),
+      pw.Text('Parts Used: ${report['parts_used']??'-'}'),
+      pw.SizedBox(height:10),
+      pw.Text('Labour: ₹${labour.toStringAsFixed(2)}'),
+      pw.Text('Other: ₹${other.toStringAsFixed(2)}'),
+      pw.Text('Total Service Charges: ₹${total.toStringAsFixed(2)}',style:pw.TextStyle(fontWeight:pw.FontWeight.bold)),
+      pw.SizedBox(height:20),
+      pw.Text('Customer Approval: ${report['customer_otp_verified']==true?'OTP Verified':'Not Verified'}'),
+      pw.SizedBox(height:30),
+      pw.Text('Station Road, Hotel Rajdoot, Ichalkaranji'),
+      pw.Text('7350060071'),
+    ])));
+    await Printing.layoutPdf(onLayout:(_)=>doc.save());
+  }
+  @override Widget build(BuildContext context){
+    final total=(num.tryParse(report['labour_amount']?.toString()??'')??0)+(num.tryParse(report['other_amount']?.toString()??'')??0);
+    return Scaffold(appBar:AppBar(title:const Text('Service Report')),body:ListView(padding:const EdgeInsets.all(18),children:[
+      Card(child:Padding(padding:const EdgeInsets.all(18),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+        Text((job['ticket_no']??job['complaint_no']??'Report').toString(),style:const TextStyle(fontSize:24,fontWeight:FontWeight.w900)),
+        const SizedBox(height:10),
+        Text('Customer: ${job['customer_name']??'-'}'),
+        Text('Completed: ${job['completed_at']??'-'}'),
+        const Divider(height:24),
+        Text('Diagnosis: ${report['diagnosis']??'-'}'),
+        const SizedBox(height:8),
+        Text('Work Done: ${report['work_summary']??'-'}'),
+        const SizedBox(height:8),
+        Text('Parts Used: ${report['parts_used']??'-'}'),
+        const Divider(height:24),
+        Text('Labour: ₹${(num.tryParse(report['labour_amount']?.toString()??'')??0).toStringAsFixed(2)}'),
+        Text('Other: ₹${(num.tryParse(report['other_amount']?.toString()??'')??0).toStringAsFixed(2)}'),
+        const SizedBox(height:6),
+        Text('Total: ₹${total.toStringAsFixed(2)}',style:const TextStyle(fontSize:20,fontWeight:FontWeight.w900)),
+      ]))),
+      const SizedBox(height:12),
+      SizedBox(height:52,child:FilledButton.icon(onPressed:()=>exportPdf(context),icon:const Icon(Icons.picture_as_pdf),label:const Text('VIEW / SHARE PDF REPORT'))),
+    ]));
+  }
 }
 
 class TechnicianSchedulePage extends StatefulWidget {
