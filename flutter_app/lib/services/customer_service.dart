@@ -149,6 +149,21 @@ class CustomerService {
     return Map<String,dynamic>.from(row);
   }
 
+  Future<Map<String,dynamic>?> amcRenewalRequest(String amcId) async {
+    final customer = await this.customer(); if (customer == null) return null;
+    final row = await client.from('amc_renewal_requests').select().eq('amc_contract_id', amcId).eq('customer_id', customer['id']).maybeSingle();
+    return row == null ? null : Map<String,dynamic>.from(row);
+  }
+
+  Future<void> requestAmcRenewal(String amcId, {String? notes}) async {
+    final customer = await this.customer(); if (customer == null) throw Exception('Customer profile not found');
+    await client.from('amc_renewal_requests').upsert({
+      'amc_contract_id': amcId, 'customer_id': customer['id'],
+      'notes': notes?.trim().isEmpty == true ? null : notes?.trim(),
+      'status': 'pending'
+    }, onConflict: 'amc_contract_id,customer_id');
+  }
+
   Future<List<Map<String,dynamic>>> amcContracts() async {
     final customer = await this.customer();
     if (customer == null) return [];
