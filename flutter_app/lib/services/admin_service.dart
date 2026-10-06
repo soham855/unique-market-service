@@ -50,13 +50,19 @@ class AdminService {
   Future<void> assignComplaint(String complaintId, String technicianProfileId, DateTime? visitAt, {String? note}) async {
     final data = <String,dynamic>{
       'technician_id': technicianProfileId,
-      'status': 'Assigned',
+      'status': visitAt == null ? 'Assigned' : 'Scheduled',
       'assigned_at': DateTime.now().toUtc().toIso8601String(),
       'scheduled_visit_at': visitAt?.toUtc().toIso8601String(),
       'scheduled_visit_date': visitAt == null ? null : visitAt.toIso8601String().substring(0,10),
     };
     if (note != null && note.trim().isNotEmpty) data['resolution_notes'] = note.trim();
-    await client.from('complaints').update(data).eq('id', complaintId);
+    final updated = await client.from('complaints').update(data).eq('id', complaintId).select('id,ticket_no,customer_id,scheduled_visit_at').single();
+    final customer = await client.from('customers').select('profile_id').eq('id', updated['customer_id']).maybeSingle();
+    final customerProfileId = customer?['profile_id']?.toString();
+    if (customerProfileId != null && customerProfileId.isNotEmpty) {
+      await client.from('notifications').insert({'user_id': customerProfileId, 'complaint_id': complaintId, 'title': visitAt == null ? 'Technician Assigned' : 'Visit Scheduled', 'message': visitAt == null ? 'A technician has been assigned to your complaint.' : 'Your service visit is scheduled for ' + visitAt.toLocal().toString(), 'type': 'complaint_update'});
+    }
+    await client.from('notifications').insert({'user_id': technicianProfileId, 'complaint_id': complaintId, 'title': visitAt == null ? 'New Job Assigned' : 'New Visit Scheduled', 'message': 'Ticket ' + (updated['ticket_no'] ?? complaintId).toString() + (visitAt == null ? ' has been assigned to you.' : ' is scheduled for ' + visitAt.toLocal().toString()), 'type': 'technician_job'});
   }
 
   Future<List<Map<String,dynamic>>> reportComplaints() async {
