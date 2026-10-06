@@ -109,12 +109,25 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
   Map<String,dynamic>? tech;
   bool loading = true;
   int tab = 0;
+  int unreadNotifications = 0;
   late final PushNotificationService pushService;
   Timer? _timer;
   @override void initState() { super.initState(); pushService = PushNotificationService(Supabase.instance.client); pushService.initialize(); load(); _timer = Timer.periodic(const Duration(seconds:10), (_) => load()); }
   @override void dispose() { _timer?.cancel(); super.dispose(); }
   Future<void> load() async {
-    try { tech = await service.technician(); jobs = await service.jobs(); } catch (_) {}
+    try {
+      tech = await service.technician();
+      jobs = await service.jobs();
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user != null) {
+        final rows = await Supabase.instance.client
+            .from('notifications')
+            .select('id')
+            .eq('user_id', user.id)
+            .isFilter('read_at', null);
+        unreadNotifications = rows.length;
+      }
+    } catch (_) {}
     if (mounted) setState(() => loading = false);
   }
   Future<void> logout() async {
@@ -127,7 +140,32 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
     final completed = jobs.where((j) => j['status'] == 'Completed').length;
     return Scaffold(
       appBar: AppBar(title: const Text('Technician', style: TextStyle(fontWeight: FontWeight.w800)), actions: [
-        IconButton(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TechnicianNotificationsPage(service: pushService))), icon: const Icon(Icons.notifications_none_outlined)),
+        Stack(
+          children: [
+            IconButton(
+              onPressed: () async {
+                await Navigator.push(context, MaterialPageRoute(builder: (_) => TechnicianNotificationsPage(service: pushService)));
+                if (mounted) load();
+              },
+              icon: const Icon(Icons.notifications_none_outlined),
+            ),
+            if (unreadNotifications > 0)
+              Positioned(
+                right: 6,
+                top: 5,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                  decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(10)),
+                  constraints: const BoxConstraints(minWidth: 18),
+                  child: Text(
+                    unreadNotifications > 99 ? '99+' : unreadNotifications.toString(),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ),
+          ],
+        ),
         IconButton(onPressed: load, icon: const Icon(Icons.refresh)),
         PopupMenuButton<String>(onSelected: (v) { if (v == 'logout') logout(); }, itemBuilder: (_) => const [PopupMenuItem(value: 'logout', child: Text('Logout'))])
       ]),
@@ -306,8 +344,9 @@ class TechnicianNotificationsPage extends StatefulWidget {
   @override State<TechnicianNotificationsPage> createState()=>_TechnicianNotificationsPageState();
 }
 class _TechnicianNotificationsPageState extends State<TechnicianNotificationsPage>{
-  List<Map<String,dynamic>> items=[]; bool loading=true;
-  @override void initState(){super.initState(); load();}
+  List<Map<String,dynamic>> items=[]; bool loading=true; Timer? _timer;
+  @override void initState(){super.initState(); load(); _timer=Timer.periodic(const Duration(seconds:10), (_) => load());}
+  @override void dispose(){_timer?.cancel(); super.dispose();}
   Future<void> load()async{
     final user=Supabase.instance.client.auth.currentUser;
     if(user==null){if(mounted)setState(()=>loading=false);return;}
@@ -317,7 +356,7 @@ class _TechnicianNotificationsPageState extends State<TechnicianNotificationsPag
     }catch(_){}
     if(mounted)setState(()=>loading=false);
   }
-  Future<void> markRead(String id)async{try{await Supabase.instance.client.from('notifications').update({'read_at':DateTime.now().toUtc().toIso8601String()}).eq('id',id);}catch(_){}}
+  Future<void> markRead(String id)async{try{await Supabase.instance.client.from('notifications').update({'read_at':DateTime.now().toUtc().toIso8601String()}).eq('id',id); await load();}catch(_){}}
   @override Widget build(BuildContext context)=>Scaffold(
     appBar:AppBar(title:const Text('Notifications'),actions:[IconButton(onPressed:load,icon:const Icon(Icons.refresh))]),
     body:loading?const Center(child:CircularProgressIndicator()):RefreshIndicator(onRefresh:load,child:ListView(padding:const EdgeInsets.all(12),children:[
