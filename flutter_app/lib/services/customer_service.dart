@@ -100,4 +100,9 @@ class CustomerService {
     return Map<String, dynamic>.from(result);
   }
 
+  Future<Map<String, dynamic>?> serviceReport(String complaintId) async {
+    final rows = await client.from('service_reports').select().eq('complaint_id', complaintId).order('created_at', ascending: false).limit(1);
+    return rows.isEmpty ? null : Map<String, dynamic>.from(rows.first);
+  }
+
 }
