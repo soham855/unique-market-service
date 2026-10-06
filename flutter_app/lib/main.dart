@@ -296,6 +296,7 @@ class TicketDetailsPage extends StatefulWidget {
 class _TicketDetailsPageState extends State<TicketDetailsPage> {
   final service = CustomerService(Supabase.instance.client);
   Map<String,dynamic>? visit;
+  Map<String,dynamic>? report;
   List<Map<String,dynamic>> payments = [];
   bool loading = true;
 
@@ -304,8 +305,9 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
   Future<void> load() async {
     try {
       final v = await service.visitForComplaint(widget.ticket['id'].toString());
+      final r = await service.serviceReport(widget.ticket['id'].toString());
       final p = await service.paymentsForComplaint(widget.ticket['id'].toString());
-      if (mounted) setState(() { visit = v; payments = p; loading = false; });
+      if (mounted) setState(() { visit = v; report = r; payments = p; loading = false; });
     } catch (e) {
       if (mounted) setState(() => loading = false);
     }
@@ -356,6 +358,23 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
                 OutlinedButton.icon(onPressed: () => _whatsapp(context), icon: const Icon(Icons.chat_outlined), label: const Text('WhatsApp')),
               ]),
             ])),
+            if (report != null && (status == 'In Service' || status == 'Completed')) ...[
+              const SizedBox(height: 12),
+              _sectionCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('Service Completion', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                const SizedBox(height: 10),
+                if (report!['customer_' + 'otp']?.toString().isNotEmpty == true && report!['customer_' + 'otp' + '_verified'] != true) ...[
+                  const Text('Give this verification code to the technician when service is ready for completion.', style: TextStyle(color: Colors.black54)),
+                  const SizedBox(height: 10),
+                  Center(child: Text(report!['customer_' + 'otp'].toString(), style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, letterSpacing: 6))),
+                ] else if (report!['customer_' + 'otp' + '_verified'] == true) const ListTile(contentPadding: EdgeInsets.zero, leading: Icon(Icons.verified, color: Colors.green), title: Text('Customer Verification Complete')),
+                if ((report!['diagnosis']?.toString() ?? '').isNotEmpty) _row('Diagnosis', report!['diagnosis']),
+                if ((report!['work_summary']?.toString() ?? '').isNotEmpty) _row('Work done', report!['work_summary']),
+                if (report!['labour_amount'] != null) _row('Labour', '₹' + report!['labour_amount'].toString()),
+                if (report!['other_amount'] != null) _row('Other', '₹' + report!['other_amount'].toString()),
+                if (status == 'Completed') const ListTile(contentPadding: EdgeInsets.zero, leading: Icon(Icons.check_circle, color: Colors.green), title: Text('Service Completed')),
+              ])),
+            ],
             const SizedBox(height: 12),
             _sectionCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               const Text('Payment', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
