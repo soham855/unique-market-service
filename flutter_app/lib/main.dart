@@ -193,6 +193,8 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
       ]),
       const SizedBox(height: 12),
       _homeCard(Icons.verified_user_outlined, 'AMC Contracts', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AmcContractsPage()))),
+      const SizedBox(height: 12),
+      _homeCard(Icons.support_agent_outlined, 'Help & Support', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpSupportPage()))),
       const SizedBox(height: 24),
       const Text('Recent Service', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
       const SizedBox(height: 10),
@@ -220,6 +222,36 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   ));
 }
 
+class HelpSupportPage extends StatelessWidget {
+  const HelpSupportPage({super.key});
+  Future<void> call(BuildContext context)async{
+    final ok=await launchUrl(Uri(scheme:'tel',path:'7350060071'));
+    if(!ok&&context.mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Could not open phone dialer.')));
+  }
+  Future<void> whatsapp(BuildContext context)async{
+    final ok=await launchUrl(Uri.parse('https://wa.me/917350060071'),mode:LaunchMode.externalApplication);
+    if(!ok&&context.mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Could not open WhatsApp.')));
+  }
+  @override Widget build(BuildContext context)=>Scaffold(
+    appBar:AppBar(title:const Text('Help & Support')),
+    body:ListView(padding:const EdgeInsets.all(18),children:[
+      const Card(child:Padding(padding:EdgeInsets.all(20),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+        Text('UNIQUE MARKET',style:TextStyle(fontSize:22,fontWeight:FontWeight.w900)),
+        SizedBox(height:6),Text('CCTV | IT Security | Service & AMC',style:TextStyle(fontWeight:FontWeight.w700)),
+        SizedBox(height:12),Text('Station Road, Hotel Rajdoot, Ichalkaranji'),
+        Text('7350060071'),
+      ]))),
+      const SizedBox(height:14),
+      Card(child:ListTile(leading:const Icon(Icons.call_outlined),title:const Text('Call Unique Market'),subtitle:const Text('7350060071'),onTap:()=>call(context))),
+      Card(child:ListTile(leading:const Icon(Icons.chat_outlined),title:const Text('WhatsApp Support'),subtitle:const Text('Chat with Unique Market'),onTap:()=>whatsapp(context))),
+      Card(child:ListTile(leading:const Icon(Icons.location_on_outlined),title:const Text('Office Location'),subtitle:const Text('Station Road, Hotel Rajdoot, Ichalkaranji'),onTap:()=>launchUrl(Uri.parse('https://www.google.com/maps/search/?api=1&query=Station+Road+Hotel+Rajdoot+Ichalkaranji'),mode:LaunchMode.externalApplication))),
+      const SizedBox(height:12),
+      const Card(child:Padding(padding:EdgeInsets.all(18),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+        Text('Common Help',style:TextStyle(fontSize:18,fontWeight:FontWeight.w800)),
+        SizedBox(height:10),Text('• CCTV camera offline\n• DVR/NVR recording issue\n• Internet/network issue\n• Computer/Laptop error\n• AMC renewal'),
+      ]))),
+    ]));
+}
 class AmcContractsPage extends StatefulWidget {
   const AmcContractsPage({super.key});
   @override State<AmcContractsPage> createState()=>_AmcContractsPageState();
