@@ -189,8 +189,8 @@ class CustomerNotificationsPage extends StatefulWidget {
   @override State<CustomerNotificationsPage> createState()=>_CustomerNotificationsPageState();
 }
 class _CustomerNotificationsPageState extends State<CustomerNotificationsPage>{
-  List<Map<String,dynamic>> items=[]; bool loading=true;
-  @override void initState(){super.initState();load();}
+  List<Map<String,dynamic>> items=[]; bool loading=true; Timer? _timer;
+  @override void initState(){super.initState();load(); _timer=Timer.periodic(const Duration(seconds:10), (_) => load());}
   Future<void> load()async{
     final user=Supabase.instance.client.auth.currentUser;
     if(user==null){if(mounted)setState(()=>loading=false);return;}
