@@ -129,8 +129,8 @@ async function sendDocument(phoneOrJid, url, filename = 'Unique-Market-Receipt.p
 async function markProcessed(key, messageId) {
   if (!key) return true
   try {
-    await supabase('/whatsapp_openwa_processed_events', { method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' }, body: JSON.stringify({ idempotency_key: key, message_id: messageId || null }) })
-    return true
+    const rows = await supabase('/whatsapp_openwa_processed_events', { method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=representation' }, body: JSON.stringify({ idempotency_key: key, message_id: messageId || null }) })
+    return Array.isArray(rows) && rows.length > 0
   } catch (err) {
     if (/409|duplicate|unique/i.test(String(err?.message || err))) return false
     throw err
