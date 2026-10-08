@@ -19,6 +19,9 @@ const PORT = Number(process.env.PORT || 10000)
 // Default remains local for development; set WA_AUTH_DIR=/var/data/whatsapp-auth in Render.
 const AUTH_DIR = process.env.WA_AUTH_DIR || path.resolve('whatsapp-bot/auth_info')
 const PHONE_NUMBER = String(process.env.WA_PHONE_NUMBER || '917350060071').replace(/\D/g, '')
+const STAFF_PHONE_NUMBER = String(process.env.STAFF_WHATSAPP_NUMBER || '917350060071').replace(/\D/g, '')
+const GOOGLE_API_KEY = String(process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || '').trim()
+const GEMINI_TRANSCRIBE_MODEL = String(process.env.GEMINI_TRANSCRIBE_MODEL || 'gemini-2.5-flash').trim()
 const WA_API_SECRET = String(process.env.WA_API_SECRET || '')
 const KAPSO_WEBHOOK_SECRET = String(process.env.KAPSO_WEBHOOK_SECRET || '')
 const SUPABASE_URL = String(process.env.SUPABASE_URL || 'https://tfscvycomllamoubtlcf.supabase.co')
@@ -1231,6 +1234,52 @@ function startEventPoller() {
   setInterval(() => processNotificationEvents().catch(err => logger.error({ err: describeSupabaseError(err) }, 'event poll failed')), EVENT_POLL_MS)
 }
 
+
+async function transcribeWhatsAppVoice(buffer, mimetype = 'audio/ogg') {
+  if (!GOOGLE_API_KEY) {
+    throw new Error('Voice transcription is not configured. Add GOOGLE_API_KEY or GEMINI_API_KEY in Render environment variables.')
+  }
+  const base64 = Buffer.from(buffer).toString('base64')
+  const cleanMime = String(mimetype || 'audio/ogg').split(';')[0].trim() || 'audio/ogg'
+  const endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/' +
+    encodeURIComponent(GEMINI_TRANSCRIBE_MODEL) + ':generateContent?key=' + encodeURIComponent(GOOGLE_API_KEY)
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{
+        parts: [
+          { text: 'Transcribe this WhatsApp customer voice message. The customer may speak Marathi, Hindi, or English. Return only the transcription in the original spoken language. Do not add explanations.' },
+          { inlineData: { mimeType: cleanMime, data: base64 } }
+        ]
+      }],
+      generationConfig: { temperature: 0.1 }
+    })
+  })
+  const payload = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error('Voice transcription failed: ' + (payload?.error?.message || ('HTTP ' + response.status)))
+  const transcript = String(payload?.candidates?.[0]?.content?.parts?.map(p => p?.text || '').join(' ') || '').trim()
+  if (!transcript) throw new Error('Voice message could not be transcribed.')
+  return transcript
+}
+
+async function notifyStaffOfHandoff(customerPhone, customerText) {
+  const staffJid = recipientJid(STAFF_PHONE_NUMBER)
+  if (!staffJid || normalizeBroadcastPhone(STAFF_PHONE_NUMBER) === normalizeBroadcastPhone(customerPhone)) return false
+  const message = [
+    '👨‍💼 *UNIQUE MARKET | STAFF REQUEST*',
+    '',
+    'A customer requested human assistance on WhatsApp.',
+    '📞 *Customer:* ' + (customerPhone || 'Unknown'),
+    '💬 *Message:* ' + (customerText || 'Customer requested staff assistance.'),
+    '',
+    'Please contact the customer.',
+    '📞 *7350060071*'
+  ].join('\n')
+  await sendText(staffJid, formatWhatsAppBranding(message))
+  return true
+}
+
 async function startWhatsApp() {
   if (reconnecting && status === 'resetting') return
   const leaseAcquired = await acquireWhatsAppLease()
@@ -1303,8 +1352,30 @@ async function startWhatsApp() {
       const conversationKey = from || remoteJid
       const locationMessage = msg.message?.locationMessage || null
       const mediaNode = msg.message?.imageMessage || msg.message?.videoMessage || msg.message?.documentMessage || null
+      const audioNode = msg.message?.audioMessage || null
       const mediaType = msg.message?.imageMessage ? 'image' : msg.message?.videoMessage ? 'video' : msg.message?.documentMessage ? 'document' : null
-      const text = String(msg.message?.conversation || msg.message?.extendedTextMessage?.text || mediaNode?.caption || '').trim()
+      const isVoiceMessage = Boolean(audioNode)
+      let text = String(msg.message?.conversation || msg.message?.extendedTextMessage?.text || mediaNode?.caption || '').trim()
+      if (isVoiceMessage) {
+        try {
+          const voiceBuffer = await downloadMediaMessage(msg, 'buffer', {}, { logger, reuploadRequest: sock.updateMediaMessage })
+          text = await transcribeWhatsAppVoice(voiceBuffer, audioNode?.mimetype || 'audio/ogg')
+          console.log('WhatsApp voice transcribed:', JSON.stringify({ from: from || null, transcript: text }))
+        } catch (err) {
+          console.error('WhatsApp voice transcription failed:', String(err?.message || err))
+          const fallback = [
+            '🎤 *VOICE COMPLAINT RECEIVED*',
+            '',
+            'Tumcha voice message receive zala, pan ata voice samajta ala nahi.',
+            '',
+            '1️⃣ Complaint type kara',
+            '2️⃣ Punha short voice message pathva',
+            '3️⃣ 📞 *7350060071* var call kara'
+          ].join('\n')
+          try { await sendText(from, formatWhatsAppBranding(fallback)) } catch {}
+          continue
+        }
+      }
       if (controlSelfMessage) {
         try {
           let mediaInfo = null
@@ -1356,11 +1427,26 @@ async function startWhatsApp() {
       // Clear any stale interactive session before routing this menu option.
       if (normalized === '2') clearComplaintSession(conversationKey)
 
-      const active = complaintSessions.get(conversationKey); const quote = quoteSessions.get(conversationKey)
+      
+      if (isVoiceMessage && !complaintSessions.has(conversationKey) && !quoteSessions.has(conversationKey)) {
+        complaintSessions.set(conversationKey, {
+          step: 'name',
+          problem: text,
+          name: '',
+          location: '',
+          locationMode: null,
+          latitude: null,
+          longitude: null,
+          priority: 'normal'
+        })
+        reply = '🎤 *VOICE COMPLAINT UNDERSTOOD*\n\n🛠️ *Problem:* ' + text + '\n\n👤 Ata *Customer / Company Name* pathva.'
+      }
+
+const active = complaintSessions.get(conversationKey); const quote = quoteSessions.get(conversationKey)
 
       if (/^(cancel|stop|0|menu|back)$/i.test(normalized)) {
         clearComplaintSession(conversationKey)
-        reply = '🔷 *UNIQUE MARKET*\n_CCTV | IT Security | Service & AMC_\n\nNamaskar! Aaple swagat aahe.\n\n1️⃣ Service / Complaint\n2️⃣ Instant CCTV Quote\n3️⃣ CCTV / Sales\n4️⃣ AMC Service\n5️⃣ Payment Query\n6️⃣ More Services\n\nKrupaya *1, 2, 3 kiwa 4* pathva.'
+        reply = '🔷 *UNIQUE MARKET*\n_CCTV | IT Security | Service & AMC_\n\nNamaskar! Aaple swagat aahe.\n\n1️⃣ Service / Complaint\n2️⃣ Instant CCTV Quote\n3️⃣ CCTV / Sales\n4️⃣ AMC Service\n5️⃣ Payment Query\n6️⃣ More Services\n\n🎤 *Voice Complaint:* Voice message pathva\n📞 *Call Service:* +91 7350060071\n👨‍💼 *Talk to Staff:* 7\n\nKrupaya *1 ते 7* madhla option pathva kiwa direct voice message pathva.'
       } else if (quote) {
         const qty = Number.parseInt(text, 10)
         if (quote.step === 'dome') {
@@ -1506,7 +1592,7 @@ async function startWhatsApp() {
             reply = '⚠️ Complaint register kartana temporary problem ala. Complaint session reset keli aahe. Punha *1* pathvun complaint register kara kiwa *2* pathvun CCTV Quote ghya.\n\n📞 *7350060071*'
           }
         }
-      } else if (/^(hi+|hello+|hey+|namaskar|नमस्कार)$/i.test(normalized)) {
+      } else if (!reply && /^(hi+|hello+|hey+|namaskar|नमस्कार)$/i.test(normalized)) {
         reply = '🔷 *UNIQUE MARKET*\n_CCTV | IT Security | Service & AMC_\n\nNamaskar! Aaple swagat aahe.\n\n1️⃣ Service / Complaint\n2️⃣ Instant CCTV Quote\n3️⃣ CCTV / Sales\n4️⃣ AMC Service\n5️⃣ Payment Query\n6️⃣ More Services\n\nKrupaya *1, 2, 3 kiwa 4* pathva.'
       } else if (normalized === '1') {
         complaintSessions.set(conversationKey, { step: 'problem', problem: '', name: '', location: '', locationMode: null, latitude: null, longitude: null, priority: 'normal' })
@@ -1519,6 +1605,14 @@ async function startWhatsApp() {
         reply = '🔧 *AMC SERVICE*\n\nAMC service sathi Customer/Company Name + Location pathva.\n\nAmhi tumhala pudhil process sangto.\n\nType *menu* for Main Menu.'
       } else if (normalized === '5') {
         reply = '💳 *PAYMENT QUERY*\n\nInvoice Number kiwa Customer/Company Name pathva.\n\nOur office team payment status check karel.\n\n📞 7350060071'
+      } else if (normalized === '7') {
+        try {
+          const customerPhone = String(from || '').replace(/\D/g, '')
+          await notifyStaffOfHandoff(customerPhone, 'Customer selected Talk to Staff.')
+        } catch (err) {
+          console.error('Staff handoff notification failed:', String(err?.message || err))
+        }
+        reply = '👨‍💼 *TALK TO STAFF*\n\nTumchi request staff kade pathavli aahe.\n\n📞 *7350060071*\n\nTumhala call karaycha asel tar varcha number tap kara.\\n\\nTumhi tumcha problem voice message madhye pan pathvu shakta.'
       } else if (normalized === '6') {
         reply = '🧰 *MORE SERVICES*\n\nComputer Repair, Networking, Laptop/Desktop, AMC & IT services sathi *7350060071* var contact kara.'
       } else {
