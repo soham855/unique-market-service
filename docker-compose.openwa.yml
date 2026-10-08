@@ -1,0 +1,61 @@
+services:
+  openwa-api:
+    image: ghcr.io/rmyndharis/openwa:latest
+    container_name: openwa-api
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      WEBHOOK_SSRF_PROTECT: "true"
+      RESOLVE_LID_TO_PHONE: "true"
+      BAILEYS_BROWSER_NAME: Ubuntu
+      ALLOW_DEV_API_KEY: "false"
+      ENABLE_SWAGGER: "false"
+      STORE_EPHEMERAL_MESSAGES: "true"
+    ports:
+      - "2785:2785"
+    volumes:
+      - openwa-data:/app/data
+    healthcheck:
+      test: ["CMD","node","-e","fetch('http://127.0.0.1:2785/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 45s
+      retries: 10
+
+  openwa-bridge:
+    build:
+      context: .
+      dockerfile: Dockerfile.openwa-bridge
+    container_name: unique-market-openwa-bridge
+    restart: unless-stopped
+    depends_on:
+      openwa-api:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 10000
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      WA_PHONE_NUMBER: ${WA_PHONE_NUMBER:-917350060071}
+      OPENWA_URL: http://openwa-api:2785
+      OPENWA_DATA_KEY_FILE: /openwa-data/.api-key
+      OPENWA_SESSION_NAME: ${OPENWA_SESSION_NAME:-unique-market-7350060071}
+      OPENWA_PUBLIC_WEBHOOK_URL: ${OPENWA_PUBLIC_WEBHOOK_URL}
+      OPENWA_WEBHOOK_SECRET: ${OPENWA_WEBHOOK_SECRET}
+      QUOTE_FORM_URL: ${QUOTE_FORM_URL:-https://unique-market-whatsapp-zgw1.onrender.com/quote-form}
+      WA_EVENT_POLL_MS: ${WA_EVENT_POLL_MS:-5000}
+      WA_EVENT_MAX_AGE_HOURS: ${WA_EVENT_MAX_AGE_HOURS:-24}
+    ports:
+      - "10000:10000"
+    volumes:
+      - openwa-data:/openwa-data:ro
+    healthcheck:
+      test: ["CMD","node","-e","fetch('http://127.0.0.1:10000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 10
+
+volumes:
+  openwa-data:
+    name: unique-market-openwa-data
