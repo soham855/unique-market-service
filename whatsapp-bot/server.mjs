@@ -747,7 +747,7 @@ function formatWhatsAppTime(value) {
 
 function formatWhatsAppBranding(message) {
   const body = String(message || '').trim()
-  const canonicalMenu = '🔷 *UNIQUE MARKET*\n_CCTV | IT Security | Service & AMC_\n\nNamaskar! Aaple swagat aahe.\n\n1️⃣ Service / Complaint\n2️⃣ Instant CCTV Quote\n3️⃣ CCTV / Sales\n4️⃣ AMC Service\n5️⃣ Payment Query\n6️⃣ More Services\n\nKrupaya *1, 2, 3 kiwa 4* pathva.\n\n━━━━━━━━━━━━━━\n📍 *Station Road, Hotel Rajdoot, Ichalkaranji*\n📞 *7350060071*\n_Thank you for choosing Unique Market._'
+  const canonicalMenu = '🔷 *UNIQUE MARKET*\n_CCTV | IT Security | Service & AMC_\n\nNamaskar! Aaple swagat aahe.\n\n1️⃣ Service / Complaint\n2️⃣ Instant CCTV Quote\n3️⃣ CCTV / Sales\n4️⃣ AMC Service\n5️⃣ Payment Query\n6️⃣ More Services\n7️⃣ 👨‍💼 Talk to Staff\n\n🎤 *Voice Complaint:* WhatsApp voice message pathva\n📞 *Call Service:* 7350060071\n\nKrupaya *1 ते 7* madhun option select kara kiwa voice message pathva.\n\n━━━━━━━━━━━━━━\n📍 *Station Road, Hotel Rajdoot, Ichalkaranji*\n📞 *7350060071*\n_Thank you for choosing Unique Market._'
   if (/UNIQUE MARKET|Service \/ Complaint|CCTV \/ Sales|Namaskar! Aaple swagat aahe\./i.test(body)) return canonicalMenu
   return body + '\n\n' + canonicalMenu.split('\n\n').slice(-2).join('\n\n')
 }
