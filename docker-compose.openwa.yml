@@ -12,7 +12,7 @@ services:
       ENABLE_SWAGGER: "false"
       STORE_EPHEMERAL_MESSAGES: "true"
     ports:
-      - "2785:2785"
+      - "127.0.0.1:2785:2785"
     volumes:
       - openwa-data:/app/data
     healthcheck:
