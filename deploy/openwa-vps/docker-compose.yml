@@ -1,0 +1,46 @@
+services:
+  openwa-api:
+    image: ghcr.io/rmyndharis/openwa:latest
+    container_name: unique-market-openwa
+    restart: unless-stopped
+    init: true
+    ports:
+      - "2785:2785"
+    environment:
+      NODE_ENV: production
+      DATABASE_TYPE: sqlite
+      STORAGE_TYPE: local
+      ENGINE_TYPE: whatsapp-web.js
+      ENABLE_SWAGGER: "false"
+      ALLOW_DEV_API_KEY: "false"
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      WEBHOOK_SSRF_PROTECT: "true"
+      BODY_SIZE_LIMIT: ${BODY_SIZE_LIMIT:-2mb}
+      RATE_LIMIT_ENABLED: "true"
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-60}
+      RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-60000}
+    volumes:
+      - openwa-data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:2785/api/health/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 45s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    tmpfs:
+      - /tmp
+    mem_limit: 2g
+
+volumes:
+  openwa-data:
+    name: unique-market-openwa-data
