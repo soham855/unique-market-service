@@ -749,14 +749,8 @@ function formatWhatsAppTime(value) {
 function formatWhatsAppBranding(message) {
   const body = String(message || '').trim()
   const canonicalMenu = '🔷 *UNIQUE MARKET*\n_CCTV | IT Security | Service & AMC_\n\nNamaskar! Aaple swagat aahe.\n\n1️⃣ Service / Complaint\n2️⃣ Instant CCTV Quote\n3️⃣ CCTV / Sales\n4️⃣ AMC Service\n5️⃣ Payment Query\n6️⃣ More Services\n7️⃣ 👨‍💼 Talk to Staff\n\n🎤 *Voice Complaint:* WhatsApp voice message pathva\n📞 *Call Service:* 7350060071\n\nKrupaya *1 ते 7* madhun option select kara kiwa voice message pathva.\n\n━━━━━━━━━━━━━━\n📍 *Station Road, Hotel Rajdoot, Ichalkaranji*\n📞 *7350060071*\n_Thank you for choosing Unique Market._'
-  const looksLikeMenu = /(?:Service \/ Complaint|Instant CCTV Quote|CCTV \/ Sales)/i.test(body) &&
-    /(?:1️⃣|1\.)/.test(body) && /(?:5️⃣|Payment Query)/i.test(body)
-  if (looksLikeMenu) return canonicalMenu
-  if (!body) return canonicalMenu
-  // WhatsApp supports bold, italic, strikethrough and monospace, but not custom fonts or font sizes.
-  // Keep replies short and premium; do not append the entire menu to every answer.
-  if (/7350060071/.test(body) || /━━━━━━━━━━━━━━/.test(body)) return body
-  return body + '\n\n━━━━━━━━━━━━━━\n📞 *Unique Market: 7350060071*'
+  if (/UNIQUE MARKET|Service \/ Complaint|CCTV \/ Sales|Namaskar! Aaple swagat aahe\./i.test(body)) return canonicalMenu
+  return body + '\n\n' + canonicalMenu.split('\n\n').slice(-2).join('\n\n')
 }
 function formatServiceStatus(value) {
   const raw = String(value || '').toLowerCase().replaceAll('_', ' ').trim()
