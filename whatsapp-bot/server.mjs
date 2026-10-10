@@ -748,9 +748,12 @@ function formatWhatsAppTime(value) {
 
 function formatWhatsAppBranding(message) {
   const body = String(message || '').trim()
-  const canonicalMenu = '🔷 *UNIQUE MARKET*\n_CCTV | IT Security | Service & AMC_\n\nNamaskar! Aaple swagat aahe.\n\n1️⃣ Service / Complaint\n2️⃣ Instant CCTV Quote\n3️⃣ CCTV / Sales\n4️⃣ AMC Service\n5️⃣ Payment Query\n6️⃣ More Services\n7️⃣ 👨‍💼 Talk to Staff\n\n🎤 *Voice Complaint:* WhatsApp voice message pathva\n📞 *Call Service:* 7350060071\n\nKrupaya *1 ते 7* madhun option select kara kiwa voice message pathva.\n\n━━━━━━━━━━━━━━\n📍 *Station Road, Hotel Rajdoot, Ichalkaranji*\n📞 *7350060071*\n_Thank you for choosing Unique Market._'
-  if (/UNIQUE MARKET|Service \/ Complaint|CCTV \/ Sales|Namaskar! Aaple swagat aahe\./i.test(body)) return canonicalMenu
-  return body + '\n\n' + canonicalMenu.split('\n\n').slice(-2).join('\n\n')
+  const footer = '━━━━━━━━━━━━━━\n📍 *Station Road, Hotel Rajdoot, Ichalkaranji*\n📞 *7350060071*\n_Thank you for choosing Unique Market._'
+  if (!body) return footer
+  // Main menu is authored by the greeting handler; do not replace enquiry/complaint replies.
+  if (/^🔷 \\*UNIQUE MARKET\\*/i.test(body)) return body
+  if (body.includes('Station Road, Hotel Rajdoot')) return body
+  return body + '\n\n' + footer
 }
 function formatServiceStatus(value) {
   const raw = String(value || '').toLowerCase().replaceAll('_', ' ').trim()
@@ -1603,23 +1606,21 @@ const active = complaintSessions.get(conversationKey); const quote = quoteSessio
             console.error('WhatsApp complaint creation failed:', String(err?.message || err))
             // Reset the failed complaint flow so the next menu option works normally.
             clearComplaintSession(conversationKey)
-            reply = '⚠️ Complaint register kartana temporary problem ala. Complaint session reset keli aahe. Punha *1* pathvun complaint register kara kiwa *2* pathvun CCTV Quote ghya.\n\n📞 *7350060071*'
+            reply = '⚠️ Complaint register kartana temporary problem ala. Complaint session reset keli aahe. Punha *1* pathvun complaint register kara kiwa *2* pathvun CCTV / Sales enquiry kara.\n\n📞 *7350060071*'
           }
         }
       } else if (!reply && /^(hi+|hello+|hey+|namaskar|नमस्कार)$/i.test(normalized)) {
-        reply = '🔷 *UNIQUE MARKET*\n_CCTV | IT Security | Service & AMC_\n\nNamaskar! Aaple swagat aahe.\n\n1️⃣ Service / Complaint\n2️⃣ Instant CCTV Quote\n3️⃣ CCTV / Sales\n4️⃣ AMC Service\n5️⃣ Payment Query\n6️⃣ More Services\n\nKrupaya *1, 2, 3 kiwa 4* pathva.'
+        reply = '🔷 *UNIQUE MARKET*\n_CCTV | IT Security | Service & AMC_\n\n🙏 Namaskar! Aaple swagat aahe.\n\n1️⃣ *Service / Complaint*\n2️⃣ *CCTV / Sales*\n3️⃣ *AMC*\n4️⃣ *Payment Query*\n\n_Reply with 1, 2, 3 or 4._\n\n📞 *Contact: 7350060071*\n\n━━━━━━━━━━━━━━\n📍 *Station Road, Hotel Rajdoot, Ichalkaranji*\n_Thank you for choosing Unique Market._'
       } else if (normalized === '1') {
         complaintSessions.set(conversationKey, { step: 'problem', problem: '', name: '', location: '', locationMode: null, latitude: null, longitude: null, priority: 'normal' })
         reply = '🛠️ *SERVICE COMPLAINT*\n\nTumchya CCTV/IT system madhla problem short madhe type kara.\n\nExample: *Camera band aahe* / *DVR recording nahi* / *CCTV mobile var nahi.*'
       } else if (normalized === '2') {
-        reply = '📷 *INSTANT CCTV QUOTE*\n\nQuote details fill karanyasathi ha form open kara:\n\n👉 https://unique-market-whatsapp-zgw1.onrender.com/quote-form?phone=' + encodeURIComponent(String(from || '').replace(/\\D/g, '')) + '\n\nForm submit kelyavar requirement directly Unique Market la receive hoil.'
-      } else if (normalized === '3') {
         serviceEnquirySessions.set(conversationKey, { label: 'CCTV / Sales', confirmation: 'Your CCTV / IT product enquiry has been sent to our team.' })
-        reply = '📷 *CCTV / SALES ENQUIRY*\n\nPlease send your requirement in one message:\n• Product / brand / model\n• Quantity\n• Installation location (if needed)\n• Any special requirement\n\n💡 No prices are generated automatically; our team will verify and share a quotation.\nType *cancel* to return to the menu.'
-      } else if (normalized === '4') {
+        reply = '📷 *CCTV / SALES ENQUIRY*\n\nPlease send your requirement in one message:\n• Product / brand / model\n• Quantity\n• Installation location (if needed)\n• Any special requirement\n\nOr submit the detailed CCTV quote form:\n👉 https://unique-market-whatsapp-zgw1.onrender.com/quote-form?phone=' + encodeURIComponent(String(from || '').replace(/\\D/g, '')) + '\n\n💡 No prices are generated automatically; our team will verify and share a quotation.\nType *cancel* to return to the menu.'
+      } else if (normalized === '3') {
         serviceEnquirySessions.set(conversationKey, { label: 'AMC Service', confirmation: 'Your AMC request has been sent to our service team.' })
         reply = '🔧 *AMC SERVICE REQUEST*\n\nPlease send these details in one message:\n• Customer / company name\n• Site address / area\n• CCTV / IT system details\n• AMC expiry date (if known)\n\nOur team will check the service coverage and contact you.\nType *cancel* to return to the menu.'
-      } else if (normalized === '5') {
+      } else if (normalized === '4') {
         serviceEnquirySessions.set(conversationKey, { label: 'Payment Query', confirmation: 'Your payment query has been sent to our office team.' })
         reply = '💳 *PAYMENT QUERY*\n\nPlease send your invoice / challan number, customer or company name, and the payment amount or reference if available.\n\n⚠️ Do not send card PINs, OTPs or passwords.\nType *cancel* to return to the menu.'
       } else if (normalized === '7') {
@@ -1633,7 +1634,7 @@ const active = complaintSessions.get(conversationKey); const quote = quoteSessio
       } else if (normalized === '6') {
         reply = '🧰 *MORE SERVICES*\n\nComputer Repair, Networking, Laptop/Desktop, AMC & IT services sathi *7350060071* var contact kara.'
       } else {
-        reply = 'Krupaya *Hi* pathva kiwa menu madhun option select kara.\n\n1️⃣ Service / Complaint\n2️⃣ Instant CCTV Quote\n3️⃣ CCTV / Sales\n4️⃣ AMC Service\n5️⃣ Payment Query\n6️⃣ More Services'
+        reply = '🔷 *UNIQUE MARKET*\n_CCTV | IT Security | Service & AMC_\n\n🙏 Namaskar! Aaple swagat aahe.\n\n1️⃣ *Service / Complaint*\n2️⃣ *CCTV / Sales*\n3️⃣ *AMC*\n4️⃣ *Payment Query*\n\n_Reply with 1, 2, 3 or 4._\n\n📞 *Contact: 7350060071*\n\n━━━━━━━━━━━━━━\n📍 *Station Road, Hotel Rajdoot, Ichalkaranji*\n_Thank you for choosing Unique Market._'
       }
 
       if (reply) {
