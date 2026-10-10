@@ -112,6 +112,7 @@ let whatsappLeaseRenewTimer = null
 // record is persisted in Supabase as soon as the Service flow is completed.
 const complaintSessions = new Map()
 const quoteSessions = new Map()
+const serviceEnquirySessions = new Map()
 
 // Isolated WhatsApp broadcast module. It uses its own Supabase table and
 // in-memory campaign session so existing complaint/quote flows remain untouched.
@@ -748,8 +749,14 @@ function formatWhatsAppTime(value) {
 function formatWhatsAppBranding(message) {
   const body = String(message || '').trim()
   const canonicalMenu = '🔷 *UNIQUE MARKET*\n_CCTV | IT Security | Service & AMC_\n\nNamaskar! Aaple swagat aahe.\n\n1️⃣ Service / Complaint\n2️⃣ Instant CCTV Quote\n3️⃣ CCTV / Sales\n4️⃣ AMC Service\n5️⃣ Payment Query\n6️⃣ More Services\n7️⃣ 👨‍💼 Talk to Staff\n\n🎤 *Voice Complaint:* WhatsApp voice message pathva\n📞 *Call Service:* 7350060071\n\nKrupaya *1 ते 7* madhun option select kara kiwa voice message pathva.\n\n━━━━━━━━━━━━━━\n📍 *Station Road, Hotel Rajdoot, Ichalkaranji*\n📞 *7350060071*\n_Thank you for choosing Unique Market._'
-  if (/UNIQUE MARKET|Service \/ Complaint|CCTV \/ Sales|Namaskar! Aaple swagat aahe\./i.test(body)) return canonicalMenu
-  return body + '\n\n' + canonicalMenu.split('\n\n').slice(-2).join('\n\n')
+  const looksLikeMenu = /(?:Service \/ Complaint|Instant CCTV Quote|CCTV \/ Sales)/i.test(body) &&
+    /(?:1️⃣|1\.)/.test(body) && /(?:5️⃣|Payment Query)/i.test(body)
+  if (looksLikeMenu) return canonicalMenu
+  if (!body) return canonicalMenu
+  // WhatsApp supports bold, italic, strikethrough and monospace, but not custom fonts or font sizes.
+  // Keep replies short and premium; do not append the entire menu to every answer.
+  if (/7350060071/.test(body) || /━━━━━━━━━━━━━━/.test(body)) return body
+  return body + '\n\n━━━━━━━━━━━━━━\n📞 *Unique Market: 7350060071*'
 }
 function formatServiceStatus(value) {
   const raw = String(value || '').toLowerCase().replaceAll('_', ' ').trim()
@@ -1446,6 +1453,7 @@ const active = complaintSessions.get(conversationKey); const quote = quoteSessio
 
       if (/^(cancel|stop|0|menu|back)$/i.test(normalized)) {
         clearComplaintSession(conversationKey)
+        serviceEnquirySessions.delete(conversationKey)
         reply = '🔷 *UNIQUE MARKET*\n_CCTV | IT Security | Service & AMC_\n\nNamaskar! Aaple swagat aahe.\n\n1️⃣ Service / Complaint\n2️⃣ Instant CCTV Quote\n3️⃣ CCTV / Sales\n4️⃣ AMC Service\n5️⃣ Payment Query\n6️⃣ More Services\n\n🎤 *Voice Complaint:* Voice message pathva\n📞 *Call Service:* +91 7350060071\n👨‍💼 *Talk to Staff:* 7\n\nKrupaya *1 ते 7* madhla option pathva kiwa direct voice message pathva.'
       } else if (quote) {
         const qty = Number.parseInt(text, 10)
@@ -1534,6 +1542,18 @@ const active = complaintSessions.get(conversationKey); const quote = quoteSessio
             }
           }
         }
+      } else if (serviceEnquirySessions.has(conversationKey)) {
+        const enquiry = serviceEnquirySessions.get(conversationKey)
+        serviceEnquirySessions.delete(conversationKey)
+        try {
+          const customerPhone = String(from || '').replace(/\D/g, '')
+          const details = text.slice(0, 2500)
+          await notifyStaffOfHandoff(customerPhone, enquiry.label + ' enquiry: ' + details)
+          reply = '✅ *ENQUIRY RECEIVED*\n\n' + enquiry.confirmation + '\n\n👨‍💼 Our team has been notified and will contact you shortly.\n\n📞 *7350060071*\nType *menu* to return to the main menu.'
+        } catch (err) {
+          console.error('WhatsApp enquiry handoff failed:', String(err?.message || err))
+          reply = '⚠️ Your message could not be forwarded automatically. Please call *7350060071* and our team will assist you.'
+        }
       } else if (active) {
         if (active.step === 'problem') {
           active.problem = text
@@ -1600,11 +1620,14 @@ const active = complaintSessions.get(conversationKey); const quote = quoteSessio
       } else if (normalized === '2') {
         reply = '📷 *INSTANT CCTV QUOTE*\n\nQuote details fill karanyasathi ha form open kara:\n\n👉 https://unique-market-whatsapp-zgw1.onrender.com/quote-form?phone=' + encodeURIComponent(String(from || '').replace(/\\D/g, '')) + '\n\nForm submit kelyavar requirement directly Unique Market la receive hoil.'
       } else if (normalized === '3') {
-        reply = '📷 *CCTV / SALES*\n\nCamera quantity, brand, model kiwa requirement pathva.\n\nAmhi quotation sathi tumchi enquiry note karu.\n\nType *menu* for Main Menu.'
+        serviceEnquirySessions.set(conversationKey, { label: 'CCTV / Sales', confirmation: 'Your CCTV / IT product enquiry has been sent to our team.' })
+        reply = '📷 *CCTV / SALES ENQUIRY*\n\nPlease send your requirement in one message:\n• Product / brand / model\n• Quantity\n• Installation location (if needed)\n• Any special requirement\n\n💡 No prices are generated automatically; our team will verify and share a quotation.\nType *cancel* to return to the menu.'
       } else if (normalized === '4') {
-        reply = '🔧 *AMC SERVICE*\n\nAMC service sathi Customer/Company Name + Location pathva.\n\nAmhi tumhala pudhil process sangto.\n\nType *menu* for Main Menu.'
+        serviceEnquirySessions.set(conversationKey, { label: 'AMC Service', confirmation: 'Your AMC request has been sent to our service team.' })
+        reply = '🔧 *AMC SERVICE REQUEST*\n\nPlease send these details in one message:\n• Customer / company name\n• Site address / area\n• CCTV / IT system details\n• AMC expiry date (if known)\n\nOur team will check the service coverage and contact you.\nType *cancel* to return to the menu.'
       } else if (normalized === '5') {
-        reply = '💳 *PAYMENT QUERY*\n\nInvoice Number kiwa Customer/Company Name pathva.\n\nOur office team payment status check karel.\n\n📞 7350060071'
+        serviceEnquirySessions.set(conversationKey, { label: 'Payment Query', confirmation: 'Your payment query has been sent to our office team.' })
+        reply = '💳 *PAYMENT QUERY*\n\nPlease send your invoice / challan number, customer or company name, and the payment amount or reference if available.\n\n⚠️ Do not send card PINs, OTPs or passwords.\nType *cancel* to return to the menu.'
       } else if (normalized === '7') {
         try {
           const customerPhone = String(from || '').replace(/\D/g, '')
