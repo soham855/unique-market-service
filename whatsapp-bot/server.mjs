@@ -1129,24 +1129,36 @@ async function processBusinessReminders() {
     const today = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
     today.setHours(0, 0, 0, 0)
 
-    // PAYMENT: remind only genuinely unpaid challans, at most once every 3 days.
+    // PAYMENT: two days before due date, on the due date, then every two overdue days.
     try {
       const params = new URLSearchParams({
-        select: 'id,challan_no,customer_id,challan_date,due_date,subtotal,paid_amount,payment_status,party_name,whatsapp_payment_reminder_last_sent_at',
+        select: 'id,challan_no,customer_id,challan_date,due_date,subtotal,paid_amount,payment_status,party_name,whatsapp_payment_reminder_last_sent_at,whatsapp_payment_reminder_stage',
         limit: '100'
       })
       const challans = await supabaseRestRequest('/challans?' + params.toString())
+      const dateKey = date => new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit'
+      }).format(date)
+      const todayKey = dateKey(now)
+      const todayDay = Date.parse(todayKey + 'T00:00:00Z')
       for (const challan of challans || []) {
         const paymentStatus = String(challan.payment_status || '').toLowerCase().trim()
         const total = Number(challan.subtotal || 0)
         const paid = Number(challan.paid_amount || 0)
         const outstanding = Math.max(0, total - paid)
         if (!challan.id || outstanding <= 0 || ['paid','completed','settled'].includes(paymentStatus)) continue
-        const dueDate = challan.due_date ? new Date(challan.due_date + 'T00:00:00+05:30') : null
-        // Send the first payment reminder only after 2 full days past the due date.
-        // Older challans without a due_date are intentionally skipped until a due date is set.
-        if (!dueDate || !Number.isFinite(dueDate.getTime()) || now - dueDate < 2 * 24 * 60 * 60 * 1000) continue
-        if (challan.whatsapp_payment_reminder_last_sent_at && now - new Date(challan.whatsapp_payment_reminder_last_sent_at) < 3 * 24 * 60 * 60 * 1000) continue
+        // Old bills without a due date are intentionally skipped until Admin sets one.
+        if (!challan.due_date || !/^\\d{4}-\\d{2}-\\d{2}$/.test(challan.due_date)) continue
+        const dueDay = Date.parse(challan.due_date + 'T00:00:00Z')
+        if (!Number.isFinite(dueDay)) continue
+        const dayOffset = Math.round((todayDay - dueDay) / 86400000)
+        let reminderStage = ''
+        if (dayOffset === -2) reminderStage = 'before_due'
+        else if (dayOffset === 0) reminderStage = 'due_date'
+        else if (dayOffset >= 2 && dayOffset % 2 === 0) reminderStage = 'overdue_' + dayOffset
+        else continue
+        // Never send more than one reminder per bill per local calendar day.
+        if (challan.whatsapp_payment_reminder_last_sent_at && dateKey(new Date(challan.whatsapp_payment_reminder_last_sent_at)) === todayKey) continue
 
         const customers = await supabaseRestRequest('/customers?select=name,mobile,company_name&id=eq.' + encodeURIComponent(challan.customer_id || '') + '&limit=1')
         const customer = customers?.[0]
@@ -1159,7 +1171,7 @@ async function processBusinessReminders() {
         const message = [
           '💳 *UNIQUE MARKET | PAYMENT REMINDER*','',
           'Hello ' + (customer?.name || challan.party_name || 'Customer') + ' 👋,',
-          'Your payment is still pending.',
+          reminderStage === 'before_due' ? 'Your payment due date is in 2 days.' : reminderStage === 'due_date' ? 'Your payment is due today.' : 'Your payment is overdue. Please clear the pending balance.',
           '',
           '🧾 *Challan:* ' + (challan.challan_no || challan.id),
           '💰 *Outstanding:* ₹' + outstanding.toFixed(2),
@@ -1172,7 +1184,7 @@ async function processBusinessReminders() {
         await sendText(jid, message)
         await supabaseRestRequest('/challans?id=eq.' + encodeURIComponent(challan.id), {
           method:'PATCH', headers:{Prefer:'return=minimal'},
-          body:JSON.stringify({ whatsapp_payment_reminder_last_sent_at: now.toISOString() })
+          body:JSON.stringify({ whatsapp_payment_reminder_last_sent_at: now.toISOString(), whatsapp_payment_reminder_stage: reminderStage })
         })
       }
     } catch (err) {
