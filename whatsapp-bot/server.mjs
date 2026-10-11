@@ -1148,7 +1148,7 @@ async function processBusinessReminders() {
         const outstanding = Math.max(0, total - paid)
         if (!challan.id || outstanding <= 0 || ['paid','completed','settled'].includes(paymentStatus)) continue
         // Old bills without a due date are intentionally skipped until Admin sets one.
-        if (!challan.due_date || !/^\\d{4}-\\d{2}-\\d{2}$/.test(challan.due_date)) continue
+        if (!challan.due_date || !/^\d{4}-\d{2}-\d{2}$/.test(challan.due_date)) continue
         const dueDay = Date.parse(challan.due_date + 'T00:00:00Z')
         if (!Number.isFinite(dueDay)) continue
         const dayOffset = Math.round((todayDay - dueDay) / 86400000)
