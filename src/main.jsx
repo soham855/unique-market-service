@@ -24,6 +24,7 @@ import TechnicianRequest from './components/TechnicianRequest'
 import CustomerProfile from './components/CustomerProfile'
 import ComplaintSearch from './components/ComplaintSearch'
 import AdminModule from './components/AdminModule'
+import QuoteLeadModule from './components/QuoteLeadModule'
 import TechnicianAdmin from './components/TechnicianAdmin'
 import AdminComplaintKanban from './components/AdminComplaintKanban'
 import AdminReports from './components/AdminReports'
@@ -86,6 +87,7 @@ function App(){
  else if(isMyComplaints){content=<section className='role-dashboard'><button className='secondary' type='button' onClick={()=>setActiveModule(null)}>← Back to Dashboard</button><CustomerComplaintModule profile={profile} activeModule='My Complaints' onSubmitted={()=>setActiveModule('__MY_COMPLAINTS__')}/></section>}
  else if(isRaiseComplaint){content=<section className='role-dashboard'><button className='secondary' type='button' onClick={()=>setActiveModule(null)}>← Back to Dashboard</button><CustomerComplaintModule profile={profile} activeModule='Raise Complaint' onSubmitted={()=>setActiveModule('__MY_COMPLAINTS__')}/></section>}
  else if(admin&&selected==='Complaints'){content=<AdminComplaintKanban onBack={()=>setActiveModule(null)}/>}
+ else if(admin&&selected==='CCTV Quote Requests'){content=<QuoteLeadModule onBack={()=>setActiveModule(null)}/>} 
  else if(admin&&selected==='Reports'){content=<AdminReports onBack={()=>setActiveModule(null)}/>}
  else if(admin&&selected==='Settings'){content=<AdminSettings onBack={()=>setActiveModule(null)}/>}
  else if(admin&&selected==='Payments'){content=<PaymentLedger onBack={()=>setActiveModule(null)}/>}
