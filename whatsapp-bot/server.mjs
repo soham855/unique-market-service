@@ -1281,10 +1281,16 @@ async function processBankAmcReminders() {
           const scheduled=formatVisitReminderTime(v.scheduled_at),staff=v.assigned_staff_id?await getProfile(v.assigned_staff_id):null
           const message=['🏦 *UNIQUE MARKET | BANK AMC VISIT REMINDER*','', '📍 *Branch:* '+(branch.site_name||title),'🛡️ *Contract:* '+title,'📅 *Visit:* '+scheduled,'⏰ *Reminder:* '+w.label,'🔧 *Type:* '+String(v.visit_type||'scheduled').replaceAll('_',' '),'👨‍🔧 *Assigned Staff:* '+(staff?.full_name||'Not assigned'),'📍 *Address:* '+(branch.address||'Not provided'),'','After the visit, update the Bank AMC & Visits section in the Service Portal and submit the report/material notes.','📞 *Unique Market: 7350060071*'].join('\\n')
           if(!v[w.wa] && status==='connected' && sock){
-            const targets=[],owner=normalizeBroadcastPhone(STAFF_PHONE_NUMBER),bot=normalizeBroadcastPhone(PHONE_NUMBER)
-            if(owner&&owner!==bot){const j=recipientJid(owner);if(j)targets.push(j)}
+            const targets=[],bot=normalizeBroadcastPhone(PHONE_NUMBER)
+            const adminProfiles=await supabaseRestRequest('/profiles?select=id,full_name,phone&role=eq.admin&limit=20').catch(()=>[])
+            for(const adminProfile of adminProfiles||[]){
+              const owner=normalizeBroadcastPhone(adminProfile.phone||'')
+              if(owner&&owner!==bot&&owner!=='918554887026'){const j=recipientJid(owner);if(j&&!targets.includes(j))targets.push(j)}
+            }
+            const configuredOwner=normalizeBroadcastPhone(STAFF_PHONE_NUMBER)
+            if(configuredOwner&&configuredOwner!==bot&&configuredOwner!=='918554887026'){const j=recipientJid(configuredOwner);if(j&&!targets.includes(j))targets.push(j)}
             const staffPhone=normalizeBroadcastPhone(staff?.phone||'')
-            if(staffPhone&&staffPhone!==bot){const j=recipientJid(staffPhone);if(j&&!targets.includes(j))targets.push(j)}
+            if(staffPhone&&staffPhone!==bot&&staffPhone!=='918554887026'){const j=recipientJid(staffPhone);if(j&&!targets.includes(j))targets.push(j)}
             if(targets.length){try{for(const j of targets)await sendText(j,message);await supabaseRestRequest('/bank_amc_visits?id=eq.'+encodeURIComponent(v.id),{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({[w.wa]:new Date().toISOString(),updated_at:new Date().toISOString()})})}catch(err){console.error('Bank AMC WhatsApp reminder failed:',JSON.stringify({visitId:v.id,milestone:w.label,error:String(err?.message||err)}))}}
             else console.warn('Bank AMC WhatsApp reminder skipped: configure STAFF_WHATSAPP_NUMBER and assign staff with a valid phone.')
           }
