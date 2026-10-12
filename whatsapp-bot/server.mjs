@@ -1274,7 +1274,7 @@ async function processBankAmcReminders() {
       try{
         const range=bankAmcIstWindow(bankAmcIstDate(w.offset))
         const q=new URLSearchParams({select:'id,amc_contract_id,scheduled_at,assigned_staff_id,visit_type,status,report_summary,material_notes,breakdown_notes,'+w.wa+','+w.email+',amc_contract:amc_contracts(id,contract_name,end_date,site_id,sites:sites(site_name,address,contact_email))',status:'in.(scheduled,in_progress)',order:'scheduled_at.asc',limit:'100'})
-        q.set('scheduled_at','gte.'+range.from);q.append('scheduled_at','lt.'+range.to)
+        q.set('and','(scheduled_at.gte.'+range.from+',scheduled_at.lt.'+range.to+')')
         const visits=await supabaseRestRequest('/bank_amc_visits?'+q.toString())
         for(const v of visits||[]){
           const contract=v.amc_contract||{},branch=contract.sites||{},title=contract.contract_name||branch.site_name||'Bank AMC'
