@@ -24,6 +24,7 @@ import TechnicianRequest from './components/TechnicianRequest'
 import CustomerProfile from './components/CustomerProfile'
 import ComplaintSearch from './components/ComplaintSearch'
 import AdminModule from './components/AdminModule'
+import BankAmcModule from './components/BankAmcModule'
 import TechnicianAdmin from './components/TechnicianAdmin'
 import AdminComplaintKanban from './components/AdminComplaintKanban'
 import AdminReports from './components/AdminReports'
@@ -70,6 +71,7 @@ function App(){
  const selected=String(activeModule||'').trim(),admin=profile.role==='admin',technician=profile.role==='technician',customer=profile.role==='customer',isFeedback=customer&&(selected.toLowerCase()==='feedback'||isFeedbackPath),isMyComplaints=customer&&(selected==='__MY_COMPLAINTS__'||selected.toLowerCase()==='my complaints'),isRaiseComplaint=customer&&selected.toLowerCase()==='raise complaint',isServiceHistory=selected.toLowerCase()==='service history',isCustomerProfile=(customer||technician)&&selected.toLowerCase()==='my profile',isCustomerAmc=customer&&selected.toLowerCase()==='amc details',isCustomerAIAssistant=customer&&selected.toLowerCase()==='ai service assistant',isServiceReport=technician&&selected==='Complete Service Report',isReferral=customer&&selected==='Referral System',isFindComplaint=(admin||technician)&&selected==='Find Complaint',isTodayVisits=technician&&selected==="Today's Visits",isTechnicianServiceHistory=technician&&selected==='Service History',isTechnicianRequest=technician&&selected==='Raise Request',isTechnicianComplaints=technician&&(selected==='My Assigned Complaints'||selected==='Find Complaint'||isTodayVisits),complaint=selected==='Complaints'||isRaiseComplaint||isMyComplaints
  let content
  if(!activeModule){content=<RoleDashboard profile={profile} onSelectModule={setActiveModule}/>}
+ else if(admin&&selected==='Bank AMC & Visits'){content=<BankAmcModule onBack={()=>setActiveModule(null)}/>}
  else if(admin&&selected==='User Accounts'){content=<AdminAccountManager onBack={()=>setActiveModule(null)}/>}
  else if(admin&&selected==='Technicians'){content=<TechnicianAdmin onBack={()=>setActiveModule(null)}/>}
  else if(isTechnicianRequest){content=<TechnicianRequest profile={profile} onBack={()=>setActiveModule(null)}/>}
