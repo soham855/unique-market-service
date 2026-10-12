@@ -1262,6 +1262,8 @@ async function sendBankAmcEmail(to, subject, text) {
   return true
 }
 async function processBankAmcReminders() {
+  // Keep Bank AMC reminders paused unless explicitly enabled after permissions and delivery are verified.
+  if (String(process.env.BANK_AMC_REMINDERS_ENABLED || 'false').toLowerCase() !== 'true') return
   if(!SUPABASE_SERVICE_ROLE_KEY)return
   if(bankAmcReminderProcessingInFlight)return bankAmcReminderProcessingInFlight
   bankAmcReminderProcessingInFlight=(async()=>{
