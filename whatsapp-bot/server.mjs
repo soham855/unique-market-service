@@ -1433,7 +1433,7 @@ const active = complaintSessions.get(conversationKey); const quote = quoteSessio
         clearComplaintSession(conversationKey)
         serviceEnquirySessions.delete(conversationKey)
         saleMenuSessions.delete(conversationKey)
-        reply = '🔷 *UNIQUE MARKET*\n_CCTV | IT Security | Service & AMC_\n\nNamaskar! Aaple swagat aahe.\n\n1️⃣ Service / Complaint\n2️⃣ Instant CCTV Quote\n3️⃣ CCTV / Sales\n4️⃣ AMC Service\n5️⃣ Payment Query\n6️⃣ More Services\n\n🎤 *Voice Complaint:* Voice message pathva\n📞 *Call Service:* +91 7350060071\n👨‍💼 *Talk to Staff:* 7\n\nKrupaya *1 ते 7* madhla option pathva kiwa direct voice message pathva.'
+        reply = '🔷 *UNIQUE MARKET*\n_CCTV | IT Security | Service & AMC_\n\nNamaskar! Aaple swagat aahe.\n\n1. Service / Complaint\n2. CCTV / Sales\n3. AMC\n4. Payment Query\n\nReply with 1, 2, 3 or 4.\n\n📞 *Contact: 7350060071*\n📍 Station Road, Hotel Rajdoot, Ichalkaranji.'
       } else if (quote) {
         const qty = Number.parseInt(text, 10)
         if (quote.step === 'dome') {
