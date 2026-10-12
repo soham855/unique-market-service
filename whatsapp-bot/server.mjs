@@ -1433,7 +1433,7 @@ const active = complaintSessions.get(conversationKey); const quote = quoteSessio
         clearComplaintSession(conversationKey)
         serviceEnquirySessions.delete(conversationKey)
         saleMenuSessions.delete(conversationKey)
-        reply = '🔷 *UNIQUE MARKET*\n_CCTV | IT Security | Service & AMC_\n\nNamaskar! Aaple swagat aahe.\n\n1. Service / Complaint\n2. CCTV / Sales\n3. AMC\n4. Payment Query\n\nReply with 1, 2, 3 or 4.\n\n📞 *Contact: 7350060071*\n📍 Station Road, Hotel Rajdoot, Ichalkaranji.'
+        reply = '🔷 *UNIQUE MARKET*\n_CCTV | IT Security | Service & AMC_\n\nNamaskar! Aaple swagat aahe.\n\n1. Service / Complaint\n2. AMC\n3. CCTV / Sales\n4. Payment Query\n\nReply with 1, 2, 3 or 4.\n\n📞 *Contact: 7350060071*\n📍 Station Road, Hotel Rajdoot, Ichalkaranji.'
       } else if (quote) {
         const qty = Number.parseInt(text, 10)
         if (quote.step === 'dome') {
@@ -1626,17 +1626,17 @@ const active = complaintSessions.get(conversationKey); const quote = quoteSessio
           }
         }
       } else if (!reply && /^(hi+|hello+|hey+|namaskar|नमस्कार)$/i.test(normalized)) {
-        reply = '🔷 *UNIQUE MARKET*\n_CCTV | IT Security | Service & AMC_\n\n🙏 Namaskar! Aaple swagat aahe.\n\n1️⃣ *Service / Complaint*\n2️⃣ *CCTV / Sales*\n3️⃣ *AMC*\n4️⃣ *Payment Query*\n\n_Reply with 1, 2, 3 or 4._\n\n📞 *Contact: 7350060071*\n\n━━━━━━━━━━━━━━\n📍 *Station Road, Hotel Rajdoot, Ichalkaranji*\n_Thank you for choosing Unique Market._'
+        reply = '🔷 *UNIQUE MARKET*\n_CCTV | IT Security | Service & AMC_\n\n🙏 Namaskar! Aaple swagat aahe.\n\n1️⃣ *Service / Complaint*\n2️⃣ *AMC*\n3️⃣ *CCTV / Sales*\n4️⃣ *Payment Query*\n\n_Reply with 1, 2, 3 or 4._\n\n📞 *Contact: 7350060071*\n\n━━━━━━━━━━━━━━\n📍 *Station Road, Hotel Rajdoot, Ichalkaranji*\n_Thank you for choosing Unique Market._'
       } else if (normalized === '1') {
         complaintSessions.set(conversationKey, { step: 'problem', problem: '', name: '', location: '', locationMode: null, latitude: null, longitude: null, priority: 'normal' })
         reply = '🛠️ *SERVICE COMPLAINT*\n\nTumchya CCTV/IT system madhla problem short madhe type kara.\n\nExample: *Camera band aahe* / *DVR recording nahi* / *CCTV mobile var nahi.*'
       } else if (normalized === '2') {
+        serviceEnquirySessions.set(conversationKey, { label: 'AMC Service', confirmation: 'Your AMC request has been sent to our service team.' })
+        reply = '🔧 *AMC SERVICE REQUEST*\n\nPlease send these details in one message:\n• Customer / company name\n• Site address / area\n• CCTV / IT system details\n• AMC expiry date (if known)\n\nOur team will check the service coverage and contact you.\nType *cancel* to return to the menu.'
+      } else if (normalized === '3') {
         clearComplaintSession(conversationKey)
         saleMenuSessions.set(conversationKey, { step: 'product', product: '' })
         reply = '📹 *CCTV SALES MENU*\n\n1. IP Camera\n2. HD Camera\n3. DVR\n4. NVR\n5. Power Supply\n6. 3+1 Cable\n7. CAT6 Cable\n8. PVC Box\n9. Rack\n\nKrupaya product cha number pathva.\nType *cancel* to return to Main Menu.'
-      } else if (normalized === '3') {
-        serviceEnquirySessions.set(conversationKey, { label: 'AMC Service', confirmation: 'Your AMC request has been sent to our service team.' })
-        reply = '🔧 *AMC SERVICE REQUEST*\n\nPlease send these details in one message:\n• Customer / company name\n• Site address / area\n• CCTV / IT system details\n• AMC expiry date (if known)\n\nOur team will check the service coverage and contact you.\nType *cancel* to return to the menu.'
       } else if (normalized === '4') {
         serviceEnquirySessions.set(conversationKey, { label: 'Payment Query', confirmation: 'Your payment query has been sent to our office team.' })
         reply = '💳 *PAYMENT QUERY*\n\nPlease send your invoice / challan number, customer or company name, and the payment amount or reference if available.\n\n⚠️ Do not send card PINs, OTPs or passwords.\nType *cancel* to return to the menu.'
@@ -1651,7 +1651,7 @@ const active = complaintSessions.get(conversationKey); const quote = quoteSessio
       } else if (normalized === '6') {
         reply = '🧰 *MORE SERVICES*\n\nComputer Repair, Networking, Laptop/Desktop, AMC & IT services sathi *7350060071* var contact kara.'
       } else {
-        reply = '🔷 *UNIQUE MARKET*\n_CCTV | IT Security | Service & AMC_\n\n🙏 Namaskar! Aaple swagat aahe.\n\n1️⃣ *Service / Complaint*\n2️⃣ *CCTV / Sales*\n3️⃣ *AMC*\n4️⃣ *Payment Query*\n\n_Reply with 1, 2, 3 or 4._\n\n📞 *Contact: 7350060071*\n\n━━━━━━━━━━━━━━\n📍 *Station Road, Hotel Rajdoot, Ichalkaranji*\n_Thank you for choosing Unique Market._'
+        reply = '🔷 *UNIQUE MARKET*\n_CCTV | IT Security | Service & AMC_\n\n🙏 Namaskar! Aaple swagat aahe.\n\n1️⃣ *Service / Complaint*\n2️⃣ *AMC*\n3️⃣ *CCTV / Sales*\n4️⃣ *Payment Query*\n\n_Reply with 1, 2, 3 or 4._\n\n📞 *Contact: 7350060071*\n\n━━━━━━━━━━━━━━\n📍 *Station Road, Hotel Rajdoot, Ichalkaranji*\n_Thank you for choosing Unique Market._'
       }
 
       if (reply) {
