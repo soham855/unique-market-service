@@ -113,6 +113,7 @@ let whatsappLeaseRenewTimer = null
 const complaintSessions = new Map()
 const quoteSessions = new Map()
 const serviceEnquirySessions = new Map()
+const saleMenuSessions = new Map()
 
 // Isolated WhatsApp broadcast module. It uses its own Supabase table and
 // in-memory campaign session so existing complaint/quote flows remain untouched.
@@ -1412,26 +1413,6 @@ async function startWhatsApp() {
       const normalized = text.toLowerCase()
       let reply = null
 
-      // HARD ROUTE: option 2 always opens the web quote form.
-      // Do this before ALL menu/session routing. Never let option 2 reach the main menu.
-      if (text.trim() === '2') {
-        clearComplaintSession(conversationKey)
-        const phone = String(from || '').replace(/\D/g, '')
-        const quoteReply = '📷 *INSTANT CCTV QUOTE*\n\nQuote details fill karanyasathi ha form open kara:\n\n👉 https://unique-market-whatsapp-zgw1.onrender.com/quote-form?phone=' + encodeURIComponent(phone) + '\n\nForm submit kelyavar requirement directly Unique Market la receive hoil.\n\n🔷 *UNIQUE MARKET*\n📞 7350060071'
-        try {
-          await sendText(from, quoteReply)
-          console.log('WhatsApp HARD option 2 reply sent:', JSON.stringify({ to: from, phone, messageId: msg.key?.id || null }))
-        } catch (err) {
-          console.error('WhatsApp HARD option 2 reply failed:', String(err?.message || err))
-        }
-        continue
-      }
-
-      // Main-menu option 2 must ALWAYS open the instant quote web form.
-      // Clear any stale interactive session before routing this menu option.
-      if (normalized === '2') clearComplaintSession(conversationKey)
-
-      
       if (isVoiceMessage && !complaintSessions.has(conversationKey) && !quoteSessions.has(conversationKey)) {
         complaintSessions.set(conversationKey, {
           step: 'name',
@@ -1451,7 +1432,8 @@ const active = complaintSessions.get(conversationKey); const quote = quoteSessio
       if (/^(cancel|stop|0|menu|back)$/i.test(normalized)) {
         clearComplaintSession(conversationKey)
         serviceEnquirySessions.delete(conversationKey)
-        reply = '🔷 *UNIQUE MARKET*\n_CCTV | IT Security | Service & AMC_\n\nNamaskar! Aaple swagat aahe.\n\n1️⃣ Service / Complaint\n2️⃣ Instant CCTV Quote\n3️⃣ CCTV / Sales\n4️⃣ AMC Service\n5️⃣ Payment Query\n6️⃣ More Services\n\n🎤 *Voice Complaint:* Voice message pathva\n📞 *Call Service:* +91 7350060071\n👨‍💼 *Talk to Staff:* 7\n\nKrupaya *1 ते 7* madhla option pathva kiwa direct voice message pathva.'
+        saleMenuSessions.delete(conversationKey)
+        reply = '🔷 *UNIQUE MARKET*\n_CCTV | IT Security | Service & AMC_\n\nNamaskar! Aaple swagat aahe.\n\n1. Service / Complaint\n2. CCTV / Sales\n3. AMC\n4. Payment Query\n\nReply with 1, 2, 3 or 4.\n\n📞 *Contact: 7350060071*\n📍 Station Road, Hotel Rajdoot, Ichalkaranji.'
       } else if (quote) {
         const qty = Number.parseInt(text, 10)
         if (quote.step === 'dome') {
@@ -1539,6 +1521,40 @@ const active = complaintSessions.get(conversationKey); const quote = quoteSessio
             }
           }
         }
+      } else if (saleMenuSessions.has(conversationKey)) {
+        const sale = saleMenuSessions.get(conversationKey)
+        if (sale.step === 'product') {
+          const products = {
+            '1': 'IP Camera',
+            '2': 'HD Camera',
+            '3': 'DVR',
+            '4': 'NVR',
+            '5': 'Power Supply',
+            '6': '3+1 Cable',
+            '7': 'CAT6 Cable',
+            '8': 'PVC Box',
+            '9': 'Rack'
+          }
+          const product = products[normalized]
+          if (!product) {
+            reply = '📹 *CCTV SALES MENU*\n\n1. IP Camera\n2. HD Camera\n3. DVR\n4. NVR\n5. Power Supply\n6. 3+1 Cable\n7. CAT6 Cable\n8. PVC Box\n9. Rack\n\nKrupaya 1 te 9 madhla product number pathva.\nType *cancel* to return to Main Menu.'
+          } else {
+            sale.product = product
+            sale.step = 'details'
+            reply = '✅ *' + product.toUpperCase() + ' SELECTED*\n\nKiti quantity pahije? Brand/model ani kahi special requirement asel tar tyasah ekach message madhye pathva.\n\nExample: *10 pcs, CP Plus, outdoor use*\n\nType *cancel* to return to Main Menu.'
+          }
+        } else if (sale.step === 'details') {
+          const customerPhone = String(from || '').replace(/\D/g, '')
+          const details = text.slice(0, 2000)
+          try {
+            await notifyStaffOfHandoff(customerPhone, 'CCTV SALE ENQUIRY\nProduct: ' + sale.product + '\nCustomer WhatsApp: ' + customerPhone + '\nRequirement: ' + details)
+            saleMenuSessions.delete(conversationKey)
+            reply = '✅ *CCTV SALE ENQUIRY RECEIVED*\n\n📦 *Product:* ' + sale.product + '\n📝 *Requirement:* ' + details + '\n\nOur team has been notified and will contact you shortly.\n📞 *7350060071*\n\nType *menu* for Main Menu.'
+          } catch (err) {
+            console.error('WhatsApp CCTV sale enquiry handoff failed:', String(err?.message || err))
+            reply = '⚠️ Enquiry forward kartana temporary problem ala. Krupaya *7350060071* var contact kara.'
+          }
+        }
       } else if (serviceEnquirySessions.has(conversationKey)) {
         const enquiry = serviceEnquirySessions.get(conversationKey)
         serviceEnquirySessions.delete(conversationKey)
@@ -1615,8 +1631,9 @@ const active = complaintSessions.get(conversationKey); const quote = quoteSessio
         complaintSessions.set(conversationKey, { step: 'problem', problem: '', name: '', location: '', locationMode: null, latitude: null, longitude: null, priority: 'normal' })
         reply = '🛠️ *SERVICE COMPLAINT*\n\nTumchya CCTV/IT system madhla problem short madhe type kara.\n\nExample: *Camera band aahe* / *DVR recording nahi* / *CCTV mobile var nahi.*'
       } else if (normalized === '2') {
-        serviceEnquirySessions.set(conversationKey, { label: 'CCTV / Sales', confirmation: 'Your CCTV / IT product enquiry has been sent to our team.' })
-        reply = '📷 *CCTV / SALES ENQUIRY*\n\nPlease send your requirement in one message:\n• Product / brand / model\n• Quantity\n• Installation location (if needed)\n• Any special requirement\n\nOr submit the detailed CCTV quote form:\n👉 https://unique-market-whatsapp-zgw1.onrender.com/quote-form?phone=' + encodeURIComponent(String(from || '').replace(/\\D/g, '')) + '\n\n💡 No prices are generated automatically; our team will verify and share a quotation.\nType *cancel* to return to the menu.'
+        clearComplaintSession(conversationKey)
+        saleMenuSessions.set(conversationKey, { step: 'product', product: '' })
+        reply = '📹 *CCTV SALES MENU*\n\n1. IP Camera\n2. HD Camera\n3. DVR\n4. NVR\n5. Power Supply\n6. 3+1 Cable\n7. CAT6 Cable\n8. PVC Box\n9. Rack\n\nKrupaya product cha number pathva.\nType *cancel* to return to Main Menu.'
       } else if (normalized === '3') {
         serviceEnquirySessions.set(conversationKey, { label: 'AMC Service', confirmation: 'Your AMC request has been sent to our service team.' })
         reply = '🔧 *AMC SERVICE REQUEST*\n\nPlease send these details in one message:\n• Customer / company name\n• Site address / area\n• CCTV / IT system details\n• AMC expiry date (if known)\n\nOur team will check the service coverage and contact you.\nType *cancel* to return to the menu.'
