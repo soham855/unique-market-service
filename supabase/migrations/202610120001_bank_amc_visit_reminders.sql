@@ -55,3 +55,6 @@ with check (exists (select 1 from public.profiles p where p.id = (select auth.ui
 drop policy if exists "bank_amc_visits_delete_admin" on public.bank_amc_visits;
 create policy "bank_amc_visits_delete_admin" on public.bank_amc_visits for delete to authenticated
 using (exists (select 1 from public.profiles p where p.id = (select auth.uid()) and p.role = 'admin'));
+
+grant select, insert, update, delete on public.bank_amc_visits to authenticated;
+create index if not exists bank_amc_visits_contract_idx on public.bank_amc_visits (amc_contract_id);
