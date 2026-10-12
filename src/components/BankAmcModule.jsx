@@ -63,6 +63,31 @@ export default function BankAmcModule({onBack}) {
     setMessage('')
     const patch={status,updated_at:new Date().toISOString()}
     if(status==='completed')patch.completed_at=new Date().toISOString()
+    if(status==='completed' && v.visit_type==='scheduled') {
+      const contract=contracts.find(c=>c.id===v.amc_contract_id)
+      const months=Math.max(1,Number(contract?.visit_interval_months)||2)
+      const base=new Date(v.scheduled_at)
+      const day=base.getUTCDate()
+      const next=new Date(base)
+      next.setUTCDate(1)
+      next.setUTCMonth(next.getUTCMonth()+months)
+      const lastDay=new Date(Date.UTC(next.getUTCFullYear(),next.getUTCMonth()+1,0)).getUTCDate()
+      next.setUTCDate(Math.min(day,lastDay))
+      patch.next_visit_at=next.toISOString()
+      const start=new Date(Date.UTC(next.getUTCFullYear(),next.getUTCMonth(),next.getUTCDate())).toISOString()
+      const end=new Date(Date.UTC(next.getUTCFullYear(),next.getUTCMonth(),next.getUTCDate()+1)).toISOString()
+      const {data:existing,error:checkError}=await supabase.from('bank_amc_visits').select('id').eq('amc_contract_id',v.amc_contract_id).gte('scheduled_at',start).lt('scheduled_at',end).in('status',['scheduled','in_progress']).limit(1)
+      if(checkError){setMessage('Could not check the next visit: '+checkError.message);return}
+      const {error}=await supabase.from('bank_amc_visits').update(patch).eq('id',v.id)
+      if(error){setMessage('Status update failed: '+error.message);return}
+      if(!(existing||[]).length) {
+        const {error:nextError}=await supabase.from('bank_amc_visits').insert({amc_contract_id:v.amc_contract_id,scheduled_at:next.toISOString(),assigned_staff_id:v.assigned_staff_id||null,visit_type:'scheduled',status:'scheduled',created_by:null})
+        if(nextError){setMessage('Visit completed, but next visit could not be created: '+nextError.message);await load();return}
+      }
+      setMessage('Visit completed. Next routine visit scheduled '+next.toLocaleDateString('en-IN')+'.')
+      await load()
+      return
+    }
     const {error}=await supabase.from('bank_amc_visits').update(patch).eq('id',v.id)
     if(error)setMessage('Status update failed: '+error.message);else {setMessage('Visit status updated.');await load()}
   }
