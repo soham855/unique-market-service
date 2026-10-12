@@ -1537,19 +1537,19 @@ const active = complaintSessions.get(conversationKey); const quote = quoteSessio
           }
           const product = products[normalized]
           if (!product) {
-            reply = '📹 *CCTV SALES MENU*\\n\\n1. IP Camera\\n2. HD Camera\\n3. DVR\\n4. NVR\\n5. Power Supply\\n6. 3+1 Cable\\n7. CAT6 Cable\\n8. PVC Box\\n9. Rack\\n\\nKrupaya 1 te 9 madhla product number pathva.\\nType *cancel* to return to Main Menu.'
+            reply = '📹 *CCTV SALES MENU*\n\n1. IP Camera\n2. HD Camera\n3. DVR\n4. NVR\n5. Power Supply\n6. 3+1 Cable\n7. CAT6 Cable\n8. PVC Box\n9. Rack\n\nKrupaya 1 te 9 madhla product number pathva.\nType *cancel* to return to Main Menu.'
           } else {
             sale.product = product
             sale.step = 'details'
-            reply = '✅ *' + product.toUpperCase() + ' SELECTED*\\n\\nKiti quantity pahije? Brand/model ani kahi special requirement asel tar tyasah ekach message madhye pathva.\\n\\nExample: *10 pcs, CP Plus, outdoor use*\\n\\nType *cancel* to return to Main Menu.'
+            reply = '✅ *' + product.toUpperCase() + ' SELECTED*\n\nKiti quantity pahije? Brand/model ani kahi special requirement asel tar tyasah ekach message madhye pathva.\n\nExample: *10 pcs, CP Plus, outdoor use*\n\nType *cancel* to return to Main Menu.'
           }
         } else if (sale.step === 'details') {
-          const customerPhone = String(from || '').replace(/\\D/g, '')
+          const customerPhone = String(from || '').replace(/\D/g, '')
           const details = text.slice(0, 2000)
           try {
-            await notifyStaffOfHandoff(customerPhone, 'CCTV SALE ENQUIRY\\nProduct: ' + sale.product + '\\nCustomer WhatsApp: ' + customerPhone + '\\nRequirement: ' + details)
+            await notifyStaffOfHandoff(customerPhone, 'CCTV SALE ENQUIRY\nProduct: ' + sale.product + '\nCustomer WhatsApp: ' + customerPhone + '\nRequirement: ' + details)
             saleMenuSessions.delete(conversationKey)
-            reply = '✅ *CCTV SALE ENQUIRY RECEIVED*\\n\\n📦 *Product:* ' + sale.product + '\\n📝 *Requirement:* ' + details + '\\n\\nOur team has been notified and will contact you shortly.\\n📞 *7350060071*\\n\\nType *menu* for Main Menu.'
+            reply = '✅ *CCTV SALE ENQUIRY RECEIVED*\n\n📦 *Product:* ' + sale.product + '\n📝 *Requirement:* ' + details + '\n\nOur team has been notified and will contact you shortly.\n📞 *7350060071*\n\nType *menu* for Main Menu.'
           } catch (err) {
             console.error('WhatsApp CCTV sale enquiry handoff failed:', String(err?.message || err))
             reply = '⚠️ Enquiry forward kartana temporary problem ala. Krupaya *7350060071* var contact kara.'
@@ -1633,7 +1633,7 @@ const active = complaintSessions.get(conversationKey); const quote = quoteSessio
       } else if (normalized === '2') {
         clearComplaintSession(conversationKey)
         saleMenuSessions.set(conversationKey, { step: 'product', product: '' })
-        reply = '📹 *CCTV SALES MENU*\\n\\n1. IP Camera\\n2. HD Camera\\n3. DVR\\n4. NVR\\n5. Power Supply\\n6. 3+1 Cable\\n7. CAT6 Cable\\n8. PVC Box\\n9. Rack\\n\\nKrupaya product cha number pathva.\\nType *cancel* to return to Main Menu.'
+        reply = '📹 *CCTV SALES MENU*\n\n1. IP Camera\n2. HD Camera\n3. DVR\n4. NVR\n5. Power Supply\n6. 3+1 Cable\n7. CAT6 Cable\n8. PVC Box\n9. Rack\n\nKrupaya product cha number pathva.\nType *cancel* to return to Main Menu.'
       } else if (normalized === '3') {
         serviceEnquirySessions.set(conversationKey, { label: 'AMC Service', confirmation: 'Your AMC request has been sent to our service team.' })
         reply = '🔧 *AMC SERVICE REQUEST*\n\nPlease send these details in one message:\n• Customer / company name\n• Site address / area\n• CCTV / IT system details\n• AMC expiry date (if known)\n\nOur team will check the service coverage and contact you.\nType *cancel* to return to the menu.'
