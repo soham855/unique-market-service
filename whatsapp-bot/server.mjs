@@ -27,6 +27,10 @@ const KAPSO_WEBHOOK_SECRET = String(process.env.KAPSO_WEBHOOK_SECRET || '')
 const SUPABASE_URL = String(process.env.SUPABASE_URL || 'https://tfscvycomllamoubtlcf.supabase.co')
 const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '')
 const WA_GROUP_JID = String(process.env.WA_GROUP_JID || '').trim()
+const BANK_AMC_EMAIL_ENABLED = String(process.env.BANK_AMC_EMAIL_ENABLED || '').toLowerCase() === 'true'
+const BANK_AMC_EMAIL_VERIFIED = String(process.env.BANK_AMC_EMAIL_VERIFIED || '').toLowerCase() === 'true'
+const BANK_AMC_RESEND_API_KEY = String(process.env.BANK_AMC_RESEND_API_KEY || '').trim()
+const BANK_AMC_EMAIL_FROM = String(process.env.BANK_AMC_EMAIL_FROM || '').trim()
 const EVENT_POLL_MS = Number(process.env.WA_EVENT_POLL_MS || 5000)
 const logger = pino({ level: process.env.WA_LOG_LEVEL || 'silent' })
 let authSyncTimer = null
@@ -1233,6 +1237,84 @@ function startBusinessReminderPoller() {
 }
 
 
+
+let bankAmcReminderPollerStarted = false
+let bankAmcReminderProcessingInFlight = null
+function bankAmcIstDate(offsetDays = 0) {
+  const parts = new Intl.DateTimeFormat('en-CA', {timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date())
+  const p = Object.fromEntries(parts.map(x => [x.type,x.value]))
+  return new Date(Date.UTC(Number(p.year),Number(p.month)-1,Number(p.day)+offsetDays)).toISOString().slice(0,10)
+}
+function bankAmcIstWindow(date) {
+  const next = new Date(date+'T00:00:00Z'); next.setUTCDate(next.getUTCDate()+1)
+  return {from:date+'T00:00:00+05:30',to:next.toISOString().slice(0,10)+'T00:00:00+05:30'}
+}
+function bankAmcEmailReady() {
+  return BANK_AMC_EMAIL_ENABLED && BANK_AMC_EMAIL_VERIFIED && Boolean(BANK_AMC_RESEND_API_KEY && BANK_AMC_EMAIL_FROM)
+}
+async function sendBankAmcEmail(to, subject, text) {
+  if (!bankAmcEmailReady()) return false
+  const recipient=String(to||'').trim()
+  if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(recipient)) return false
+  const response=await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:'Bearer '+BANK_AMC_RESEND_API_KEY,'Content-Type':'application/json'},body:JSON.stringify({from:BANK_AMC_EMAIL_FROM,to:[recipient],subject,text})})
+  const payload=await response.json().catch(()=>({}))
+  if(!response.ok)throw new Error('Email provider error: '+(payload?.message||('HTTP '+response.status)))
+  return true
+}
+async function processBankAmcReminders() {
+  if(!SUPABASE_SERVICE_ROLE_KEY||status!=='connected'||!sock)return
+  if(bankAmcReminderProcessingInFlight)return bankAmcReminderProcessingInFlight
+  bankAmcReminderProcessingInFlight=(async()=>{
+    const windows=[
+      {offset:2,label:'2 days',wa:'whatsapp_reminder_2d_sent_at',email:'email_reminder_2d_sent_at'},
+      {offset:1,label:'1 day',wa:'whatsapp_reminder_1d_sent_at',email:'email_reminder_1d_sent_at'},
+      {offset:0,label:'today',wa:'whatsapp_reminder_day_sent_at',email:'email_reminder_day_sent_at'}
+    ]
+    for(const w of windows){
+      try{
+        const range=bankAmcIstWindow(bankAmcIstDate(w.offset))
+        const q=new URLSearchParams({select:'id,amc_contract_id,scheduled_at,assigned_staff_id,visit_type,status,report_summary,material_notes,breakdown_notes,'+w.wa+','+w.email+',amc_contract:amc_contracts(id,contract_name,end_date,site_id,sites:sites(site_name,address,contact_email))',status:'in.(scheduled,in_progress)',order:'scheduled_at.asc',limit:'100'})
+        q.set('scheduled_at','gte.'+range.from);q.append('scheduled_at','lt.'+range.to)
+        const visits=await supabaseRestRequest('/bank_amc_visits?'+q.toString())
+        for(const v of visits||[]){
+          const contract=v.amc_contract||{},branch=contract.sites||{},title=contract.contract_name||branch.site_name||'Bank AMC'
+          const scheduled=formatVisitReminderTime(v.scheduled_at),staff=v.assigned_staff_id?await getProfile(v.assigned_staff_id):null
+          const message=['🏦 *UNIQUE MARKET | BANK AMC VISIT REMINDER*','', '📍 *Branch:* '+(branch.site_name||title),'🛡️ *Contract:* '+title,'📅 *Visit:* '+scheduled,'⏰ *Reminder:* '+w.label,'🔧 *Type:* '+String(v.visit_type||'scheduled').replaceAll('_',' '),'👨‍🔧 *Assigned Staff:* '+(staff?.full_name||'Not assigned'),'📍 *Address:* '+(branch.address||'Not provided'),'','After the visit, update the Bank AMC & Visits section in the Service Portal and submit the report/material notes.','📞 *Unique Market: 7350060071*'].join('\\n')
+          if(!v[w.wa]){
+            const targets=[],owner=normalizeBroadcastPhone(STAFF_PHONE_NUMBER),bot=normalizeBroadcastPhone(PHONE_NUMBER)
+            if(owner&&owner!==bot){const j=recipientJid(owner);if(j)targets.push(j)}
+            const staffPhone=normalizeBroadcastPhone(staff?.phone||'')
+            if(staffPhone&&staffPhone!==bot){const j=recipientJid(staffPhone);if(j&&!targets.includes(j))targets.push(j)}
+            if(targets.length){try{for(const j of targets)await sendText(j,message);await supabaseRestRequest('/bank_amc_visits?id=eq.'+encodeURIComponent(v.id),{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({[w.wa]:new Date().toISOString(),updated_at:new Date().toISOString()})})}catch(err){console.error('Bank AMC WhatsApp reminder failed:',JSON.stringify({visitId:v.id,milestone:w.label,error:String(err?.message||err)}))}}
+            else console.warn('Bank AMC WhatsApp reminder skipped: configure STAFF_WHATSAPP_NUMBER and assign staff with a valid phone.')
+          }
+          if(!v[w.email]&&branch.contact_email&&bankAmcEmailReady()){
+            try{const sent=await sendBankAmcEmail(branch.contact_email,'Unique Market | Bank AMC visit reminder — '+(branch.site_name||title),'Dear Branch Team,\n\nThis is a reminder for the scheduled Bank AMC visit.\n\nBranch: '+(branch.site_name||title)+'\nContract: '+title+'\nVisit date/time: '+scheduled+'\nReminder: '+w.label+'\nVisit type: '+String(v.visit_type||'scheduled').replaceAll('_',' ')+'\n\nUnique Market | CCTV | IT Security | Service & AMC\n7350060071');if(sent)await supabaseRestRequest('/bank_amc_visits?id=eq.'+encodeURIComponent(v.id),{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({[w.email]:new Date().toISOString(),updated_at:new Date().toISOString()})})}catch(err){console.error('Bank AMC branch email failed:',String(err?.message||err))}
+          }
+        }
+      }catch(err){console.error('Bank AMC visit reminder query failed:',JSON.stringify({milestone:w.label,error:String(err?.message||err)}))}
+    }
+    try{
+      const contracts=await supabaseRestRequest('/amc_contracts?select=id,contract_name,end_date,next_billing_date,status,renewal_reminder_30d_sent_at,renewal_reminder_15d_sent_at,renewal_reminder_7d_sent_at,billing_reminder_7d_sent_at,sites:sites(site_name,address,contact_email)&status=eq.active&limit=200')
+      const today=bankAmcIstDate(0),dayDiff=date=>Math.round((new Date(date+'T00:00:00Z')-new Date(today+'T00:00:00Z'))/86400000)
+      for(const c of contracts||[]){
+        const branch=c.sites||{},email=branch.contact_email
+        if(!email||!bankAmcEmailReady())continue
+        const title=c.contract_name||branch.site_name||'Bank AMC',days=c.end_date?dayDiff(c.end_date):null
+        let col=null,label=''
+        if(days!==null&&days<=7&&days>=0&&!c.renewal_reminder_7d_sent_at){col='renewal_reminder_7d_sent_at';label='7 days'}
+        else if(days!==null&&days<=15&&days>7&&!c.renewal_reminder_15d_sent_at){col='renewal_reminder_15d_sent_at';label='15 days'}
+        else if(days!==null&&days<=30&&days>15&&!c.renewal_reminder_30d_sent_at){col='renewal_reminder_30d_sent_at';label='30 days'}
+        if(col){try{const sent=await sendBankAmcEmail(email,'Unique Market | AMC renewal reminder — '+(branch.site_name||title),'Dear Branch Team,\n\nThe Bank AMC contract is due for renewal in '+label+'.\nBranch: '+(branch.site_name||title)+'\nContract: '+title+'\nExpiry date: '+c.end_date+'\n\nPlease coordinate with Unique Market at 7350060071.');if(sent)await supabaseRestRequest('/amc_contracts?id=eq.'+encodeURIComponent(c.id),{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({[col]:new Date().toISOString()})})}catch(err){console.error('Bank AMC renewal email failed:',String(err?.message||err))}}
+        const billDays=c.next_billing_date?dayDiff(c.next_billing_date):null
+        if(billDays!==null&&billDays<=7&&!c.billing_reminder_7d_sent_at){try{const sent=await sendBankAmcEmail(email,'Unique Market | Quarterly AMC billing reminder — '+(branch.site_name||title),'Dear Branch Team,\n\nThe quarterly Bank AMC billing date is approaching.\nBranch: '+(branch.site_name||title)+'\nContract: '+title+'\nBilling date: '+c.next_billing_date+'\n\nFor billing coordination, contact Unique Market at 7350060071.');if(sent)await supabaseRestRequest('/amc_contracts?id=eq.'+encodeURIComponent(c.id),{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({billing_reminder_7d_sent_at:new Date().toISOString()})})}catch(err){console.error('Bank AMC billing email failed:',String(err?.message||err))}}
+      }
+    }catch(err){console.error('Bank AMC contract reminder query failed:',String(err?.message||err))}
+  })().finally(()=>{bankAmcReminderProcessingInFlight=null})
+  return bankAmcReminderProcessingInFlight
+}
+function startBankAmcReminderPoller(){if(bankAmcReminderPollerStarted)return;bankAmcReminderPollerStarted=true;setInterval(()=>processBankAmcReminders().catch(err=>console.error('Bank AMC reminder poll failed:',String(err?.message||err))),60000)}
+
 function startEventPoller() {
   if (eventPollerStarted) return
   eventPollerStarted = true
@@ -1691,6 +1773,7 @@ const active = complaintSessions.get(conversationKey); const quote = quoteSessio
       startEventPoller()
       startVisitReminderPoller()
       startBusinessReminderPoller()
+      startBankAmcReminderPoller()
       setTimeout(() => processNotificationEvents().catch(err => logger.error({ err: describeSupabaseError(err) }, 'initial event processing failed')), 500)
       console.log('WhatsApp connected')
     }
