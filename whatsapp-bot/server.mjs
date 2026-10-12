@@ -1622,7 +1622,7 @@ const active = complaintSessions.get(conversationKey); const quote = quoteSessio
             console.error('WhatsApp complaint creation failed:', String(err?.message || err))
             // Reset the failed complaint flow so the next menu option works normally.
             clearComplaintSession(conversationKey)
-            reply = '⚠️ Complaint register kartana temporary problem ala. Complaint session reset keli aahe. Punha *1* pathvun complaint register kara kiwa *2* pathvun CCTV / Sales enquiry kara.\n\n📞 *7350060071*'
+            reply = '⚠️ Complaint register kartana temporary problem ala. Complaint session reset keli aahe. Punha *1* pathvun complaint register kara kiwa *3* pathvun CCTV / Sales enquiry kara.\n\n📞 *7350060071*'
           }
         }
       } else if (!reply && /^(hi+|hello+|hey+|namaskar|नमस्कार)$/i.test(normalized)) {
