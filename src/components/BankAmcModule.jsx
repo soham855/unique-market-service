@@ -12,6 +12,7 @@ export default function BankAmcModule({onBack}) {
   const [contracts,setContracts]=useState([])
   const [visits,setVisits]=useState([])
   const [sites,setSites]=useState([])
+  const [selectedDistrict,setSelectedDistrict]=useState('')
   const [staff,setStaff]=useState([])
   const [loading,setLoading]=useState(true)
   const [saving,setSaving]=useState(false)
@@ -25,7 +26,7 @@ export default function BankAmcModule({onBack}) {
     const [c,v,s,t]=await Promise.all([
       supabase.from('amc_contracts').select('*,sites:sites(id,site_name,address,contact_email)').order('created_at',{ascending:false}).limit(500),
       supabase.from('bank_amc_visits').select('*,amc_contract:amc_contracts(id,contract_name,site_id,sites:sites(site_name,address,contact_email))').order('scheduled_at',{ascending:true}).limit(500),
-      supabase.from('sites').select('id,site_name,address,contact_email').order('site_name').limit(500),
+      supabase.from('sites').select('id,site_name,district,address,contact_email').order('site_name').limit(500),
       supabase.from('profiles').select('id,full_name,phone').eq('role','technician').limit(500)
     ])
     const errors=[c.error,v.error,s.error,t.error].filter(Boolean)
@@ -110,7 +111,8 @@ export default function BankAmcModule({onBack}) {
     {loading?<p className='muted'>Loading bank AMC records…</p>:<>
       {tab==='contracts'&&<><h3>Register Bank AMC Contract</h3><form className='admin-form' onSubmit={saveContract}>
         <label>Contract / Bank Name<input value={contractForm.contract_name} onChange={e=>setContractForm({...contractForm,contract_name:e.target.value})} placeholder='e.g. Bank AMC — Branch contract'/></label>
-        <label>Bank Branch / Site<select required value={contractForm.site_id} onChange={e=>setContractForm({...contractForm,site_id:e.target.value})}><option value=''>Select branch</option>{sites.map(s=><option key={s.id} value={s.id}>{siteLabel(s)}</option>)}</select></label>
+        <label>District<select required value={selectedDistrict} onChange={e=>{setSelectedDistrict(e.target.value);setContractForm({...contractForm,site_id:''})}}><option value=''>Select district</option>{[...new Set(sites.map(s=>String(s.district||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b)).map(d=><option key={d} value={d}>{d}</option>)}</select></label>
+        <label>Bank Branch / Site<select required value={contractForm.site_id} onChange={e=>setContractForm({...contractForm,site_id:e.target.value})}><option value=''>Select branch</option>{sites.filter(s=>!selectedDistrict||s.district===selectedDistrict).map(s=><option key={s.id} value={s.id}>{siteLabel(s)}</option>)}</select></label>
         <label>Contract Start<input type='date' required value={contractForm.start_date} onChange={e=>setContractForm({...contractForm,start_date:e.target.value})}/></label>
         <label>Contract Expiry / Renewal Date<input type='date' required value={contractForm.end_date} onChange={e=>setContractForm({...contractForm,end_date:e.target.value})}/></label>
         <label>Contract Status<select value={contractForm.status} onChange={e=>setContractForm({...contractForm,status:e.target.value})}><option value='active'>Active</option><option value='pending'>Pending</option><option value='expired'>Expired</option><option value='cancelled'>Cancelled</option></select></label>
