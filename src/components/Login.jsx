@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { signIn } from '../lib/auth'
-import { REMEMBER_KEY } from '../lib/supabase'
+import { REMEMBER_KEY, AUTH_STORAGE_KEY } from '../lib/supabase'
 
 const FIFTEEN_DAYS = 15 * 24 * 60 * 60 * 1000
 
@@ -22,7 +22,7 @@ export default function Login({ onLogin, portal = null }) {
         localStorage.setItem(REMEMBER_KEY, String(Date.now() + FIFTEEN_DAYS))
       } else {
         localStorage.removeItem(REMEMBER_KEY)
-        localStorage.removeItem('unique-market-auth-token')
+        localStorage.removeItem(AUTH_STORAGE_KEY)
       }
 
       const data = await signIn(email.trim(), password)
