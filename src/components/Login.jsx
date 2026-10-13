@@ -4,7 +4,8 @@ import { REMEMBER_KEY } from '../lib/supabase'
 
 const FIFTEEN_DAYS = 15 * 24 * 60 * 60 * 1000
 
-export default function Login({ onLogin }) {
+export default function Login({ onLogin, portal = null }) {
+  const portalTitle = portal === 'customer' ? 'Customer Portal' : portal === 'technician' ? 'Technician Portal' : portal === 'admin' ? 'Admin Portal' : 'Service Portal'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [remember, setRemember] = useState(() => Number(localStorage.getItem(REMEMBER_KEY) || 0) > Date.now())
@@ -41,8 +42,8 @@ export default function Login({ onLogin }) {
 
   return <main className='auth-shell'>
     <form className='login-card' onSubmit={submit}>
-      <p className='eyebrow'>UNIQUE MARKET</p><h1>Sign in</h1>
-      <p className='muted'>Access the Service Management control center.</p>
+      <p className='eyebrow'>UNIQUE MARKET</p><h1>{portalTitle} Sign in</h1>
+      <p className='muted'>Secure access from anywhere. Use your assigned account credentials.</p>
       <label>Email<input type='email' value={email} onChange={e=>setEmail(e.target.value)} required autoComplete='email' /></label>
       <label>Password<input type='password' value={password} onChange={e=>setPassword(e.target.value)} required autoComplete='current-password' /></label>
       <label className='remember-login'>
@@ -51,6 +52,7 @@ export default function Login({ onLogin }) {
       </label>
       {error && <div className='error'>{error}</div>}
       <button disabled={loading}>{loading ? 'Signing in…' : 'Sign in'}</button>
+      <nav aria-label='Portal links' className='portal-login-links' style={{display:'flex',flexWrap:'wrap',gap:10,marginTop:14,fontSize:12}}><a href='/customer/login'>Customer</a><a href='/technician/login'>Technician</a><a href='/admin/login'>Admin</a></nav>
     </form>
   </main>
 }
