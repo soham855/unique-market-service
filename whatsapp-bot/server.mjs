@@ -1447,11 +1447,11 @@ async function answerTechnicianSupport(phone, question) {
       })
       const payload = await response.json().catch(() => ({}))
       const answer = String(payload?.candidates?.[0]?.content?.parts?.map(p => p?.text || '').join('\n') || '').trim()
-      if (response.ok && answer) return '🧰 *UNIQUE MARKET | AI TECH SUPPORT*\\n\\n' + answer + '\\n\\n⚠️ AI guidance आहे; exact model/firmware verify करा. उपाय खात्रीशीर नसेल तर *SOS* टाइप करा.'
+      if (response.ok && answer) return '🧰 *UNIQUE MARKET | AI TECH SUPPORT*\n\n' + answer + '\n\n⚠️ AI guidance आहे; exact model/firmware verify करा. उपाय खात्रीशीर नसेल तर *SOS* टाइप करा.'
     }
     try { await notifyStaffOfHandoff(normalizedPhone, 'Technician needs KB support: ' + String(question || '').slice(0, 1000)) } catch {}
-    return '🧰 *UNIQUE MARKET | TECH SUPPORT*\\n\\nया प्रश्नासाठी published, verified KB answer सापडला नाही.' +
-      (GOOGLE_API_KEY ? '\\nAI answer तयार करता आला नाही.' : '\\nAI support key configured नाही.') +
+    return '🧰 *UNIQUE MARKET | TECH SUPPORT*\n\nया प्रश्नासाठी published, verified KB answer सापडला नाही.' +
+      (GOOGLE_API_KEY ? '\nAI answer तयार करता आला नाही.' : '\nAI support key configured नाही.') +
       '\\n\\nकृपया exact model number, firmware आणि error चा फोटो पाठवा किंवा *SOS* टाइप करून Senior Technician कडून मदत मागा.'
   } catch (err) {
     console.error('Technician KB assistant failed:', String(err?.message || err))
@@ -1472,7 +1472,7 @@ async function requestTechnicianSosFromWhatsApp(phone, notes) {
     body: JSON.stringify({ technician_id: technician.id, notes: String(notes || 'Technician requested urgent expert support').slice(0, 2000) })
   })
   if (!Array.isArray(inserted) || !inserted[0]?.id) throw new Error('SOS could not be saved')
-  return '🚨 *SOS ALERT REGISTERED*\\n\\nAdmin आणि Senior Technician यांना WhatsApp alert पाठवला जाईल.\\n\\nकृपया फोन जवळ ठेवा. तातडीची safety emergency असल्यास local emergency services शी संपर्क करा.\\n\\n📞 *Unique Market: 7350060071*'
+  return '🚨 *SOS ALERT REGISTERED*\n\nAdmin आणि Senior Technician यांना WhatsApp alert पाठवला जाईल.\n\nकृपया फोन जवळ ठेवा. तातडीची safety emergency असल्यास local emergency services शी संपर्क करा.\\n\\n📞 *Unique Market: 7350060071*'
 }
 
 async function processTechnicianSosAlerts() {
