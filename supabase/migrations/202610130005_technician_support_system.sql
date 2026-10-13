@@ -48,6 +48,7 @@ create table if not exists public.technician_sos_alerts (
   acknowledged_at timestamptz,
   resolved_at timestamptz,
   notification_sent_at timestamptz,
+  admin_notification_sent_at timestamptz,
   notification_error text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
