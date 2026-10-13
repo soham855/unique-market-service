@@ -1,0 +1,9 @@
+alter table public.sites add column if not exists state text;
+alter table public.sites add column if not exists pincode text;
+alter table public.amc add column if not exists state text;
+alter table public.amc add column if not exists address text;
+alter table public.amc add column if not exists pincode text;
+alter table public.amc_contracts add column if not exists state text;
+alter table public.amc_contracts add column if not exists district text;
+alter table public.amc_contracts add column if not exists address text;
+alter table public.amc_contracts add column if not exists pincode text;
