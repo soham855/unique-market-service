@@ -564,8 +564,12 @@ function authorized(req) {
 }
 
 function recipientJid(phone) {
-  const digits = String(phone || '').replace(/\D/g, '')
+  let digits = String(phone || '').replace(/\D/g, '')
   if (!digits) return null
+  // Complaint forms commonly store Indian mobile numbers as 10 digits.
+  // Baileys needs the country code in the WhatsApp JID.
+  if (digits.length === 10) digits = '91' + digits
+  else if (digits.length === 11 && digits.startsWith('0')) digits = '91' + digits.slice(1)
   return `${digits}@s.whatsapp.net`
 }
 
@@ -886,7 +890,10 @@ async function processNotificationEvents() {
 
     const seenEventGroups = new Set()
     for (const event of data || []) {
-      const groupKey = String(event.complaint_id || '') + ':' + String(event.event_type || '')
+      // Deduplicate per complaint + event + recipient, not per complaint/event alone.
+      // A complaint can legitimately have separate customer and office notifications.
+      const recipientKey = String(event.phone || event.customer_phone || event.recipient_user_id || '').replace(/\D/g, '')
+      const groupKey = String(event.complaint_id || '') + ':' + String(event.event_type || '') + ':' + recipientKey
       if (seenEventGroups.has(groupKey)) {
         console.log('WhatsApp duplicate pending event skipped:', JSON.stringify({ eventId: event.id, complaintId: event.complaint_id, eventType: event.event_type }))
         try {
