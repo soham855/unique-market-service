@@ -13,8 +13,7 @@ create table if not exists public.technician_kb_articles (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-create index if not exists technician_kb_articles_search_idx
-  on public.technician_kb_articles using gin (to_tsvector('simple', coalesce(title,'') || ' ' || coalesce(problem,'') || ' ' || array_to_string(keywords,' ')));
+create index if not exists technician_kb_articles_title_idx on public.technician_kb_articles (lower(title));
 
 create table if not exists public.tech_manuals (
   id uuid primary key default gen_random_uuid(),
@@ -31,8 +30,7 @@ create table if not exists public.tech_manuals (
   updated_at timestamptz not null default now(),
   constraint tech_manuals_has_resource check (nullif(file_path,'') is not null or nullif(external_url,'') is not null)
 );
-create index if not exists tech_manuals_search_idx
-  on public.tech_manuals using gin (to_tsvector('simple', coalesce(title,'') || ' ' || coalesce(brand,'') || ' ' || coalesce(model,'') || ' ' || coalesce(category,'')));
+create index if not exists tech_manuals_title_idx on public.tech_manuals (lower(title));
 
 create table if not exists public.technician_sos_alerts (
   id uuid primary key default gen_random_uuid(),
