@@ -1459,6 +1459,22 @@ async function answerTechnicianSupport(phone, question) {
   }
 }
 
+
+async function requestTechnicianSosFromWhatsApp(phone, notes) {
+  if (!supabase) return '⚠️ SOS system is not configured. Please call 7350060071.'
+  const normalizedPhone = normalizeSupportPhone(phone)
+  const profiles = await supabaseRestRequest('/profiles?select=id,full_name,phone,role&role=eq.technician&limit=500')
+  const technician = (Array.isArray(profiles) ? profiles : []).find(p => normalizeSupportPhone(p.phone) === normalizedPhone)
+  if (!technician) return null
+  const inserted = await supabaseRestRequest('/technician_sos_alerts', {
+    method: 'POST',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({ technician_id: technician.id, notes: String(notes || 'Technician requested urgent expert support').slice(0, 2000) })
+  })
+  if (!Array.isArray(inserted) || !inserted[0]?.id) throw new Error('SOS could not be saved')
+  return '🚨 *SOS ALERT REGISTERED*\\n\\nAdmin आणि Senior Technician यांना WhatsApp alert पाठवला जाईल.\\n\\nकृपया फोन जवळ ठेवा. तातडीची safety emergency असल्यास local emergency services शी संपर्क करा.\\n\\n📞 *Unique Market: 7350060071*'
+}
+
 async function processTechnicianSosAlerts() {
   if (!supabase || status !== 'connected' || !sock || sosPollInFlight) return
   sosPollInFlight = (async () => {
@@ -1855,6 +1871,9 @@ const active = complaintSessions.get(conversationKey); const quote = quoteSessio
             reply = '⚠️ Complaint register kartana temporary problem ala. Complaint session reset keli aahe. Punha *1* pathvun complaint register kara kiwa *3* pathvun CCTV / Sales enquiry kara.\n\n📞 *7350060071*'
           }
         }
+      } else if (/^(sos|expert|call expert)$/i.test(normalized)) {
+        const sosReply = await requestTechnicianSosFromWhatsApp(from, text)
+        if (sosReply) reply = sosReply
       } else if (isTechnicianSupportIntent(normalized)) {
         const supportReply = await answerTechnicianSupport(from, text)
         if (supportReply) reply = supportReply
