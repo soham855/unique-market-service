@@ -1490,6 +1490,25 @@ async function processTechnicianSosAlerts() {
     if (adminNumber.length >= 12 && adminNumber !== normalizeSupportPhone(PHONE_NUMBER)) recipients.set(adminNumber, { full_name: 'Admin' })
     for (const alert of alerts) {
       const technician = (Array.isArray(profiles) ? profiles : []).find(p => p.id === alert.technician_id)
+      if (!alert.admin_notification_sent_at) {
+        const adminProfiles = (Array.isArray(profiles) ? profiles : []).filter(p => p.role === 'admin')
+        const adminMessage = 'Technician ' + (technician?.full_name || 'Technician') + ' requested urgent help. Site: ' + (alert.customer_name || alert.location_text || 'Not provided') + '. Details: ' + String(alert.notes || '').slice(0, 700)
+        try {
+          for (const adminProfile of adminProfiles) {
+            await supabaseRestRequest('/notifications', {
+              method: 'POST',
+              headers: { Prefer: 'return=minimal' },
+              body: JSON.stringify({ user_id: adminProfile.id, complaint_id: alert.complaint_id || null, title: 'Technician SOS Alert', message: adminMessage, type: 'urgent' })
+            })
+          }
+          await supabaseRestRequest('/technician_sos_alerts?id=eq.' + encodeURIComponent(alert.id), {
+            method: 'PATCH', headers: { Prefer: 'return=minimal' },
+            body: JSON.stringify({ admin_notification_sent_at: new Date().toISOString() })
+          })
+        } catch (err) {
+          console.error('Technician SOS in-app notification failed:', String(err?.message || err))
+        }
+      }
       const targetRecipients = [...recipients.entries()].filter(([number, p]) => number !== normalizeSupportPhone(technician?.phone))
       const maps = alert.latitude != null && alert.longitude != null ? 'https://www.google.com/maps?q=' + alert.latitude + ',' + alert.longitude : ''
       const message = [
