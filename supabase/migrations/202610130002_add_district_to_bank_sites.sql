@@ -1,4 +1,5 @@
 alter table public.sites add column if not exists district text;
+alter table public.amc add column if not exists district text;
 
 -- Keep one linked Bank AMC contract per Admin AMC record; PostgreSQL permits multiple NULL values.
 drop index if exists public.amc_contracts_source_amc_id_uidx;
