@@ -1452,7 +1452,7 @@ async function answerTechnicianSupport(phone, question) {
     try { await notifyStaffOfHandoff(normalizedPhone, 'Technician needs KB support: ' + String(question || '').slice(0, 1000)) } catch {}
     return '🧰 *UNIQUE MARKET | TECH SUPPORT*\n\nया प्रश्नासाठी published, verified KB answer सापडला नाही.' +
       (GOOGLE_API_KEY ? '\nAI answer तयार करता आला नाही.' : '\nAI support key configured नाही.') +
-      '\\n\\nकृपया exact model number, firmware आणि error चा फोटो पाठवा किंवा *SOS* टाइप करून Senior Technician कडून मदत मागा.'
+      '\n\nकृपया exact model number, firmware आणि error चा फोटो पाठवा किंवा *SOS* टाइप करून Senior Technician कडून मदत मागा.'
   } catch (err) {
     console.error('Technician KB assistant failed:', String(err?.message || err))
     return '⚠️ Tech Support तात्पुरते उपलब्ध नाही. कृपया *SOS* टाइप करा किंवा 7350060071 वर कॉल करा.'
