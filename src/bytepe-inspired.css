@@ -286,3 +286,44 @@
   .premium-landing .service-card{min-height:0!important}
   .premium-landing .about-card,.premium-landing .contact-section{padding:24px!important}
 }
+
+
+/* Hand-finished brand pass: restrained surfaces, stronger editorial hierarchy, less template-like gloss. */
+.premium-landing{--store-accent:#087f8c!important;--store-accent-dark:#086b75!important;background:#fff!important}
+.premium-landing:before{background:#fff!important}
+.premium-landing .company-nav{border-radius:12px!important;box-shadow:0 2px 8px rgba(15,23,42,.035)!important;backdrop-filter:none!important}
+.premium-landing .company-logo{font-weight:800!important;letter-spacing:-.045em!important}
+.premium-landing .company-navlinks a{font-weight:600!important;font-size:13px!important}
+.premium-landing .nav-portal{background:#087f8c!important;border-color:#087f8c!important;box-shadow:none!important}
+.premium-landing .company-hero{min-height:560px!important;gap:56px!important}
+.premium-landing .company-hero:before{display:none!important}
+.premium-landing .company-kicker{font-size:11px!important;letter-spacing:.095em!important}
+.premium-landing .hero-copy h1{font-size:clamp(42px,5.25vw,64px)!important;line-height:1.06!important;letter-spacing:-.052em!important;font-weight:760!important}
+.premium-landing .hero-copy h1 span{color:#087f8c!important;background:none!important;-webkit-text-fill-color:currentColor!important}
+.premium-landing .hero-copy>p{font-size:16px!important;line-height:1.72!important;color:#526174!important}
+.premium-landing .cta-primary{background:#087f8c!important;box-shadow:none!important}
+.premium-landing .cta-secondary{background:#fff!important;box-shadow:none!important}
+.premium-landing .cta-primary,.premium-landing .cta-secondary{border-radius:9px!important;font-weight:700!important}
+.premium-landing .cta-primary:hover,.premium-landing .cta-secondary:hover{transform:translateY(-1px)!important;box-shadow:0 5px 14px rgba(15,23,42,.08)!important}
+.premium-landing .hero-panel{border-radius:14px!important;box-shadow:0 8px 28px rgba(15,23,42,.065)!important}
+.premium-landing .quick-enquiry-submit{background:#087f8c!important;box-shadow:none!important;font-weight:750!important}
+.premium-landing .company-stats{border-radius:12px!important;box-shadow:none!important}
+.premium-landing .company-stats strong{font-size:24px!important;letter-spacing:-.035em!important}
+.premium-landing .company-stats span{font-size:9px!important;letter-spacing:.055em!important}
+.premium-landing .company-section{padding:58px 0!important}
+.premium-landing .section-label{font-size:10px!important;letter-spacing:.11em!important}
+.premium-landing .section-head h2{font-size:clamp(29px,3.5vw,42px)!important;letter-spacing:-.045em!important;line-height:1.12!important}
+.premium-landing .section-head>p{font-size:14px!important}
+.premium-landing .service-grid{gap:16px!important}
+.premium-landing .service-card{border-radius:12px!important;box-shadow:none!important;min-height:260px!important}
+.premium-landing .service-card:hover{transform:translateY(-2px)!important;box-shadow:0 8px 22px rgba(15,23,42,.06)!important;border-color:#c6dfe1!important}
+.premium-landing .service-icon{border-radius:10px!important;background:#eff8f8!important;color:#087f8c!important;border-color:#d8eaea!important}
+.premium-landing .service-card>a,.premium-landing .product-item span,.premium-landing .area-list a:hover{color:#087f8c!important}
+.premium-landing .product-item{border-radius:11px!important;box-shadow:none!important}
+.premium-landing .product-item:hover{transform:translateY(-2px)!important;box-shadow:0 7px 18px rgba(15,23,42,.055)!important;border-color:#c6dfe1!important}
+.premium-landing .about-card{border-radius:14px!important;box-shadow:none!important;background:#f7f9fa!important}
+.premium-landing .contact-section{border-radius:14px!important;box-shadow:none!important;background:#f4f9f9!important;border-color:#dce9e9!important}
+.premium-landing .contact-card{border-radius:11px!important}
+.premium-landing .contact-links a:first-child{background:#087f8c!important;border-color:#087f8c!important}
+.premium-landing .company-footer{padding-top:28px!important}
+@media(max-width:640px){.premium-landing .hero-copy h1{font-size:clamp(37px,10vw,45px)!important}.premium-landing .hero-copy>p{font-size:14px!important}.premium-landing .company-section{padding:42px 0!important}}
