@@ -165,3 +165,23 @@
 @media(prefers-reduced-motion:reduce){
   .app-shell .module-card,.app-shell .top-actions button,.auth-shell button{transition:none!important}
 }
+
+
+/* Hand-finished portal pass: clear hierarchy and practical, low-noise enterprise UI. */
+.app-shell{background:#f6f7f8!important;color:#182230!important}
+.app-shell .topbar{border-radius:12px!important;box-shadow:0 1px 3px rgba(15,23,42,.035)!important;backdrop-filter:none!important}
+.app-shell .dashboard-heading{border-radius:16px!important;box-shadow:0 2px 8px rgba(15,23,42,.035)!important;background:#fff!important}
+.app-shell .dashboard-title-row h2{font-weight:760!important;letter-spacing:-.045em!important}
+.app-shell .dashboard-kicker{letter-spacing:.09em!important}
+.app-shell .dashboard-stat-card{border-radius:12px!important;box-shadow:0 1px 4px rgba(15,23,42,.025)!important;background:#fff!important}
+.app-shell .module-card{border-radius:12px!important;box-shadow:0 1px 4px rgba(15,23,42,.025)!important;background:#fff!important}
+.app-shell .module-card:hover{transform:translateY(-2px)!important;box-shadow:0 5px 14px rgba(15,23,42,.055)!important;border-color:#bddbdc!important}
+.app-shell .module-icon{border-radius:10px!important;box-shadow:none!important;background:#f0f7f7!important}
+.app-shell .role-dashboard--customer .module-card:first-child,.app-shell .role-dashboard--technician .module-card:first-child{background:#f4f9f9!important}
+.app-shell .admin-panel,.app-shell .complaints-panel{border-radius:14px!important;box-shadow:0 2px 9px rgba(15,23,42,.035)!important;backdrop-filter:none!important}
+.app-shell input:not([type=checkbox]):not([type=radio]),.app-shell select,.app-shell textarea{border-radius:8px!important;box-shadow:none!important}
+.app-shell button:not(.module-card){font-weight:650}
+.auth-shell{background:#f5f7f8!important}
+.auth-shell .login-card{border-radius:16px!important;box-shadow:0 8px 28px rgba(15,23,42,.06)!important}
+.auth-shell .login-card button[type=submit],.auth-shell .login-card>button{border-radius:9px!important;box-shadow:none!important;background:#087e8b!important}
+@media(max-width:700px){.app-shell .dashboard-heading{border-radius:14px!important}.app-shell .module-card{border-radius:11px!important}.app-shell .admin-panel,.app-shell .complaints-panel{border-radius:12px!important}}
