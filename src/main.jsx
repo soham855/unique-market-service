@@ -15,6 +15,7 @@ import {supabase} from './lib/supabase'
 import {getSession,onAuthStateChange,signOut} from './lib/auth'
 import {getMyProfile} from './lib/profile'
 import Login from './components/Login'
+import NativeSplash from './components/NativeSplash'
 import RoleDashboard from './components/RoleDashboard'
 import ComplaintModule from './components/ComplaintModule'
 import CustomerComplaintModule from './components/CustomerComplaintModule'
@@ -61,10 +62,12 @@ function App(){
  if(pathname==='/track-service') return <TrackService/>
  if(pathname==='/network-ai') return <NetworkAITool onBack={()=>{window.location.href='/'}}/>
  if(publicSeoPaths.includes(pathname)) return <LocalSeoPage/>
- const[session,setSession]=useState(undefined),[profile,setProfile]=useState(null),[profileError,setProfileError]=useState(''),[activeModule,setActiveModule]=useState(null)
+ const[session,setSession]=useState(undefined),[profile,setProfile]=useState(null),[profileError,setProfileError]=useState(''),[activeModule,setActiveModule]=useState(null),[showNativeSplash,setShowNativeSplash]=useState(isNativeApp)
  useEffect(()=>{let listener;CapacitorApp.addListener('backButton',({canGoBack})=>{if(activeModule){setActiveModule(null);return}if(canGoBack&&window.history.length>1){window.history.back();return}CapacitorApp.exitApp()}).then(v=>{listener=v});return()=>{listener?.remove()}},[activeModule])
+ useEffect(()=>{if(!isNativeApp)return;const timer=setTimeout(()=>setShowNativeSplash(false),1500);return()=>clearTimeout(timer)},[isNativeApp])
  async function loadProfile(){try{setProfileError('');const p=await getMyProfile();if(!p?.role)throw new Error('Your account has no valid role assigned.');if(!['admin','technician','customer'].includes(p.role))throw new Error('Invalid account role.');setProfile(p);setActiveModule(null)}catch(e){setProfile(null);setProfileError(e.message||'Unable to load profile')}}
  useEffect(()=>{let mounted=true;getSession().then(async v=>{if(!mounted)return;setSession(v);if(v){await initNativePushNotifications();try{const p=await getMyProfile();if(!p?.role||!['admin','technician','customer'].includes(p.role))throw new Error('Invalid account role.');setProfile(p)}catch(e){setProfileError(e.message||'Unable to load profile')}}});const{data}=onAuthStateChange((_e,n)=>{setSession(n);if(n){initNativePushNotifications();setTimeout(()=>{if(mounted)loadProfile()},0)}else{setProfile(null);setActiveModule(null)}});return()=>{mounted=false;data.subscription.unsubscribe()}},[])
+ if(isNativeApp&&showNativeSplash)return <NativeSplash/>
  if(session===undefined)return <main className='auth-shell'><div className='login-card'><p className='eyebrow'>UNIQUE MARKET</p><h1>Loading…</h1></div></main>
  if(!session)return <Login onLogin={setSession} portal={portalPath}/>
  if(profileError)return <main className='auth-shell'><div className='login-card'><p className='eyebrow'>UNIQUE MARKET</p><h1>Profile setup required</h1><p className='error'>{profileError}</p><button type='button' onClick={signOut}>Sign out</button></div></main>
