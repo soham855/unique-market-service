@@ -39,5 +39,8 @@
     "vite": "^6.0.7",
     "@capacitor/cli": "^8.0.0",
     "typescript": "^5.9.2"
+  },
+  "overrides": {
+    "rollup": "4.53.3"
   }
 }
