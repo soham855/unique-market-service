@@ -1472,7 +1472,7 @@ async function requestTechnicianSosFromWhatsApp(phone, notes) {
     body: JSON.stringify({ technician_id: technician.id, notes: String(notes || 'Technician requested urgent expert support').slice(0, 2000) })
   })
   if (!Array.isArray(inserted) || !inserted[0]?.id) throw new Error('SOS could not be saved')
-  return '🚨 *SOS ALERT REGISTERED*\n\nAdmin आणि Senior Technician यांना WhatsApp alert पाठवला जाईल.\n\nकृपया फोन जवळ ठेवा. तातडीची safety emergency असल्यास local emergency services शी संपर्क करा.\\n\\n📞 *Unique Market: 7350060071*'
+  return '🚨 *SOS ALERT REGISTERED*\n\nAdmin आणि Senior Technician यांना WhatsApp alert पाठवला जाईल.\n\nकृपया फोन जवळ ठेवा. तातडीची safety emergency असल्यास local emergency services शी संपर्क करा.\n\n📞 *Unique Market: 7350060071*'
 }
 
 async function processTechnicianSosAlerts() {
