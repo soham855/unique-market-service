@@ -107,23 +107,21 @@ Deno.serve(async (req: Request) => {
         return json({ error: "Incorrect OTP" }, 400);
       }
 
-      const { data: locked, error: lockError } = await db.from("cash_payment_otp_challenges")
-        .update({ verified_at: new Date().toISOString(), attempts: challenge.attempts + 1 })
-        .eq("id", challenge.id).is("verified_at", null).lt("attempts", 5).select("id").maybeSingle();
-      if (lockError) throw lockError;
-      if (!locked) return json({ error: "OTP already used or attempt limit reached" }, 409);
-
-      const { error: paymentError } = await db.from("payments").insert({
-        customer_id: customer.id, complaint_id: complaintId, amount: Number(challenge.amount),
-        mode: "Cash", payment_date: new Date().toISOString().slice(0, 10), status: "confirmed",
-        payment_status: "Confirmed", source: "cash_customer_otp", recorded_by: challenge.technician_id,
-        notes: "Cash settlement confirmed by customer OTP",
+      // OTP verification, payment ledger insert, challenge consumption, and complaint closure
+      // are committed by one PostgreSQL transaction to avoid partial settlement.
+      const { data: settlement, error: settlementError } = await db.rpc("confirm_cash_payment_with_otp", {
+        p_challenge_id: challenge.id,
+        p_customer_profile_id: user.id,
+        p_supplied_hash: suppliedHash,
       });
-      if (paymentError) throw paymentError;
-      const { error: closeError } = await db.from("complaints").update({
-        payment_status: "paid", closed_at: new Date().toISOString(),
-      }).eq("id", complaintId);
-      if (closeError) throw closeError;
+      if (settlementError) {
+        const message = settlementError.message || "";
+        if (/expired/i.test(message)) return json({ error: "OTP expired. Ask the technician to request a new one." }, 410);
+        if (/already used|awaiting cash settlement|state changed/i.test(message)) return json({ error: "OTP already used or complaint is no longer awaiting cash settlement" }, 409);
+        if (/attempt limit/i.test(message)) return json({ error: "OTP attempt limit reached. Request admin assistance." }, 429);
+        console.error("Atomic cash settlement failed:", message);
+        return json({ error: "Cash settlement could not be completed. No payment was recorded; contact Admin." }, 409);
+      }
 
       const phone = String(complaint.customer_phone || customer.mobile || "").replace(/[^0-9]/g, "");
       if (phone.length >= 10) {
