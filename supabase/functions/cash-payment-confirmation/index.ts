@@ -47,7 +47,7 @@ Deno.serve(async (req: Request) => {
 
     if (action === "request_cash_otp") {
       if (complaint.technician_id !== user.id) return json({ error: "Only the assigned technician can request cash confirmation" }, 403);
-      if (!["Completed", "completed", "Awaiting Payment", "awaiting_payment"].includes(String(complaint.status))) {
+      if (!["Completed", "completed", "resolved", "Awaiting Payment", "awaiting_payment"].includes(String(complaint.status))) {
         return json({ error: "Complete the service report before requesting cash confirmation" }, 409);
       }
       const { data: profile } = await db.from("profiles").select("role").eq("id", user.id).maybeSingle();
