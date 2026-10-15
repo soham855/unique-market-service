@@ -114,7 +114,7 @@ BEGIN
   );
 
   UPDATE public.complaints
-    SET payment_status = 'paid', closed_at = now()
+    SET payment_status = 'paid', closed_at = now(), status = 'closed'
     WHERE id = v_complaint.id
       AND payment_status = 'cash_otp_pending'
       AND closed_at IS NULL;
