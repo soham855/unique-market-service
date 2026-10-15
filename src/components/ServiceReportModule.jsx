@@ -35,7 +35,21 @@ export default function ServiceReportModule({profile,onBack}){
    const pdfUrl=supabase.storage.from('service-reports').getPublicUrl(pdfPath).data.publicUrl
    const {error:pdfRecordError}=await supabase.from('service_reports').update({pdf_url:pdfUrl,pdf_generated_at:new Date().toISOString()}).eq('id',report.id)
    if(pdfRecordError)throw pdfRecordError
-   pdf.save(reportNo+'.pdf');setMessage('Service report '+reportNo+' saved; PDF stored for secure-settlement follow-up.');reset();await loadComplaints()
+   let notificationNote=''
+   try {
+    const phone=String(selected.customer_phone||'').replace(/[^0-9]/g,'')
+    if(phone.length>=10){
+     const {error:notifyError}=await supabase.from('whatsapp_notification_events').insert({
+      complaint_id:selected.id,phone,customer_phone:phone,event_type:'service_report_pdf_'+report.id,
+      message:'UNIQUE MARKET — Service report '+reportNo+' for ticket '+(selected.ticket_no||selected.complaint_no||selected.id)+'. The PDF is attached. [[PDF_URL='+pdfUrl+']]'
+     })
+     if(notifyError)throw notifyError
+    } else notificationNote=' Customer phone missing; WhatsApp PDF was not queued.'
+   } catch(notifyError) {
+    console.error('Service report WhatsApp PDF queue failed:',notifyError)
+    notificationNote=' PDF saved, but WhatsApp delivery could not be queued.'
+   }
+   pdf.save(reportNo+'.pdf');setMessage('Service report '+reportNo+' saved; PDF stored for secure-settlement follow-up.'+notificationNote);reset();await loadComplaints()
   }catch(e){setMessage(e.message||'Unable to save service report.')}finally{setSaving(false)}
  }
  return <section className="complaints-panel service-report-panel"><div className="panel-heading"><div><span className="badge">DIGITAL SERVICE REPORT</span><h2>Complete Technician Work</h2><p>Before/after photos, parts, labour and customer confirmation — then generate the PDF automatically.</p></div><button className="secondary" onClick={onBack}>← Back</button></div>
