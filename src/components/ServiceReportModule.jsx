@@ -33,7 +33,7 @@ export default function ServiceReportModule({profile,onBack}){
    const {error:pdfUploadError}=await supabase.storage.from('service-reports').upload(pdfPath,pdfBlob,{upsert:true,contentType:'application/pdf'})
    if(pdfUploadError)throw pdfUploadError
    const pdfUrl=supabase.storage.from('service-reports').getPublicUrl(pdfPath).data.publicUrl
-   const {error:pdfRecordError}=await supabase.from('service_reports').update({pdf_url:pdfUrl,pdf_generated_at:new Date().toISOString()}).eq('id',report.id)
+   const {error:pdfRecordError}=await supabase.from('service_reports').update({pdf_url:pdfUrl}).eq('id',report.id)
    if(pdfRecordError)throw pdfRecordError
    let notificationNote=''
    try {
