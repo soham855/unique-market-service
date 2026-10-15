@@ -39,6 +39,13 @@ COMMENT ON COLUMN public.complaints.payment_status IS
 COMMENT ON COLUMN public.complaints.closed_at IS
   'Timestamp set only after verified payment settlement.';
 
+-- Cash settlement via customer OTP is a distinct, auditable payment source.
+ALTER TABLE public.payments
+  DROP CONSTRAINT IF EXISTS payments_source_check;
+ALTER TABLE public.payments
+  ADD CONSTRAINT payments_source_check
+  CHECK (source = ANY (ARRAY['customer'::text, 'technician'::text, 'admin'::text, 'cash_customer_otp'::text]));
+
 
 -- Complete cash settlement in one database transaction. This prevents a verified OTP
 -- from being consumed without recording payment, or payment being recorded without closure.
