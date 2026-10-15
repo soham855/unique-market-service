@@ -126,12 +126,22 @@ Deno.serve(async (req: Request) => {
 
       const phone = String(complaint.customer_phone || customer.mobile || "").replace(/[^0-9]/g, "");
       if (phone.length >= 10) {
+        const { data: savedReport } = await db.from("service_reports").select("pdf_url")
+          .eq("complaint_id", complaintId).eq("technician_id", challenge.technician_id)
+          .order("created_at", { ascending: false }).limit(1).maybeSingle();
+        const siteUrl = (Deno.env.get("PUBLIC_SITE_URL") || "https://salesuniquemarket.com").replace(/\\/$/, "");
+        const pdfUrl = typeof savedReport?.pdf_url === "string" && /^https:\/\//i.test(savedReport.pdf_url)
+          ? savedReport.pdf_url : "";
+        const pdfMarker = pdfUrl ? "\\n[[PDF_URL=" + pdfUrl + "]]" : "";
+        const invoiceNotice = pdfUrl
+          ? " Your service report PDF is attached."
+          : " Your service report PDF is not available yet; please contact our office.";
         const { error: notifyError } = await db.from("whatsapp_notification_events").insert({
           complaint_id: complaintId, recipient_user_id: customer.profile_id, phone,
           customer_phone: phone, event_type: "cash_payment_confirmed_" + crypto.randomUUID(),
           message: "UNIQUE MARKET — Cash payment of ₹" + Number(challenge.amount).toFixed(2) +
-            " confirmed for ticket " + (complaint.ticket_no || complaintId) +
-            ". Your payment is recorded. Please contact us if you need the digital invoice.",
+            " confirmed for ticket " + (complaint.ticket_no || complaintId) + "." + invoiceNotice +
+            "\\nRate your service (1–5 stars): " + siteUrl + "/feedback" + pdfMarker,
         });
         if (notifyError) console.error("Cash confirmation WhatsApp enqueue failed:", notifyError.message);
       }
