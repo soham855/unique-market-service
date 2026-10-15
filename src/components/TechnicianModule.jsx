@@ -34,7 +34,7 @@ export default function TechnicianModule({profile,mode='assigned',onBack}){
 }
  async function completeService(item){const notes=window.prompt('Service completion notes (optional):',item.resolution_notes||'');if(notes===null)return;await setStatus(item,'resolved',{completed_at:new Date().toISOString(),resolution_notes:notes})}
  async function requestCashOtp(item){
-  const amountText=window.prompt('Enter the exact total from the saved service report (labour + other charges):','')
+  const amountText=window.prompt('Enter the exact total from the saved service report (labour + other charges + parts):','')
   if(amountText===null)return
   const amount=Number(amountText)
   if(!Number.isFinite(amount)||amount<=0){setMessage('Enter a valid service report total.');return}
