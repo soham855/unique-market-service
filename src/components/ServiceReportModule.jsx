@@ -28,8 +28,14 @@ export default function ServiceReportModule({profile,onBack}){
    const pdf=new jsPDF();pdf.setFontSize(18);pdf.text('UNIQUE MARKET',20,20);pdf.setFontSize(11);pdf.text('Digital Service Report',20,28);pdf.text('Report: '+reportNo,20,37);pdf.text('Ticket: '+(selected.ticket_no||selected.complaint_no||selected.id.slice(0,8)),20,44);pdf.text('Customer: '+(selected.customer_name||''),20,51);pdf.text('Company: '+(selected.company_name||''),20,58);pdf.text('Technician: '+(profile.full_name||''),20,65);pdf.text('Date: '+new Date().toLocaleString('en-IN'),20,72)
    let y=84;const wrap=(label,value)=>{pdf.setFont(undefined,'bold');pdf.text(label,20,y);pdf.setFont(undefined,'normal');const lines=pdf.splitTextToSize(value||'-',165);pdf.text(lines,20,y+7);y+=7+lines.length*6+5}
    wrap('Diagnosis',diagnosis);wrap('Work Completed',work);wrap('Parts Used',cleanParts.map(p=>p.name+' × '+p.qty+' — ₹'+p.amount).join(' | '));wrap('Labour','₹'+(Number(labour)||0));wrap('Customer Confirmation',signature?'Signature captured':(verified?'OTP verified':'Not captured'))
-   if(beforeUrl){pdf.addImage(beforeUrl,'JPEG',20,y,75,55);y+=62}if(afterUrl){pdf.addImage(afterUrl,'JPEG',105,y,75,55);y+=62}pdf.text('Thank you for choosing Unique Market.',20,285);pdf.save(reportNo+'.pdf')
-   await supabase.from('service_reports').update({pdf_generated_at:new Date().toISOString()}).eq('id',report.id);setMessage('Service report '+reportNo+' saved and PDF generated.');reset();await loadComplaints()
+   if(beforeUrl){pdf.addImage(beforeUrl,'JPEG',20,y,75,55);y+=62}if(afterUrl){pdf.addImage(afterUrl,'JPEG',105,y,75,55);y+=62}pdf.text('Thank you for choosing Unique Market.',20,285)
+   const pdfBlob=pdf.output('blob'),pdfPath=profile.id+'/'+reportNo+'.pdf'
+   const {error:pdfUploadError}=await supabase.storage.from('service-reports').upload(pdfPath,pdfBlob,{upsert:true,contentType:'application/pdf'})
+   if(pdfUploadError)throw pdfUploadError
+   const pdfUrl=supabase.storage.from('service-reports').getPublicUrl(pdfPath).data.publicUrl
+   const {error:pdfRecordError}=await supabase.from('service_reports').update({pdf_url:pdfUrl,pdf_generated_at:new Date().toISOString()}).eq('id',report.id)
+   if(pdfRecordError)throw pdfRecordError
+   pdf.save(reportNo+'.pdf');setMessage('Service report '+reportNo+' saved; PDF stored for secure-settlement follow-up.');reset();await loadComplaints()
   }catch(e){setMessage(e.message||'Unable to save service report.')}finally{setSaving(false)}
  }
  return <section className="complaints-panel service-report-panel"><div className="panel-heading"><div><span className="badge">DIGITAL SERVICE REPORT</span><h2>Complete Technician Work</h2><p>Before/after photos, parts, labour and customer confirmation — then generate the PDF automatically.</p></div><button className="secondary" onClick={onBack}>← Back</button></div>
