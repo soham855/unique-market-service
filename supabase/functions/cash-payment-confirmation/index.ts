@@ -104,7 +104,18 @@ Deno.serve(async (req: Request) => {
 
       const suppliedHash = await sha256(complaintId + ":" + challenge.technician_id + ":" + otp);
       if (suppliedHash !== challenge.otp_hash) {
-        await db.from("cash_payment_otp_challenges").update({ attempts: challenge.attempts + 1 }).eq("id", challenge.id);
+        const { data: attempts, error: attemptError } = await db.rpc("record_cash_payment_otp_failure", {
+          p_challenge_id: challenge.id,
+          p_customer_profile_id: user.id,
+        });
+        if (attemptError) {
+          const message = attemptError.message || "";
+          if (/expired/i.test(message)) return json({ error: "OTP expired. Ask the technician to request a new one." }, 410);
+          if (/already used/i.test(message)) return json({ error: "OTP already used." }, 409);
+          console.error("Atomic OTP attempt update failed:", message);
+          return json({ error: "Could not verify OTP. Please retry or contact Admin." }, 409);
+        }
+        if (Number(attempts) >= 5) return json({ error: "OTP attempt limit reached. Request admin assistance." }, 429);
         return json({ error: "Incorrect OTP" }, 400);
       }
 
