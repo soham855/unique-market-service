@@ -12,7 +12,7 @@ The current payment screen uses a static UPI QR and collects a UTR. A static UPI
 - The function never trusts a client-side `Paid` flag or a UTR as proof of online settlement.
 
 ## Rollout notes
-This migration/function is intentionally additive and is not wired into technician/customer UI in this change. Wire the technician's "request cash OTP" action and the customer's authenticated "confirm cash payment" action before enabling the workflow in production. The final invoice PDF and rating URL are not emitted by this backend yet; they should be added only after a verified settlement and after confirming the existing invoice storage/feedback routes.
+The technician UI now exposes "Request Cash OTP" for completed assigned jobs, and the authenticated customer UI exposes "Confirm Cash Payment" when the complaint is awaiting cash confirmation. The WhatsApp bridge routes `cash_payment_otp_*` and `cash_payment_confirmed_*` events only to the customer phone; OTPs must never be sent to the office/admin recipient. The final invoice PDF and rating URL are not emitted by this backend yet; add them only after verified settlement and after confirming the existing invoice storage/feedback routes.
 
 ## Required pre-production checks
 1. Apply the migration only to a non-production test database first.
