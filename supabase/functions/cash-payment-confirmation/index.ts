@@ -80,7 +80,7 @@ Deno.serve(async (req: Request) => {
       if (stateError) throw stateError;
       const { error: queueError } = await db.from("whatsapp_notification_events").insert({
         complaint_id: complaintId, recipient_user_id: customer.profile_id, phone,
-        customer_phone: phone, event_type: "cash_payment_otp",
+        customer_phone: phone, event_type: "cash_payment_otp_" + crypto.randomUUID(),
         message: "UNIQUE MARKET — Cash payment confirmation for ticket " + (complaint.ticket_no || complaintId) +
           ". OTP: " + otp + ". Valid for 5 minutes. Share it only to confirm the cash amount ₹" +
           amount.toFixed(2) + ". If you did not request this, contact Unique Market.",
@@ -129,7 +129,7 @@ Deno.serve(async (req: Request) => {
       if (phone.length >= 10) {
         const { error: notifyError } = await db.from("whatsapp_notification_events").insert({
           complaint_id: complaintId, recipient_user_id: customer.profile_id, phone,
-          customer_phone: phone, event_type: "cash_payment_confirmed",
+          customer_phone: phone, event_type: "cash_payment_confirmed_" + crypto.randomUUID(),
           message: "UNIQUE MARKET — Cash payment of ₹" + Number(challenge.amount).toFixed(2) +
             " confirmed for ticket " + (complaint.ticket_no || complaintId) +
             ". Your payment is recorded. Please contact us if you need the digital invoice.",
