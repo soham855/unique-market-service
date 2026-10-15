@@ -56,7 +56,7 @@ Deno.serve(async (req: Request) => {
       const { data: report } = await db.from("service_reports").select("labour_amount,parts_used")
         .eq("complaint_id", complaintId).eq("technician_id", user.id)
         .order("created_at", { ascending: false }).limit(1).maybeSingle();
-      const partsTotal = Array.isArray(report?.parts_used) ? report.parts_used.reduce((sum, part) => sum + (Number(part.amount || 0) * Number(part.qty || 1)), 0) : 0;
+      const partsTotal = Array.isArray(report?.parts_used) ? report.parts_used.reduce((sum, part) => sum + Number(part.amount || 0), 0) : 0;
       const expectedAmount = Number(report?.labour_amount || 0) + partsTotal;
       const amount = Number(body.amount);
       if (!Number.isFinite(amount) || amount <= 0 || Math.abs(amount - expectedAmount) > 0.009) {
