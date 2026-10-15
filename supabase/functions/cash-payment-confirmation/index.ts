@@ -141,7 +141,7 @@ Deno.serve(async (req: Request) => {
           customer_phone: phone, event_type: "cash_payment_confirmed_" + crypto.randomUUID(),
           message: "UNIQUE MARKET — Cash payment of ₹" + Number(challenge.amount).toFixed(2) +
             " confirmed for ticket " + (complaint.ticket_no || complaintId) + "." + invoiceNotice +
-            "\nRate your service (1–5 stars): " + siteUrl + "/feedback" + pdfMarker,
+            "\nRate your service (1–5 stars; sign in to your customer account if prompted): " + siteUrl + "/feedback" + pdfMarker,
         });
         if (notifyError) console.error("Cash confirmation WhatsApp enqueue failed:", notifyError.message);
       }
