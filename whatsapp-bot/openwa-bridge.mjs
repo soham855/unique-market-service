@@ -237,7 +237,7 @@ async function handleIncoming(payload) {
 async function processNotificationEvents() {
   try {
     const cutoff = new Date(Date.now() - EVENT_MAX_AGE_HOURS * 3600 * 1000).toISOString()
-    const rows = await supabase('/whatsapp_notification_events?select=id,phone,customer_phone,event_type,message,status,created_at&status=eq.pending&created_at=gte.' + encodeURIComponent(cutoff) + '&order=created_at.asc&limit=20')
+    const rows = await supabase('/whatsapp_notification_events?select=id,complaint_id,phone,customer_phone,event_type,message,status,created_at&status=eq.pending&created_at=gte.' + encodeURIComponent(cutoff) + '&order=created_at.asc&limit=20')
     for (const event of rows || []) {
       try {
         const customerPhone = normalizePhone(event.customer_phone || event.phone)
