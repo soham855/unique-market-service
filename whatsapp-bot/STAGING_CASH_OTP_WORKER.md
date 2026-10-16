@@ -6,7 +6,7 @@ This worker is deliberately separate from `server.mjs` and `openwa-bridge.mjs`. 
 
 - `STAGING_SUPABASE_URL=https://hwfbcpxnntzrhbnveqtl.supabase.co`
 - `STAGING_SUPABASE_SERVICE_ROLE_KEY=<staging project's service-role key>`
-- `WA_ADMIN_PHONE=<admin's reachable WhatsApp number, country code included>`
+- `WA_ADMIN_PHONE=<reachable admin test WhatsApp number>` (accepts a 10-digit Indian mobile number or 91 + 10 digits; a 10-digit number is normalized to country code 91)
 - `OPENWA_URL=http://openwa-api:2785` (or the OpenWA API URL reachable from the worker)
 - `OPENWA_DATA_KEY_FILE=/openwa-data/.api-key` or `OPENWA_API_KEY=<existing OpenWA API key>`
 - `OPENWA_SESSION_NAME=unique-market-7350060071` or `OPENWA_SESSION_ID=<existing connected session id>`
