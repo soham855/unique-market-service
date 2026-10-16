@@ -84,7 +84,7 @@ async function poll() {
     const cutoff = new Date(Date.now() - MAX_AGE_HOURS * 3600 * 1000).toISOString()
     const events = await supabase(
       '/whatsapp_notification_events?select=id,event_type,message,created_at,status' +
-      '&status=eq.pending&event_type=like.cash_payment_otp_*&created_at=gte.' +
+      '&status=eq.pending&event_type=like.cash_payment_otp_%&created_at=gte.' +
       encodeURIComponent(cutoff) + '&order=created_at.asc&limit=10'
     )
     for (const event of events || []) {
