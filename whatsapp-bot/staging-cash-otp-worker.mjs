@@ -7,7 +7,10 @@ const OPENWA_API_KEY_FILE = String(process.env.OPENWA_DATA_KEY_FILE || '/openwa-
 const OPENWA_API_KEY_ENV = String(process.env.OPENWA_API_KEY || '').trim()
 const OPENWA_SESSION_ID_ENV = String(process.env.OPENWA_SESSION_ID || '').trim()
 const OPENWA_SESSION_NAME = String(process.env.OPENWA_SESSION_NAME || 'unique-market-7350060071')
-const WA_ADMIN_PHONE = String(process.env.WA_ADMIN_PHONE || '').replace(/\D/g, '')
+const ADMIN_PHONE_DIGITS = String(process.env.WA_ADMIN_PHONE || '').replace(/\D/g, '')
+const WA_ADMIN_PHONE = ADMIN_PHONE_DIGITS.length === 10
+  ? '91' + ADMIN_PHONE_DIGITS
+  : ADMIN_PHONE_DIGITS
 const POLL_MS = Math.max(3000, Number(process.env.STAGING_OTP_POLL_MS || 5000))
 const MAX_AGE_HOURS = Math.max(1, Number(process.env.STAGING_OTP_MAX_AGE_HOURS || 1))
 
@@ -15,8 +18,8 @@ let apiKey = OPENWA_API_KEY_ENV
 let sessionId = OPENWA_SESSION_ID_ENV
 let busy = false
 
-if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !WA_ADMIN_PHONE || WA_ADMIN_PHONE.length < 10) {
-  throw new Error('Set STAGING_SUPABASE_URL, STAGING_SUPABASE_SERVICE_ROLE_KEY, and WA_ADMIN_PHONE. This worker is intentionally admin-only.')
+if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !WA_ADMIN_PHONE || !/^91\d{10}$/.test(WA_ADMIN_PHONE)) {
+  throw new Error('Set STAGING_SUPABASE_URL, STAGING_SUPABASE_SERVICE_ROLE_KEY, and a valid Indian WA_ADMIN_PHONE (10-digit local or 91 + 10 digits). This worker is intentionally admin-only.')
 }
 
 async function readApiKey() {
