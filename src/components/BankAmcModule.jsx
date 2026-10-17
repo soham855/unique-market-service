@@ -25,6 +25,7 @@ export default function BankAmcModule({onBack}) {
   const [loading,setLoading]=useState(true)
   const [saving,setSaving]=useState(false)
   const [message,setMessage]=useState('')
+  const [emailReadiness,setEmailReadiness]=useState({loading:false,checked:false,ready:false,error:''})
   const [locationLoading,setLocationLoading]=useState(false)
   const [locationMessage,setLocationMessage]=useState('')
   const [locationError,setLocationError]=useState(false)
@@ -79,6 +80,28 @@ export default function BankAmcModule({onBack}) {
     setLoading(false)
   }
   useEffect(()=>{load()},[])
+
+  useEffect(()=>{
+    if(tab!=='emails') return
+    let cancelled=false
+    async function checkEmailReadiness() {
+      setEmailReadiness({loading:true,checked:false,ready:false,error:''})
+      const {data:{session}}=await supabase.auth.getSession()
+      if(!session?.access_token) {
+        if(!cancelled)setEmailReadiness({loading:false,checked:true,ready:false,error:'Please sign in again to verify email configuration.'})
+        return
+      }
+      try {
+        const response=await fetch('/api/bank-amc-email-status',{headers:{Authorization:`Bearer ${session.access_token}`},cache:'no-store'})
+        const result=await response.json()
+        if(!cancelled)setEmailReadiness({loading:false,checked:true,ready:Boolean(result.ready),error:result.error||'',senderDomain:result.senderDomain||'',domainStatus:result.domainStatus||'',apiKeyConfigured:result.apiKeyConfigured,senderConfigured:result.senderConfigured})
+      } catch {
+        if(!cancelled)setEmailReadiness({loading:false,checked:true,ready:false,error:'Could not verify Resend configuration. No email was sent.'})
+      }
+    }
+    checkEmailReadiness()
+    return ()=>{cancelled=true}
+  },[tab])
 
   async function saveContract(e) {
     e.preventDefault(); setSaving(true); setMessage('')
@@ -202,7 +225,7 @@ export default function BankAmcModule({onBack}) {
         <label>Breakdown / Follow-up Notes<textarea value={visitForm.breakdown_notes} onChange={e=>setVisitForm({...visitForm,breakdown_notes:e.target.value})}/></label>
         <button type='submit' disabled={saving}>{saving?'Saving…':editingVisit?'Update Visit':'Schedule Visit'}</button>{editingVisit&&<button type='button' className='secondary' onClick={()=>{setEditingVisit(null);setVisitForm({amc_contract_id:'',scheduled_at:'',assigned_staff_id:'',visit_type:'scheduled',report_summary:'',material_notes:'',breakdown_notes:''})}}>Cancel Edit</button>}
       </form><h3>Visit Schedule & History</h3><div className='data-list'>{visits.map(v=><article key={v.id}><strong>{contractLabel(v.amc_contract)} • {v.visit_type?.replaceAll('_',' ')||'visit'}</strong><span>{v.scheduled_at?new Date(v.scheduled_at).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}):'No date'} • Staff: {staff.find(s=>s.id===v.assigned_staff_id)?.full_name||'Not assigned'} • Status: {v.status}{v.report_summary?' • Report: '+v.report_summary:''}{v.material_notes?' • Material: '+v.material_notes:''}</span><div><button type='button' className='secondary' onClick={()=>editVisit(v)}>Edit / Report</button>{v.status!=='completed'&&v.status!=='cancelled'&&<button type='button' onClick={()=>updateVisitStatus(v,'completed')}>Mark Complete</button>}{v.status==='scheduled'&&<button type='button' className='secondary' onClick={()=>updateVisitStatus(v,'cancelled')}>Cancel</button>}</div></article>)}{!visits.length&&<p className='muted'>No visits scheduled yet.</p>}</div></>}
-      {tab==='emails'&&<><h3>Branch-specific Email Recipients</h3><p className='muted'>Save each bank branch's email separately. Email delivery remains disabled until the sending account/provider is configured and verified. No test email will be sent.</p><div className='data-list'>{sites.map(s=><BranchEmailRow key={s.id} site={s} onSave={saveBranchEmail}/>)}</div>{!sites.length&&<p className='muted'>Add bank branches in Admin → Sites first.</p>}</>}
+      {tab==='emails'&&<><h3>Branch-specific Email Recipients</h3><p className='muted'>Save each bank branch's email separately. Resend configuration is checked securely without sending a test email.</p><article className='email-readiness' aria-live='polite'><strong>{emailReadiness.loading?'Checking Resend configuration…':emailReadiness.ready?'Resend sender domain verified':'Email delivery not ready'}</strong><span>{emailReadiness.loading?'Checking the production API key and sender domain.':emailReadiness.ready?`Sender domain ${emailReadiness.senderDomain} is verified. Email sending code and reminder scheduling must also be enabled before delivery starts.`:emailReadiness.error||'Configuration check has not completed.'}</span><button type='button' className='secondary' onClick={()=>setTab('visits')}>Close</button></article><div className='data-list'>{sites.map(s=><BranchEmailRow key={s.id} site={s} onSave={saveBranchEmail}/>)}</div>{!sites.length&&<p className='muted'>Add bank branches in Admin → Sites first.</p>}</>}
     </>}
   </section>
 }
