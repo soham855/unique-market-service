@@ -799,7 +799,7 @@ function buildWhatsAppNotification(event, complaint, customer, recipientProfile)
     '🛠️ *Issue:* ' + issue,
     '📊 *Status:* ' + statusText,
     '📍 *Location:* ' + location, '',
-    String(complaint?.status || '').toLowerCase().replaceAll('_',' ') === 'closed' || String(complaint?.status || '').toLowerCase() === 'completed' || String(complaint?.status || '').toLowerCase() === 'resolved' ? '⭐ *Feedback:* https://salesuniquemarket.com/feedback' : 'We will keep you updated on the next service step.',
+    String(complaint?.status || '').toLowerCase().replaceAll('_',' ') === 'closed' || String(complaint?.status || '').toLowerCase() === 'completed' || String(complaint?.status || '').toLowerCase() === 'resolved' ? '⭐ *Google Review:* https://g.page/r/CWY_3B12wn32EBI/review' : 'We will keep you updated on the next service step.',
     'For assistance, reply here or call us.'
   ].join('\n')
   return [
