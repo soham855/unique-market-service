@@ -1,6 +1,7 @@
 import {useEffect,useState} from 'react'
 import {supabase} from '../lib/supabase'
 import {INDIA_STATES, DISTRICTS_BY_STATE} from '../lib/indiaLocations'
+import {GP_PARSIK_BRANCHES} from '../lib/gpParsikBranches'
 
 const MAHARASHTRA_DISTRICTS = [
   'Ahilyanagar','Akola','Amravati','Beed','Bhandara','Buldhana','Chandrapur',
@@ -82,7 +83,20 @@ export default function BankAmcModule({onBack}) {
   async function saveContract(e) {
     e.preventDefault(); setSaving(true); setMessage('')
     if(!contractForm.site_id || !contractForm.start_date || !contractForm.end_date){setMessage('Branch, contract start date and end date are required.');setSaving(false);return}
-    const payload={contract_name:contractForm.contract_name.trim()||null,state:contractForm.state||null,district:contractForm.district||null,site_id:contractForm.site_id,address:contractForm.address||null,pincode:contractForm.pincode||null,start_date:contractForm.start_date,end_date:contractForm.end_date,status:contractForm.status,visit_interval_months:Math.max(1,Number(contractForm.visit_interval_months)||2),billing_interval_months:Math.max(1,Number(contractForm.billing_interval_months)||3),next_billing_date:contractForm.next_billing_date||null,billing_amount:contractForm.billing_amount===''?null:Number(contractForm.billing_amount),notes:contractForm.notes||null}
+    let resolvedSiteId=contractForm.site_id
+    if(String(resolvedSiteId).startsWith('directory:')) {
+      const branch=GP_PARSIK_BRANCHES[Number(String(resolvedSiteId).split(':')[1])]
+      if(!branch){setMessage('Selected bank branch was not found. Please select it again.');setSaving(false);return}
+      const {data:existingSite,error:findError}=await supabase.from('sites').select('id').eq('site_name',branch.name).eq('state',branch.state).eq('district',branch.district).limit(1).maybeSingle()
+      if(findError){setMessage('Could not check existing branch records: '+findError.message);setSaving(false);return}
+      if(existingSite?.id) resolvedSiteId=existingSite.id
+      else {
+        const {data:newSite,error:siteError}=await supabase.from('sites').insert({site_name:branch.name,state:branch.state,district:branch.district,address:contractForm.address||branch.address,pincode:contractForm.pincode||branch.pincode}).select('id').single()
+        if(siteError){setMessage('Could not register the selected branch in Sites: '+siteError.message);setSaving(false);return}
+        resolvedSiteId=newSite.id
+      }
+    }
+    const payload={contract_name:contractForm.contract_name.trim()||null,state:contractForm.state||null,district:contractForm.district||null,site_id:resolvedSiteId,address:contractForm.address||null,pincode:contractForm.pincode||null,start_date:contractForm.start_date,end_date:contractForm.end_date,status:contractForm.status,visit_interval_months:Math.max(1,Number(contractForm.visit_interval_months)||2),billing_interval_months:Math.max(1,Number(contractForm.billing_interval_months)||3),next_billing_date:contractForm.next_billing_date||null,billing_amount:contractForm.billing_amount===''?null:Number(contractForm.billing_amount),notes:contractForm.notes||null}
     const {error}=await supabase.from('amc_contracts').insert(payload)
     if(error)setMessage('Could not save contract: '+error.message)
     else {setMessage('AMC contract saved. Add its first scheduled visit in the Visits tab.');setContractForm({contract_name:'',state:'',district:'',site_id:'',address:'',pincode:'',start_date:today(),end_date:'',status:'active',visit_interval_months:2,billing_interval_months:3,next_billing_date:'',billing_amount:'',notes:''});await load()}
@@ -156,7 +170,7 @@ export default function BankAmcModule({onBack}) {
         <label>Contract / Bank Name<input value={contractForm.contract_name} onChange={e=>setContractForm({...contractForm,contract_name:e.target.value})} placeholder='e.g. Bank AMC — Branch contract'/></label>
         <label>State<select required value={contractForm.state} onChange={e=>setContractForm({...contractForm,state:e.target.value,district:'',site_id:''})}><option value=''>Select state</option>{INDIA_STATES.map(s=><option key={s} value={s}>{s}</option>)}</select></label>
         <label>District<select required value={contractForm.district} onChange={e=>setContractForm({...contractForm,district:e.target.value,site_id:''})}><option value=''>Select district</option>{(contractForm.state==='Maharashtra'?MAHARASHTRA_DISTRICTS:(DISTRICTS_BY_STATE[contractForm.state]||[])).map(d=><option key={d} value={d}>{d}</option>)}</select></label>
-        <label>Bank Branch / Site<select required value={contractForm.site_id} onChange={e=>{const site=sites.find(s=>s.id===e.target.value);setContractForm({...contractForm,site_id:e.target.value,...(site?{state:site.state||contractForm.state,district:site.district||contractForm.district,address:site.address||contractForm.address,pincode:site.pincode||contractForm.pincode}:{})})}}><option value=''>Select branch</option>{sites.filter(s=>(!contractForm.state||s.state===contractForm.state)&&(!contractForm.district||s.district===contractForm.district)).map(s=><option key={s.id} value={s.id}>{siteLabel(s)}</option>)}</select></label>
+        <label>Bank Branch / Site<select required value={contractForm.site_id} onChange={e=>{const value=e.target.value;const site=sites.find(s=>s.id===value);const directoryIndex=value.startsWith('directory:')?Number(value.split(':')[1]):-1;const branch=directoryIndex>=0?GP_PARSIK_BRANCHES[directoryIndex]:null;setContractForm({...contractForm,site_id:value,...(site?{state:site.state||contractForm.state,district:site.district||contractForm.district,address:site.address||contractForm.address,pincode:site.pincode||contractForm.pincode}:branch?{state:branch.state,district:branch.district,address:branch.address,pincode:branch.pincode}:{})})}}><option value=''>Select branch</option><optgroup label='Existing Sites'>{sites.filter(s=>(!contractForm.state||s.state===contractForm.state)&&(!contractForm.district||s.district===contractForm.district)).map(s=><option key={s.id} value={s.id}>{siteLabel(s)}</option>)}</optgroup><optgroup label='GP Parsik Bank Directory'>{GP_PARSIK_BRANCHES.map((b,i)=>({b,i})).filter(({b})=>(!contractForm.state||b.state===contractForm.state)&&(!contractForm.district||b.district===contractForm.district)).map(({b,i})=><option key={'directory:'+i} value={'directory:'+i}>{b.name} — {b.city} ({b.pincode})</option>)}</optgroup></select><span className='muted'>GP Parsik directory branches are added to Sites automatically when you save the AMC contract.</span></label>
         <label>Address (auto-fetch or type manually)
           <div className='admin-actions' style={{alignItems:'center'}}>
             <input style={{flex:'1 1 260px'}} value={contractForm.address} onChange={e=>setContractForm({...contractForm,address:e.target.value})} placeholder='Type full bank branch / AMC site address manually'/>
