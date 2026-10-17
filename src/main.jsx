@@ -26,6 +26,7 @@ import CustomerProfile from './components/CustomerProfile'
 import ComplaintSearch from './components/ComplaintSearch'
 import AdminModule from './components/AdminModule'
 import BankAmcModule from './components/BankAmcModule'
+import TechnicianBankAmcModule from './components/TechnicianBankAmcModule'
 import TechnicianAdmin from './components/TechnicianAdmin'
 import AdminComplaintKanban from './components/AdminComplaintKanban'
 import AdminReports from './components/AdminReports'
@@ -79,6 +80,7 @@ function App(){
  let content
  if(!activeModule){content=<RoleDashboard profile={profile} onSelectModule={setActiveModule}/>}
  else if(admin&&selected==='Bank AMC & Visits'){content=<BankAmcModule onBack={()=>setActiveModule(null)}/>}
+ else if(technician&&selected==='Technician Bank AMC Visits'){content=<TechnicianBankAmcModule profile={profile} onBack={()=>setActiveModule(null)}/>}
  else if(admin&&selected==='User Accounts'){content=<AdminAccountManager onBack={()=>setActiveModule(null)}/>}
  else if(admin&&selected==='Technicians'){content=<TechnicianAdmin onBack={()=>setActiveModule(null)}/>}
  else if(isTechnicianSupport){content=<TechnicianSupport profile={profile} onBack={()=>setActiveModule(null)}/>}

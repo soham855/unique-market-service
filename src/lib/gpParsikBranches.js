@@ -1,0 +1,70 @@
+// GP Parsik Bank branch directory compiled from the bank's published branch pages.
+// Verify the latest address with the bank before using it for physical correspondence.
+export const GP_PARSIK_BRANCHES = [
+  {name:'Head Office',state:'Maharashtra',district:'Thane',city:'Kalwa, Thane',pincode:'400605',address:'Sahakarmurti Gopinath Shivram Patil Bhavan, Parsik Nagar, Kalwa, Thane - 400605'},
+  {name:'Kalwa Branch',state:'Maharashtra',district:'Thane',city:'Kalwa, Thane',pincode:'400605',address:'Creek View Apartment, 1st floor, Thane - 400605'},
+  {name:'Belapur Branch',state:'Maharashtra',district:'Thane',city:'Belapur, Navi Mumbai',pincode:'400614',address:'Yamunabai Apartment, Plot D-10C/D-10D, Sector 29, Agroli Gaon, Belapur, Navi Mumbai - 400614'},
+  {name:'Koparkhairne Branch',state:'Maharashtra',district:'Thane',city:'Koparkhairne, Navi Mumbai',pincode:'400709',address:'Plot No. 80, Sector 5, Koparkhairne, Navi Mumbai - 400709'},
+  {name:'Majiwade Branch',state:'Maharashtra',district:'Thane',city:'Majiwade, Thane',pincode:'400607',address:'High Street cum Highland Corporate Center, Ground floor, GB-149, near Big Bazar, Majiwade, Thane (W) - 400607'},
+  {name:'Kharkar Ali Branch',state:'Maharashtra',district:'Thane',city:'Thane',pincode:'400601',address:'Office 1-5, Ramdas Plaza, Bazar Peth, Jambhali Naka, above Pedhya Maruti Mandir, Kharkar Ali, Thane - 400601'},
+  {name:'Nerul Branch',state:'Maharashtra',district:'Thane',city:'Nerul, Navi Mumbai',pincode:'400706',address:'Plot No. 4B, Sector 3, Nerul, Navi Mumbai - 400706'},
+  {name:'Bhiwandi Branch',state:'Maharashtra',district:'Thane',city:'Bhiwandi',pincode:'421302',address:'Unit 2/3, ground floor plus basement, Surya Excellency 94, Suryabhai Compound, near Northern India Petrol Pump, Agra Road, Narpoli, Bhiwandi - 421302'},
+  {name:'Louiswadi Branch',state:'Maharashtra',district:'Thane',city:'Louiswadi, Thane',pincode:'400604',address:'Surabhi Apartment, Ground floor, Louiswadi, Thane - 400604'},
+  {name:'A.P.M.C. Market Branch',state:'Maharashtra',district:'Thane',city:'Vashi, Navi Mumbai',pincode:'400709',address:'Central Facility Building, A.P.M.C. Market, Sector 19, Vashi, Navi Mumbai - 400709'},
+  {name:'Kharigaon Branch',state:'Maharashtra',district:'Thane',city:'Kharigaon, Kalwa',pincode:'400605',address:'Jay Bharat Sports Club Building, Kharigaon, Pakhadi, Post Kalwa, Thane - 400605'},
+  {name:'Naupada Branch',state:'Maharashtra',district:'Thane',city:'Naupada, Thane',pincode:'400602',address:'Hemendra Shopping Centre, 1st floor, Gokhale Road, Naupada, Thane - 400602'},
+  {name:'Parsik Nagar Branch',state:'Maharashtra',district:'Thane',city:'Parsik Nagar, Kalwa',pincode:'400605',address:'Sahakarmurti Gopinath Shivram Patil Bhavan, ground floor, Parsik Nagar, Kalwa, Thane - 400605'},
+  {name:'Nerul Phase-II Branch',state:'Maharashtra',district:'Thane',city:'Nerul, Navi Mumbai',pincode:'400708',address:'Plot No. 28/B, Sector 10, Nerul, opposite Sarsole Bus Stop, Navi Mumbai - 400708'},
+  {name:'Mankoli Branch',state:'Maharashtra',district:'Thane',city:'Mankoli, Bhiwandi',pincode:'421302',address:'Shree Krishna Commercial Complex, Shop 101-105, 1st Floor, Mankoli Naka, Mumbai Nashik Highway, Tal. Bhiwandi, Dist. Thane - 421302'},
+  {name:'Panvel Branch',state:'Maharashtra',district:'Raigad',city:'Panvel',pincode:'410206',address:'GB-NEA-107, Sai Arcade, Ground floor, opposite Panvel Bus Stand, Panvel, Dist. Raigad - 410206'},
+  {name:'Kamothe Branch',state:'Maharashtra',district:'Raigad',city:'Kamothe, Navi Mumbai',pincode:'410209',address:'Shop 28-29, Ground Floor, Shivakalpataru Arcade 2, Plot 1, Sector 17, Kamothe, Tal. Panvel, Dist. Raigad - 410209'},
+  {name:'Shahapur Branch',state:'Maharashtra',district:'Thane',city:'Shahapur',pincode:'421601',address:'Saiplaza Building, 1st floor, Shahapur Bus Stand (Pandit Naka), Shahapur (Gotheghar), Tal. Shahapur, Dist. Thane - 421601'},
+  {name:'Kharghar Branch',state:'Maharashtra',district:'Raigad',city:'Kharghar, Navi Mumbai',pincode:'410210',address:'Shop 17-19, Ground Floor, Kamdhenu Commerz, Plot 2, Sector 14, Kharghar, Tal. Panvel, Dist. Raigad'},
+  {name:'Ghansoli Branch',state:'Maharashtra',district:'Thane',city:'Ghansoli, Navi Mumbai',pincode:'400701',address:'Shop 13-14, Ground floor, Shree Ambika Complex CHS Ltd., Plot 18, Sector 7, Ghansoli, Navi Mumbai - 400701'},
+  {name:'Badlapur Branch',state:'Maharashtra',district:'Thane',city:'Badlapur East',pincode:'421503',address:'Shop 8, 9, 32, C-Block, Shreeji Building, Katrap Gaon, Badlapur (East) - 421503'},
+  {name:'Vasind Branch',state:'Maharashtra',district:'Thane',city:'Vasind',pincode:'421301',address:'Shop 7-10, Ground floor, Rohini Apartment, Padmashri Tarmale Nagar, Vasind, Tal. Shahapur, Dist. Thane - 421301'},
+  {name:'Waghbil Branch',state:'Maharashtra',district:'Thane',city:'Waghbil, Thane',pincode:'400615',address:'Shop 1-2, Ground floor, R-Plazia, near Swastik Rigalia, Kavesar, Ghodbunder Road, Waghbil, Thane - 400615'},
+  {name:'Bhiwandi - Shivaji Chowk',state:'Maharashtra',district:'Thane',city:'Bhiwandi',pincode:'421302',address:'A-101, President Plaza, Shivaji Chowk, Bhiwandi, Dist. Thane - 421302'},
+  {name:'Shilgaon Branch',state:'Maharashtra',district:'Thane',city:'Shilgaon, Thane',pincode:'421204',address:'Shivkrupa Building, First floor, Survey No. 210/7-8, Shilgaon, Post Padle, Tal. & Dist. Thane - 421204'},
+  {name:'Vitawa Branch',state:'Maharashtra',district:'Thane',city:'Vitawa, Kalwa',pincode:'400605',address:'Shop 1, Vishram Co-op Housing Society, Vitawa, Kalwa, Thane - 400605'},
+  {name:'Navade Branch',state:'Maharashtra',district:'Raigad',city:'Navade',pincode:'410208',address:'Shop 1-2, Srushti Building, Navade Phata opposite Navade Grampanchayat, Navade - 410208'},
+  {name:'Dombivali Branch',state:'Maharashtra',district:'Thane',city:'Dombivali East',pincode:'421201',address:'Shop 2-5, Ground Floor, Suchit Square, Dr. Rajendra Prasad Road, Dombivali (East) - 421201'},
+  {name:'Kalbadevi Branch',state:'Maharashtra',district:'Mumbai City',city:'Kalbadevi, Mumbai',pincode:'400002',address:'Shop 4, Ajmera Midtown, Ramdas Building Co HSG, near Princess Street Signal, Kalbadevi Road, Mumbai - 400002'},
+  {name:'Uran Branch',state:'Maharashtra',district:'Raigad',city:'Uran',pincode:'400702',address:'House 72, 1st floor, Kot Naka, Uran, Dist. Raigad - 400702'},
+  {name:'Bhayandar Branch',state:'Maharashtra',district:'Thane',city:'Bhayandar East',pincode:'401107',address:'Hall 1 & 2, Shree Vinayak Building, 1st floor, Sarvodaya Complex, Bhayandar (East) - 401107'},
+  {name:'Pune Branch',state:'Maharashtra',district:'Pune',city:'Parvati, Pune',pincode:'411009',address:'Showroom 1, ground floor, Treasure Park, J Building, Survey 61, Sant Nagar, Parvati, Pune - 411009'},
+  {name:'Nashik Branch',state:'Maharashtra',district:'Nashik',city:'Ambad-Khurd, Nashik',pincode:'422009',address:'Shop 10-11, ground floor, Shree Tirumala Plaza, Upendra Nagar, opposite Atul Dairy, Gut 305/A/2, Village Ambad-Khurd, MIDC, CIDCO, Nashik - 422009'},
+  {name:'Ulwe Branch',state:'Maharashtra',district:'Raigad',city:'Ulwe, Navi Mumbai',pincode:'410206',address:'Shop S-14, ground floor, Ulwe Commercial Complex, Sector 19-A, Ulwe, Dist. Raigad, Navi Mumbai - 410206'},
+  {name:'Vashi Branch',state:'Maharashtra',district:'Thane',city:'Vashi, Navi Mumbai',pincode:'400703',address:'Shop 1-2, ground floor, Sai Udyan, Plot 25, Sector 14, Vashi, Navi Mumbai - 400703'},
+  {name:'Nilje Branch',state:'Maharashtra',district:'Thane',city:'Nilje, Dombivali',pincode:'421204',address:'Shop 1, Samaira Sway Commercial Complex, opposite HP Petrol Pump, At Katai, Post Nilje, Dombivali, Thane - 421204'},
+  {name:'Vartak Nagar Branch',state:'Maharashtra',district:'Thane',city:'Vartak Nagar, Thane',pincode:'400606',address:'Shop B, 1st Floor, Tamanna CHS, Plot 27, Lokmanya Nagar 2, near Yashodhan Nagar Bus Stop, Vartak Nagar, Thane (W)'},
+  {name:'Mapusa Branch',state:'Goa',district:'North Goa',city:'Mapusa',pincode:'403507',address:'Kalvekar Tower, Xim, Khorlim, Anasabhat, Tal. Bardez, Mapusa, Goa - 403507'},
+  {name:'Margao Branch',state:'Goa',district:'South Goa',city:'Margao, Salcete',pincode:'403601',address:'Shop SH-20, Costa Towers, Margao, Salcete, Goa - 403601'},
+  {name:'Ponda Branch',state:'Goa',district:'South Goa',city:'Ponda',pincode:'403401',address:'House 175/25, Alankar House, Ground Floor, Shanti Nagar, Ponda, Goa - 403401'},
+  {name:'Belagavi Branch',state:'Karnataka',district:'Belagavi',city:'Tilakwadi, Belagavi',pincode:'590006',address:'C.T. Survey 1049, A2, F.S. Plaza, Khanapur Road, Tilakwadi, Belagavi - 590006'},
+  {name:'Nipani Branch',state:'Karnataka',district:'Belagavi',city:'Nipani, Chikodi',pincode:'591237',address:'House 14 E, Ground Floor, Old P.B. Road, Ward 31, Nipani, Tal. Chikodi, Dist. Belagavi - 591237'},
+  {name:'Main Branch (Adat Peth)',state:'Maharashtra',district:'Kolhapur',city:'Ichalkaranji',pincode:'416115',address:'Devki Building, Adat Peth, Main Road, near Bargale Hospital, Ichalkaranji - 416115'},
+  {name:'Korochi Branch',state:'Maharashtra',district:'Kolhapur',city:'Korochi, Hatkanangale',pincode:'416109',address:'Near Bus Stand, Main Road, At-Post Korochi, Tal. Hatkanangale, Dist. Kolhapur - 416109'},
+  {name:'Kolhapur Rajarampuri Branch',state:'Maharashtra',district:'Kolhapur',city:'Rajarampuri, Kolhapur',pincode:'416008',address:'Shop 1-2, Damodar Heights Building, C.S. 2026/01, 8th Lane, Rajarampuri, E-Ward, Kolhapur - 416008'},
+  {name:'Jaisingpur Branch',state:'Maharashtra',district:'Kolhapur',city:'Jaisingpur, Shirol',pincode:'416101',address:'Block 254/1A, Gali 9, House 21000094, Subhash Road, Jaysingpur, Shirol, Kolhapur - 416101'},
+  {name:'Shahu Putala Branch',state:'Maharashtra',district:'Kolhapur',city:'Ichalkaranji',pincode:'416118',address:'Plot 77, Ward 18/489, Parsik Bhavan, Building 119, Ichalkaranji Co-op Industrial Estate Ltd., Kolhapur Road, Shahu Putala, Ichalkaranji - 416118'},
+  {name:'Sangli Branch',state:'Maharashtra',district:'Sangli',city:'Sangli',pincode:'416416',address:'Shop 1, Ground Floor, Mehta Arcade, 737 Ganpati Peth, Sangli - 416416'},
+  {name:'Dharampeth, Nagpur Branch',state:'Maharashtra',district:'Nagpur',city:'Dharampeth, Nagpur',pincode:'440010',address:'Plot 222, Block G1, Ground Floor, Corporate House 341, Ram Nagar Road, Dharampeth, Nagpur - 440010'},
+  {name:'Lokmat Square, Nagpur Branch',state:'Maharashtra',district:'Nagpur',city:'Lokmat Square, Nagpur',pincode:'440012',address:'House 521, Ground Floor, Badwaik Complex, Wardha Road, Lokmat Square, Nagpur - 440012'},
+  {name:'Digha Branch',state:'Maharashtra',district:'Thane',city:'Digha, Navi Mumbai',pincode:'400708',address:'Newa Business Park, Plot JN 30, 30/1, Shop 05, Ground Floor, Building A, opposite Mukund Co., Dighe, Tal. & Dist. Thane, Navi Mumbai - 400708'},
+  {name:'Pen Branch',state:'Maharashtra',district:'Raigad',city:'Pen',pincode:'402107',address:'Shop 1-3, Plot 53, opposite MSEB Office, Pen-Antore Road, Tal. Pen, Dist. Raigad - 402107'}
+
+  ,{name:'Malad (East) Branch',state:'Maharashtra',district:'Mumbai Suburban',city:'Malad East, Mumbai',pincode:'400097',address:'Shop 25, Ground floor, LEVELS, Building 6, Khot Dongri, Rani Sati Marg, Malad East, Mumbai - 400097'}
+  ,{name:'Kanjurmarg (East) Branch',state:'Maharashtra',district:'Mumbai Suburban',city:'Kanjurmarg East, Mumbai',pincode:'400062',address:'Shop 1, Apsara Co-operative Housing Society, CTS 1250, Kanjur Village Road, Kanjurmarg East, Mumbai - 400062'}
+  ,{name:'Kalamboli Branch',state:'Maharashtra',district:'Raigad',city:'Kalamboli, Navi Mumbai',pincode:'410218',address:'Shop 13-14, Ground floor, Matruchhaya Heritage CHS Ltd, Plot 21, Sector 11, Kalamboli, Navi Mumbai - 410218'}
+  ,{name:'Taloja Branch',state:'Maharashtra',district:'Raigad',city:'Taloja, Panvel',pincode:'410208',address:'Shop 1-3, Ground floor, Shree Smaran Building, Plot 34-35, Sector 11, Pachnand Taloja, Tal. Panvel, Navi Mumbai - 410208'}
+  ,{name:'Pune - Bhawani Peth Branch',state:'Maharashtra',district:'Pune',city:'Bhawani Peth, Pune',pincode:'411042',address:'Shop 1-2, Damodar Heights Building, Bhawani Peth, near Palkhi Vithoba Mandir, opposite Hamal Panchayat, Tal. Haveli, Pune - 411042'}
+  ,{name:'Nere Branch',state:'Maharashtra',district:'Raigad',city:'Nere, Panvel',pincode:'410206',address:'Sainik Apartment, Shop 3-7, Ground Floor, Nere Gaon, Panvel-Matheran Road, Tal. Panvel, Dist. Raigad - 410206'}
+  ,{name:'Ghatkopar Branch',state:'Maharashtra',district:'Mumbai Suburban',city:'Ghatkopar East, Mumbai',pincode:'400077',address:'Sapphire Arcade, Ground Floor, M.G. Road, Ghatkopar East, Mumbai - 400077'}
+  ,{name:'Chembur Branch',state:'Maharashtra',district:'Mumbai Suburban',city:'Chembur East, Mumbai',pincode:'400074',address:'Ashish Chambers, Ashish Theater, Ground Floor, Maravali Village, Mahul Road, Chembur East, Mumbai - 400074'}
+  ,{name:'Talegaon Branch',state:'Maharashtra',district:'Pune',city:'Talegaon-Dabhade',pincode:'410507',address:'Shop 1-3, Ground Floor, Satyakamal Colony, Plot 19, Survey 61 (New), Talegaon-Dabhade, Pune - 410507'}
+  ,{name:'Chakan Branch',state:'Maharashtra',district:'Pune',city:'Chakan, Khed',pincode:'410501',address:'Shop 2-5, 5A, 6-6A, Kohinoor Centre Building, Ground Floor, Shivaji Chowk, Nashik Road, Chakan Village, Tal. Khed, Pune - 410501'}
+  ,{name:'Nashik - Panchvati Branch',state:'Maharashtra',district:'Nashik',city:'Panchvati, Nashik',pincode:'422003',address:'1st Floor, Motumal Dandumal Kalaro Trust, City Survey 5869, A/3B-1B, K.N. Kela Road, near Nimani Bus Stop Circle, Panchavati, Karanja, Nashik - 422003'}
+  ,{name:'Malad (West) Branch',state:'Maharashtra',district:'Mumbai Suburban',city:'Malad West, Mumbai',pincode:'400064',address:'Shop 8-10, Station Center premises, near New Era Talkies, Malad West, Mumbai - 400064'}
+  ,{name:'Saki Naka Branch',state:'Maharashtra',district:'Mumbai Suburban',city:'Saki Naka, Mumbai',pincode:'400072',address:'Unit G-3, Ground Floor, Sagartek Plaza, Andheri Kurla Road, Saki Naka, Mumbai - 400072'}
+]

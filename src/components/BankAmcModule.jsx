@@ -1,7 +1,15 @@
 import {useEffect,useState} from 'react'
 import {supabase} from '../lib/supabase'
 import {INDIA_STATES, DISTRICTS_BY_STATE} from '../lib/indiaLocations'
+import {GP_PARSIK_BRANCHES} from '../lib/gpParsikBranches'
 
+const MAHARASHTRA_DISTRICTS = [
+  'Ahilyanagar','Akola','Amravati','Beed','Bhandara','Buldhana','Chandrapur',
+  'Chhatrapati Sambhajinagar','Dharashiv','Dhule','Gadchiroli','Gondia','Hingoli',
+  'Jalgaon','Jalna','Kolhapur','Latur','Mumbai City','Mumbai Suburban','Nagpur',
+  'Nanded','Nandurbar','Nashik','Palghar','Parbhani','Pune','Raigad','Ratnagiri',
+  'Sangli','Satara','Sindhudurg','Solapur','Thane','Wardha','Washim','Yavatmal'
+]
 const today = () => new Date().toISOString().slice(0,10)
 const localDateTime = (value) => {
   if (!value) return ''
@@ -17,9 +25,45 @@ export default function BankAmcModule({onBack}) {
   const [loading,setLoading]=useState(true)
   const [saving,setSaving]=useState(false)
   const [message,setMessage]=useState('')
+  const [locationLoading,setLocationLoading]=useState(false)
+  const [locationMessage,setLocationMessage]=useState('')
+  const [locationError,setLocationError]=useState(false)
   const [contractForm,setContractForm]=useState({contract_name:'',state:'',district:'',site_id:'',address:'',pincode:'',start_date:today(),end_date:'',status:'active',visit_interval_months:2,billing_interval_months:3,next_billing_date:'',billing_amount:'',notes:''})
   const [visitForm,setVisitForm]=useState({amc_contract_id:'',scheduled_at:'',assigned_staff_id:'',visit_type:'scheduled',report_summary:'',material_notes:'',breakdown_notes:''})
   const [editingVisit,setEditingVisit]=useState(null)
+
+  async function fetchCurrentLocation() {
+    setLocationLoading(true); setLocationError(false); setLocationMessage('')
+    if(!navigator.geolocation) {
+      setLocationError(true); setLocationMessage('This device/browser does not support location. Please type the address manually.')
+      setLocationLoading(false); return
+    }
+    navigator.geolocation.getCurrentPosition(async position => {
+      const {latitude,longitude}=position.coords
+      try {
+        const response=await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`,{headers:{'Accept':'application/json'}})
+        if(!response.ok) throw new Error('Address lookup unavailable')
+        const result=await response.json()
+        const a=result.address||{}
+        const rawState=a.state||''
+        const normalizedState=/maharashtra/i.test(rawState)?'Maharashtra':/goa/i.test(rawState)?'Goa':/karnataka/i.test(rawState)?'Karnataka':rawState
+        const rawDistrict=a.state_district||a.district||a.county||''
+        const districtList=normalizedState==='Maharashtra'?MAHARASHTRA_DISTRICTS:(DISTRICTS_BY_STATE[normalizedState]||[])
+        const normalizedDistrict=districtList.find(d=>d.toLowerCase()===rawDistrict.toLowerCase())||
+          districtList.find(d=>rawDistrict.toLowerCase().includes(d.toLowerCase())||d.toLowerCase().includes(rawDistrict.toLowerCase()))||''
+        const nextAddress=result.display_name||`Lat ${latitude.toFixed(6)}, Long ${longitude.toFixed(6)}`
+        setContractForm(prev=>({...prev,address:nextAddress,pincode:(a.postcode||prev.pincode||'').replace(/\D/g,'').slice(0,6),...(normalizedState?{state:normalizedState,district:normalizedDistrict,site_id:''}:{})}))
+        setLocationMessage('Location fetched. Please verify the address and district; you can edit them manually before saving.')
+      } catch {
+        setContractForm(prev=>({...prev,address:`Lat ${latitude.toFixed(6)}, Long ${longitude.toFixed(6)}`}))
+        setLocationError(true); setLocationMessage('GPS coordinates fetched, but the address lookup failed. Type or correct the full address manually.')
+      } finally {setLocationLoading(false)}
+    }, error => {
+      setLocationError(true)
+      setLocationMessage(error.code===1?'Location permission was denied. Allow location access in browser settings, or type the address manually.':error.code===2?'Current location is unavailable. Check GPS/location settings, or type the address manually.':'Location request timed out. Try again or type the address manually.')
+      setLocationLoading(false)
+    },{enableHighAccuracy:true,timeout:15000,maximumAge:60000})
+  }
 
   async function load() {
     setLoading(true); setMessage('')
@@ -39,7 +83,22 @@ export default function BankAmcModule({onBack}) {
   async function saveContract(e) {
     e.preventDefault(); setSaving(true); setMessage('')
     if(!contractForm.site_id || !contractForm.start_date || !contractForm.end_date){setMessage('Branch, contract start date and end date are required.');setSaving(false);return}
-    const payload={contract_name:contractForm.contract_name.trim()||null,state:contractForm.state||null,district:contractForm.district||null,site_id:contractForm.site_id,address:contractForm.address||null,pincode:contractForm.pincode||null,start_date:contractForm.start_date,end_date:contractForm.end_date,status:contractForm.status,visit_interval_months:Math.max(1,Number(contractForm.visit_interval_months)||2),billing_interval_months:Math.max(1,Number(contractForm.billing_interval_months)||3),next_billing_date:contractForm.next_billing_date||null,billing_amount:contractForm.billing_amount===''?null:Number(contractForm.billing_amount),notes:contractForm.notes||null}
+    let resolvedSiteId=contractForm.site_id
+    if(String(resolvedSiteId).startsWith('directory:')) {
+      const branch=GP_PARSIK_BRANCHES[Number(String(resolvedSiteId).split(':')[1])]
+      if(!branch){setMessage('Selected bank branch was not found. Please select it again.');setSaving(false);return}
+      const {data:existingSite,error:findError}=await supabase.from('sites').select('id').eq('site_name',branch.name).eq('state',branch.state).eq('district',branch.district).limit(1).maybeSingle()
+      if(findError){setMessage('Could not check existing branch records: '+findError.message);setSaving(false);return}
+      if(existingSite?.id) resolvedSiteId=existingSite.id
+      else {
+        const {data:bankCustomer,error:customerError}=await supabase.from('customers').select('id').ilike('name','GP PARSIK BANK ICHALKARANJI').limit(1).maybeSingle()
+        if(customerError||!bankCustomer?.id){setMessage('GP Parsik Bank customer record was not found, so no new Site was created. Please add/link the bank customer in Admin → Customers first.');setSaving(false);return}
+        const {data:newSite,error:siteError}=await supabase.from('sites').insert({customer_id:bankCustomer.id,site_name:branch.name,state:branch.state,district:branch.district,address:contractForm.address||branch.address,pincode:contractForm.pincode||branch.pincode}).select('id').single()
+        if(siteError){setMessage('Could not register the selected branch in Sites: '+siteError.message);setSaving(false);return}
+        resolvedSiteId=newSite.id
+      }
+    }
+    const payload={contract_name:contractForm.contract_name.trim()||null,state:contractForm.state||null,district:contractForm.district||null,site_id:resolvedSiteId,address:contractForm.address||null,pincode:contractForm.pincode||null,start_date:contractForm.start_date,end_date:contractForm.end_date,status:contractForm.status,visit_interval_months:Math.max(1,Number(contractForm.visit_interval_months)||2),billing_interval_months:Math.max(1,Number(contractForm.billing_interval_months)||3),next_billing_date:contractForm.next_billing_date||null,billing_amount:contractForm.billing_amount===''?null:Number(contractForm.billing_amount),notes:contractForm.notes||null}
     const {error}=await supabase.from('amc_contracts').insert(payload)
     if(error)setMessage('Could not save contract: '+error.message)
     else {setMessage('AMC contract saved. Add its first scheduled visit in the Visits tab.');setContractForm({contract_name:'',state:'',district:'',site_id:'',address:'',pincode:'',start_date:today(),end_date:'',status:'active',visit_interval_months:2,billing_interval_months:3,next_billing_date:'',billing_amount:'',notes:''});await load()}
@@ -112,9 +171,16 @@ export default function BankAmcModule({onBack}) {
       {tab==='contracts'&&<><h3>Register Bank AMC Contract</h3><form className='admin-form' onSubmit={saveContract}>
         <label>Contract / Bank Name<input value={contractForm.contract_name} onChange={e=>setContractForm({...contractForm,contract_name:e.target.value})} placeholder='e.g. Bank AMC — Branch contract'/></label>
         <label>State<select required value={contractForm.state} onChange={e=>setContractForm({...contractForm,state:e.target.value,district:'',site_id:''})}><option value=''>Select state</option>{INDIA_STATES.map(s=><option key={s} value={s}>{s}</option>)}</select></label>
-        <label>District<select required value={contractForm.district} onChange={e=>setContractForm({...contractForm,district:e.target.value,site_id:''})}><option value=''>Select district</option>{(DISTRICTS_BY_STATE[contractForm.state]||[]).map(d=><option key={d} value={d}>{d}</option>)}</select></label>
-        <label>Bank Branch / Site<select required value={contractForm.site_id} onChange={e=>{const site=sites.find(s=>s.id===e.target.value);setContractForm({...contractForm,site_id:e.target.value,...(site?{state:site.state||contractForm.state,district:site.district||contractForm.district,address:site.address||contractForm.address,pincode:site.pincode||contractForm.pincode}:{})})}}><option value=''>Select branch</option>{sites.filter(s=>(!contractForm.state||s.state===contractForm.state)&&(!contractForm.district||s.district===contractForm.district)).map(s=><option key={s.id} value={s.id}>{siteLabel(s)}</option>)}</select></label>
-        <label>Address<input value={contractForm.address} onChange={e=>setContractForm({...contractForm,address:e.target.value})} placeholder='Branch / AMC site address'/></label>
+        <label>District<select required value={contractForm.district} onChange={e=>setContractForm({...contractForm,district:e.target.value,site_id:''})}><option value=''>Select district</option>{(contractForm.state==='Maharashtra'?MAHARASHTRA_DISTRICTS:(DISTRICTS_BY_STATE[contractForm.state]||[])).map(d=><option key={d} value={d}>{d}</option>)}</select></label>
+        <label>Bank Branch / Site<select required value={contractForm.site_id} onChange={e=>{const value=e.target.value;const site=sites.find(s=>s.id===value);const directoryIndex=value.startsWith('directory:')?Number(value.split(':')[1]):-1;const branch=directoryIndex>=0?GP_PARSIK_BRANCHES[directoryIndex]:null;setContractForm({...contractForm,site_id:value,...(site?{state:site.state||contractForm.state,district:site.district||contractForm.district,address:site.address||contractForm.address,pincode:site.pincode||contractForm.pincode}:branch?{state:branch.state,district:branch.district,address:branch.address,pincode:branch.pincode}:{})})}}><option value=''>Select branch</option><optgroup label='Existing Sites'>{sites.filter(s=>(!contractForm.state||s.state===contractForm.state)&&(!contractForm.district||s.district===contractForm.district)).map(s=><option key={s.id} value={s.id}>{siteLabel(s)}</option>)}</optgroup><optgroup label='GP Parsik Bank Directory'>{GP_PARSIK_BRANCHES.map((b,i)=>({b,i})).filter(({b})=>(!contractForm.state||b.state===contractForm.state)&&(!contractForm.district||b.district===contractForm.district)).map(({b,i})=><option key={'directory:'+i} value={'directory:'+i}>{b.name} — {b.city} ({b.pincode})</option>)}</optgroup></select><span className='muted'>GP Parsik directory branches are added to Sites automatically when you save the AMC contract.</span></label>
+        <label>Address (auto-fetch or type manually)
+          <div className='admin-actions' style={{alignItems:'center'}}>
+            <input style={{flex:'1 1 260px'}} value={contractForm.address} onChange={e=>setContractForm({...contractForm,address:e.target.value})} placeholder='Type full bank branch / AMC site address manually'/>
+            <button type='button' className='secondary' disabled={locationLoading} onClick={fetchCurrentLocation}>{locationLoading?'Fetching location…':'📍 Fetch my location'}</button>
+          </div>
+          <span className='muted'>Location access is requested only when you tap the button. You can edit the address manually at any time.</span>
+        </label>
+        {locationMessage&&<p className={locationError?'error':'muted'}>{locationMessage}</p>}
         <label>PIN Code<input inputMode='numeric' maxLength={6} pattern='[0-9]{6}' value={contractForm.pincode} onChange={e=>setContractForm({...contractForm,pincode:e.target.value.replace(/\D/g,'').slice(0,6)})} placeholder='6-digit PIN code'/></label>
         <label>Contract Start<input type='date' required value={contractForm.start_date} onChange={e=>setContractForm({...contractForm,start_date:e.target.value})}/></label>
         <label>Contract Expiry / Renewal Date<input type='date' required value={contractForm.end_date} onChange={e=>setContractForm({...contractForm,end_date:e.target.value})}/></label>
