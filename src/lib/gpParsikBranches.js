@@ -76,5 +76,5 @@ export const GP_PARSIK_BRANCHES = [
   ,{name:'Karjat Branch',state:'Maharashtra',district:'Raigad',city:'Karjat',pincode:'410201',address:'Parshwanath Tower, Ground Floor, Survey No. 27A/27B, Mahavir Peth Road, Karjat, Dist. Raigad - 410201'}
   ,{name:'Borivali West Branch',state:'Maharashtra',district:'Mumbai Suburban',city:'Borivali West, Mumbai',pincode:'400092',address:'Shop No. 2-3, Narayan Villa Co-operative Housing Society, Haridas Nagar, R. M. Bhattad Road, Borivali West, Mumbai - 400092'}
   ,{name:'Chandinagar Hupari Branch',state:'Maharashtra',district:'Kolhapur',city:'Hupari, Hatkanangale',pincode:'416203',address:'Kolhapure Building, near Chandi Association, Main Road, Hupari, Tal. Hatkanangale, Dist. Kolhapur'}
-  ,{name:'Kharbav Branch',state:'Maharashtra',district:'Thane',city:'Kharbav, Bhiwandi',pincode:'421302',address:'House No. 1-A, At-Post Kharbav, Tal. Bhiwandi, Dist. Thane - 421302'}
+  ,{name:'Kharbav Branch',state:'Maharashtra',district:'Thane',city:'Kharbav, Bhiwandi',pincode:'421302',address:'House No. 1-A, At-Post Kharbav, Tal. Bhiwandi, Dist. Thane - 421302'}  ,{name:'Mulund Branch',state:'Maharashtra',district:'Mumbai Suburban',city:'Mulund East, Mumbai',pincode:'400081',address:'Shop No. 5 and 6A, Ground Floor, Beleza of Shanti Sadan Building, G.V. Scheme No. 2, 90 Feet Road, Mulund East, Mumbai - 400081'}
 ]
