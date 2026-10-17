@@ -26,7 +26,6 @@ export default function TechnicianBankAmcModule({profile,onBack}) {
   async function updateStatus(v,status){
     setSaving(true);setMessage('')
     const patch={status,updated_at:new Date().toISOString()}
-    if(status==='in_progress')patch.started_at=new Date().toISOString()
     if(status==='completed')patch.completed_at=new Date().toISOString()
     const {error}=await supabase.from('bank_amc_visits').update(patch).eq('id',v.id).eq('assigned_staff_id',profile.id)
     if(error)setMessage('Status update failed: '+error.message)
