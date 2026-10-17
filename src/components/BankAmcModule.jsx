@@ -91,7 +91,9 @@ export default function BankAmcModule({onBack}) {
       if(findError){setMessage('Could not check existing branch records: '+findError.message);setSaving(false);return}
       if(existingSite?.id) resolvedSiteId=existingSite.id
       else {
-        const {data:newSite,error:siteError}=await supabase.from('sites').insert({site_name:branch.name,state:branch.state,district:branch.district,address:contractForm.address||branch.address,pincode:contractForm.pincode||branch.pincode}).select('id').single()
+        const {data:bankCustomer,error:customerError}=await supabase.from('customers').select('id').ilike('name','GP PARSIK BANK ICHALKARANJI').limit(1).maybeSingle()
+        if(customerError||!bankCustomer?.id){setMessage('GP Parsik Bank customer record was not found, so no new Site was created. Please add/link the bank customer in Admin → Customers first.');setSaving(false);return}
+        const {data:newSite,error:siteError}=await supabase.from('sites').insert({customer_id:bankCustomer.id,site_name:branch.name,state:branch.state,district:branch.district,address:contractForm.address||branch.address,pincode:contractForm.pincode||branch.pincode}).select('id').single()
         if(siteError){setMessage('Could not register the selected branch in Sites: '+siteError.message);setSaving(false);return}
         resolvedSiteId=newSite.id
       }
