@@ -53,4 +53,18 @@ export const GP_PARSIK_BRANCHES = [
   {name:'Lokmat Square, Nagpur Branch',state:'Maharashtra',district:'Nagpur',city:'Lokmat Square, Nagpur',pincode:'440012',address:'House 521, Ground Floor, Badwaik Complex, Wardha Road, Lokmat Square, Nagpur - 440012'},
   {name:'Digha Branch',state:'Maharashtra',district:'Thane',city:'Digha, Navi Mumbai',pincode:'400708',address:'Newa Business Park, Plot JN 30, 30/1, Shop 05, Ground Floor, Building A, opposite Mukund Co., Dighe, Tal. & Dist. Thane, Navi Mumbai - 400708'},
   {name:'Pen Branch',state:'Maharashtra',district:'Raigad',city:'Pen',pincode:'402107',address:'Shop 1-3, Plot 53, opposite MSEB Office, Pen-Antore Road, Tal. Pen, Dist. Raigad - 402107'}
+
+  ,{name:'Malad (East) Branch',state:'Maharashtra',district:'Mumbai Suburban',city:'Malad East, Mumbai',pincode:'400097',address:'Shop 25, Ground floor, LEVELS, Building 6, Khot Dongri, Rani Sati Marg, Malad East, Mumbai - 400097'}
+  ,{name:'Kanjurmarg (East) Branch',state:'Maharashtra',district:'Mumbai Suburban',city:'Kanjurmarg East, Mumbai',pincode:'400062',address:'Shop 1, Apsara Co-operative Housing Society, CTS 1250, Kanjur Village Road, Kanjurmarg East, Mumbai - 400062'}
+  ,{name:'Kalamboli Branch',state:'Maharashtra',district:'Raigad',city:'Kalamboli, Navi Mumbai',pincode:'410218',address:'Shop 13-14, Ground floor, Matruchhaya Heritage CHS Ltd, Plot 21, Sector 11, Kalamboli, Navi Mumbai - 410218'}
+  ,{name:'Taloja Branch',state:'Maharashtra',district:'Raigad',city:'Taloja, Panvel',pincode:'410208',address:'Shop 1-3, Ground floor, Shree Smaran Building, Plot 34-35, Sector 11, Pachnand Taloja, Tal. Panvel, Navi Mumbai - 410208'}
+  ,{name:'Pune - Bhawani Peth Branch',state:'Maharashtra',district:'Pune',city:'Bhawani Peth, Pune',pincode:'411042',address:'Shop 1-2, Damodar Heights Building, Bhawani Peth, near Palkhi Vithoba Mandir, opposite Hamal Panchayat, Tal. Haveli, Pune - 411042'}
+  ,{name:'Nere Branch',state:'Maharashtra',district:'Raigad',city:'Nere, Panvel',pincode:'410206',address:'Sainik Apartment, Shop 3-7, Ground Floor, Nere Gaon, Panvel-Matheran Road, Tal. Panvel, Dist. Raigad - 410206'}
+  ,{name:'Ghatkopar Branch',state:'Maharashtra',district:'Mumbai Suburban',city:'Ghatkopar East, Mumbai',pincode:'400077',address:'Sapphire Arcade, Ground Floor, M.G. Road, Ghatkopar East, Mumbai - 400077'}
+  ,{name:'Chembur Branch',state:'Maharashtra',district:'Mumbai Suburban',city:'Chembur East, Mumbai',pincode:'400074',address:'Ashish Chambers, Ashish Theater, Ground Floor, Maravali Village, Mahul Road, Chembur East, Mumbai - 400074'}
+  ,{name:'Talegaon Branch',state:'Maharashtra',district:'Pune',city:'Talegaon-Dabhade',pincode:'410507',address:'Shop 1-3, Ground Floor, Satyakamal Colony, Plot 19, Survey 61 (New), Talegaon-Dabhade, Pune - 410507'}
+  ,{name:'Chakan Branch',state:'Maharashtra',district:'Pune',city:'Chakan, Khed',pincode:'410501',address:'Shop 2-5, 5A, 6-6A, Kohinoor Centre Building, Ground Floor, Shivaji Chowk, Nashik Road, Chakan Village, Tal. Khed, Pune - 410501'}
+  ,{name:'Nashik - Panchvati Branch',state:'Maharashtra',district:'Nashik',city:'Panchvati, Nashik',pincode:'422003',address:'1st Floor, Motumal Dandumal Kalaro Trust, City Survey 5869, A/3B-1B, K.N. Kela Road, near Nimani Bus Stop Circle, Panchavati, Karanja, Nashik - 422003'}
+  ,{name:'Malad (West) Branch',state:'Maharashtra',district:'Mumbai Suburban',city:'Malad West, Mumbai',pincode:'400064',address:'Shop 8-10, Station Center premises, near New Era Talkies, Malad West, Mumbai - 400064'}
+  ,{name:'Saki Naka Branch',state:'Maharashtra',district:'Mumbai Suburban',city:'Saki Naka, Mumbai',pincode:'400072',address:'Unit G-3, Ground Floor, Sagartek Plaza, Andheri Kurla Road, Saki Naka, Mumbai - 400072'}
 ]
