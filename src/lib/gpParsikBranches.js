@@ -67,4 +67,7 @@ export const GP_PARSIK_BRANCHES = [
   ,{name:'Nashik - Panchvati Branch',state:'Maharashtra',district:'Nashik',city:'Panchvati, Nashik',pincode:'422003',address:'1st Floor, Motumal Dandumal Kalaro Trust, City Survey 5869, A/3B-1B, K.N. Kela Road, near Nimani Bus Stop Circle, Panchavati, Karanja, Nashik - 422003'}
   ,{name:'Malad (West) Branch',state:'Maharashtra',district:'Mumbai Suburban',city:'Malad West, Mumbai',pincode:'400064',address:'Shop 8-10, Station Center premises, near New Era Talkies, Malad West, Mumbai - 400064'}
   ,{name:'Saki Naka Branch',state:'Maharashtra',district:'Mumbai Suburban',city:'Saki Naka, Mumbai',pincode:'400072',address:'Unit G-3, Ground Floor, Sagartek Plaza, Andheri Kurla Road, Saki Naka, Mumbai - 400072'}
+  ,{name:'Mahape Branch',state:'Maharashtra',district:'Thane',city:'Mahape, Navi Mumbai',pincode:'400710',address:'Gala No. 35, Ground Floor, Hasti Industrial Premises CHS, Mahape MIDC, Navi Mumbai - 400710'}
+  ,{name:'New Panvel Branch',state:'Maharashtra',district:'Raigad',city:'New Panvel',pincode:'410206',address:'Shop No. 3-4, Ground Floor, Dhavalgiri, Plot No. 11, S.K. Road, Sector 11, New Panvel - 410206'}
+  ,{name:'Nipani Branch',state:'Karnataka',district:'Belagavi',city:'Nipani, Chikodi',pincode:'591237',address:'House No. 14 E, Ground Floor, Old P.B. Road, Ward No. 31, Nipani, Tal. Chikodi, Dist. Belagavi - 591237'}
 ]
