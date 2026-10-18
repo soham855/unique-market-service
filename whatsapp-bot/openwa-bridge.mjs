@@ -242,8 +242,13 @@ async function processNotificationEvents() {
       try {
         const customerPhone = normalizePhone(event.customer_phone || event.phone)
         const recipients = []
-        if (event.event_type === 'status_changed') { if (customerPhone) recipients.push(customerPhone) }
-        else { if (WA_PHONE_NUMBER) recipients.push(WA_PHONE_NUMBER); if (customerPhone && customerPhone !== WA_PHONE_NUMBER) recipients.push(customerPhone) }
+        // OTPs are confidential: send only to the customer's registered number.
+        if (event.event_type === 'cash_payment_otp' || event.event_type === 'status_changed') {
+          if (customerPhone) recipients.push(customerPhone)
+        } else {
+          if (WA_PHONE_NUMBER) recipients.push(WA_PHONE_NUMBER)
+          if (customerPhone && customerPhone !== WA_PHONE_NUMBER) recipients.push(customerPhone)
+        }
         const marker = String(event.message || '').match(/\[\[PDF_URL=(https?:\/\/[^\]]+)\]\]/i)
         if (marker?.[1] && customerPhone) await sendDocument(customerPhone, marker[1], 'Unique-Market-' + (event.complaint_id || 'Receipt') + '.pdf')
         const message = brand(String(event.message || '').replace(/\n?\[\[PDF_URL=https?:\/\/[^\]]+\]\]\s*$/i, ''))
