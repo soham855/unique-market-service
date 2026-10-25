@@ -2008,35 +2008,11 @@ app.get('/debug', (req, res) => {
 app.get('/health', (_req, res) => res.json({ ok: true, process: 'up', service: 'unique-market-whatsapp', whatsappConnected: status === 'connected', status }))
 
 const pairingPage = (_req, res) => {
-  res.type('html').send(`<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Unique Market WhatsApp QR</title><style>body{font-family:system-ui;max-width:520px;margin:40px auto;padding:20px;text-align:center}input,button{width:100%;padding:12px;margin:8px 0;box-sizing:border-box}button{cursor:pointer}.qr{display:block;width:280px;height:280px;margin:18px auto}.hint{color:#555}</style></head><body><h2>Unique Market WhatsApp QR Pairing</h2><p>WhatsApp number: <b>+91 7350060071</b></p><input id="secret" type="password" placeholder="WA_API_SECRET" autocomplete="off"><button id="btn">Show QR Code</button><button id="reset" type="button">Reset & Generate Fresh QR</button><p id="out" class="hint">Enter WA_API_SECRET and tap Show QR Code.</p><img id="qr" class="qr" style="display:none" alt="WhatsApp QR code"><script>const secret=()=>document.getElementById('secret').value;const out=document.getElementById('out');const qr=document.getElementById('qr');async function refresh(){try{const dbg=await fetch('/debug',{headers:{'x-wa-api-key':secret()}}).then(x=>x.json()).catch(()=>null);if(dbg)out.textContent='Status: '+dbg.status+' | Socket: '+dbg.socket+' | QR: '+dbg.hasQr+' | Pairing ready: '+dbg.pairingReady;const r=await fetch('/qr',{headers:{'x-wa-api-key':secret()}});const d=await r.json();if(d.qrDataUrl){qr.src=d.qrDataUrl;qr.style.display='block';out.textContent='WhatsApp → Linked Devices → Link a device → Scan this QR code.'}else if(d.connected){qr.style.display='none';out.textContent='WhatsApp is connected.'}else{qr.style.display='none';out.textContent=d.message||'Waiting for QR...'}}catch(e){out.textContent=String(e)}}document.getElementById('btn').onclick=async()=>{out.textContent='Checking QR...';await refresh()};document.getElementById('reset').onclick=async()=>{out.textContent='Resetting WhatsApp session...';try{const r=await fetch('/reset',{method:'POST',headers:{'x-wa-api-key':secret()}});const d=await r.json();out.textContent=d.message||d.error||'Reset complete. Wait a few seconds.';setTimeout(refresh,4000)}catch(e){out.textContent=String(e)}};setInterval(refresh,3000);</script></body></html>`)
+  res.type('html').send(`<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Unique Market WhatsApp QR</title><style>body{font-family:system-ui;max-width:520px;margin:40px auto;padding:20px;text-align:center}input,button{width:100%;padding:12px;margin:8px 0;box-sizing:border-box}button{cursor:pointer}.qr{display:block;width:280px;height:280px;margin:18px auto}.hint{color:#555}</style></head><body><h2>Unique Market WhatsApp QR Pairing</h2><p>WhatsApp number: <b>+91 7350060071</b></p><input id="secret" type="password" placeholder="WA_API_SECRET" autocomplete="off"><button id="btn">Show QR Code</button><p id="out" class="hint">Enter WA_API_SECRET and tap Show QR Code.</p><img id="qr" class="qr" style="display:none" alt="WhatsApp QR code"><script>const secret=()=>document.getElementById('secret').value;const out=document.getElementById('out');const qr=document.getElementById('qr');async function refresh(){try{const dbg=await fetch('/debug',{headers:{'x-wa-api-key':secret()}}).then(x=>x.json()).catch(()=>null);if(dbg)out.textContent='Status: '+dbg.status+' | Socket: '+dbg.socket+' | QR: '+dbg.hasQr+' | Pairing ready: '+dbg.pairingReady;const r=await fetch('/qr',{headers:{'x-wa-api-key':secret()}});const d=await r.json();if(d.qrDataUrl){qr.src=d.qrDataUrl;qr.style.display='block';out.textContent='WhatsApp → Linked Devices → Link a device → Scan this QR code.'}else if(d.connected){qr.style.display='none';out.textContent='WhatsApp is connected.'}else{qr.style.display='none';out.textContent=d.message||'Waiting for QR...'}}catch(e){out.textContent=String(e)}}document.getElementById('btn').onclick=async()=>{out.textContent='Checking QR...';await refresh()};setInterval(refresh,3000);</script></body></html>`)
 }
 app.get('/', pairingPage)
 app.get('/pair', pairingPage)
-app.post('/reset', async (req, res) => {
-  if (!authorized(req)) return res.status(401).json({ ok: false, error: 'Unauthorized' })
-  try {
-    // Force a clean re-link even when the current WhatsApp session is connected.
-    // Block the close handler from auto-reconnecting while the old session is being removed.
-    reconnecting = true
-    status = 'resetting'
-    await releaseWhatsAppLease()
-    if (sock) { try { sock.end(new Error('Reset requested')) } catch {} sock = null }
-    lastQr = null; pairingCode = null; pairingReady = false
-    fs.rmSync(AUTH_DIR, { recursive: true, force: true })
-    fs.mkdirSync(AUTH_DIR, { recursive: true })
-    // Clear the persisted Baileys auth state too; otherwise startWhatsApp()
-    // restores the same corrupt Signal session from Supabase after every reset.
-    if (SUPABASE_SERVICE_ROLE_KEY) {
-      await supabaseRestRequest('/whatsapp_auth_sessions?file_name=not.is.null', {
-        method: 'DELETE',
-        headers: { Prefer: 'return=minimal' }
-      })
-    }
-    await startWhatsApp()
-    return res.json({ ok: true, message: 'WhatsApp local + Supabase session reset. Wait for a fresh QR and scan it once.' })
-  }
-  catch (err) { return res.status(500).json({ ok: false, error: 'WhatsApp reset failed', detail: String(err?.message || err) }) }
-})
+app.post('/reset', (_req, res) => res.status(410).json({ ok: false, error: 'Session reset is disabled to protect the paired WhatsApp account.' }))
 app.get('/qr', async (req, res) => {
   if (!authorized(req)) return res.status(401).json({ ok: false, error: 'Unauthorized' })
   if (status === 'connected') return res.json({ ok: true, connected: true, qrDataUrl: null })
