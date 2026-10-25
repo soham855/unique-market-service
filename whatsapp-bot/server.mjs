@@ -2022,6 +2022,7 @@ app.get('/qr', async (req, res) => {
 })
 app.get('/status', (req, res) => { if (!authorized(req)) return res.status(401).json({ ok: false, error: 'Unauthorized' }); res.json({ ok: true, status, connected: status === 'connected', pairingRequired: status === 'pairing_required', pairingCode: pairingCode || null, hasQr: Boolean(lastQr), phoneConfigured: Boolean(PHONE_NUMBER), eventBridge: Boolean(supabase) }) })
 app.get('/pair-public', async (req, res) => {
+  if (!authorized(req)) return res.status(401).json({ ok: false, error: 'Unauthorized' });
   if (String(process.env.WA_PUBLIC_PAIRING || '').toLowerCase() !== 'true') return res.status(404).json({ ok: false, error: 'Not enabled' });
   if (!sock) return res.status(503).json({ ok: false, error: 'WhatsApp socket is not ready' });
   if (status === 'connected') return res.json({ ok: true, status: 'connected' });
