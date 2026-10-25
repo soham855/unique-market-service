@@ -75,4 +75,23 @@ revoke all on function public.can_insert_ticket_status_history(uuid) from public
 revoke all on function public.can_insert_ticket_status_history(uuid) from anon;
 grant execute on function public.can_insert_ticket_status_history(uuid) to authenticated;
 
+
+-- Trigger functions are invoked by their attached triggers, not directly by API roles.
+-- Remove inherited PUBLIC/anon/authenticated EXECUTE from all public-schema trigger functions.
+do $block$
+declare
+  fn record;
+begin
+  for fn in
+    select p.oid::regprocedure as signature
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and p.prorettype in ('trigger'::regtype, 'event_trigger'::regtype)
+  loop
+    execute format('revoke all on function %s from public, anon, authenticated', fn.signature);
+  end loop;
+end;
+$block$;
+
 commit;
