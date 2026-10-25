@@ -67,7 +67,7 @@ $function$;
 
 revoke all on function public.refresh_admin_operational_alerts() from public;
 revoke all on function public.refresh_admin_operational_alerts() from anon;
-grant execute on function public.refresh_admin_operational_alerts() to authenticated;
+grant execute on function public.refresh_admin_operational_alerts() to authenticated, service_role;
 
 -- This helper is used by ticket-status-history RLS checks; authenticated execution
 -- is required, but anonymous/public execution is not.
