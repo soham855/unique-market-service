@@ -521,6 +521,8 @@ async function restoreAuthFromSupabase() {
   }
 }
 
+const syncedAuthFileHashes = new Map()
+
 async function syncAuthToSupabase() {
   if (!SUPABASE_SERVICE_ROLE_KEY) return
   if (authSyncInFlight) return authSyncInFlight
@@ -541,11 +543,14 @@ async function syncAuthToSupabase() {
         }
         throw err
       }
+      const contentHash = crypto.createHash('sha256').update(data).digest('hex')
+      if (syncedAuthFileHashes.get(fileName) === contentHash) continue
       await supabaseRestRequest('/whatsapp_auth_sessions?on_conflict=file_name', {
         method: 'POST',
         headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
         body: JSON.stringify({ file_name: fileName, data, updated_at: new Date().toISOString() })
       })
+      syncedAuthFileHashes.set(fileName, contentHash)
       synced += 1
     }
     if (synced > 0) console.log(`WhatsApp auth synced to Supabase: ${synced}/${files.length} file(s)`)
