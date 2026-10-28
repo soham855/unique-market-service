@@ -19,7 +19,7 @@ jobs:
       - name: Install dependencies
         run: npm install
       - name: Security audit
-        run: npm audit --omit=dev --audit-level=critical || true
+        run: npm audit --omit=dev --audit-level=critical
       - name: Build web app
         run: npm run build
       - name: Setup Java

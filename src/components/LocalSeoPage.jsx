@@ -1,6 +1,6 @@
 import React,{useEffect} from 'react'
 const SITE='https://www.salesuniquemarket.com'
-const PHONE='+918554887026'
+const PHONE='+917350600071'
 const ADDRESS='Station Road, Hotel Rajdoot, Ichalkaranji, Maharashtra 416115, India'
 export const pages={
 '/cctv-camera-dealer-ichalkaranji':{title:'CCTV Camera Dealer in Ichalkaranji | Unique Market',heading:'CCTV Camera Dealer in Ichalkaranji',intro:'Unique Market is a local CCTV camera dealer in Ichalkaranji providing CCTV cameras, DVR, NVR, surveillance HDD, PoE networking and complete security solutions for homes, shops, offices, factories and commercial properties.',service:'CCTV Camera Dealer',keywords:'CCTV camera dealer Ichalkaranji, CCTV camera shop Ichalkaranji, CCTV cameras Ichalkaranji, security camera dealer Ichalkaranji',points:['Hikvision, CP Plus and Hi-Focus CCTV solutions','Indoor, outdoor, dome, bullet and IP cameras','DVR, NVR, surveillance HDD, PoE switch and networking products','Site survey, camera selection, installation and system configuration'],faqs:[['Where can I buy CCTV cameras in Ichalkaranji?','Unique Market provides CCTV cameras and surveillance hardware in Ichalkaranji, including cameras, DVR/NVR, surveillance HDD and PoE networking products.'],['Does Unique Market install CCTV cameras?','Yes. Unique Market provides site survey, camera placement, cabling, DVR/NVR configuration, remote viewing setup, testing and handover.'],['Which CCTV brands are available?','Unique Market works with CCTV and security brands including Hikvision, CP Plus and Hi-Focus, subject to product availability.']]},
@@ -15,7 +15,7 @@ export default function LocalSeoPage(){
  const path=window.location.pathname.replace(/\/$/,'')||links[0],page=pages[path]||pages[links[0]]
  useEffect(()=>{
   document.title=page.title
-  setMeta('description',page.intro+' Call Unique Market at +91 8554887026 or visit Station Road, Hotel Rajdoot, Ichalkaranji.')
+  setMeta('description',page.intro+' Call Unique Market at +91 7350060071 or visit Station Road, Hotel Rajdoot, Ichalkaranji.')
   setMeta('keywords',page.keywords)
   setMeta('robots','index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1')
   setLink('canonical',`${SITE}${path}`)
@@ -25,7 +25,7 @@ export default function LocalSeoPage(){
  },[page,path])
  return <main className='seo-page'>
   <header className='seo-header'><a className='seo-brand' href='/'>UNIQUE MARKET</a><a className='seo-login' href='/login'>Customer / Technician Login</a></header>
-  <section className='seo-hero'><span className='seo-badge'>ICHALKARANJI • CCTV • COMPUTER • IT SECURITY</span><h1>{page.heading}</h1><p>{page.intro}</p><div className='seo-actions'><a href={`tel:${PHONE}`}>Call +91 8554887026</a><a href={`https://wa.me/${PHONE.replace('+','')}`}>WhatsApp Us</a></div></section>
+  <section className='seo-hero'><span className='seo-badge'>ICHALKARANJI • CCTV • COMPUTER • IT SECURITY</span><h1>{page.heading}</h1><p>{page.intro}</p><div className='seo-actions'><a href={`tel:${PHONE}`}>Call +91 7350060071</a><a href={`https://wa.me/${PHONE.replace('+','')}`}>WhatsApp Us</a></div></section>
   <section className='seo-section'><h2>{page.service} in Ichalkaranji</h2><p>Unique Market provides practical CCTV, computer and IT solutions with product supply, installation, configuration, troubleshooting and after-sales support. We serve residential, commercial and industrial customers in Ichalkaranji and nearby areas.</p><div className='seo-grid'>{page.points.map(point=><article key={point}><strong>{point}</strong><p>Professional support focused on reliable products, correct installation and dependable after-sales service.</p></article>)}</div></section>
   <section className='seo-section'><h2>Why choose Unique Market?</h2><div className='seo-grid'><article><strong>Local Ichalkaranji support</strong><p>Based at Station Road, Hotel Rajdoot, Ichalkaranji.</p></article><article><strong>Complete CCTV solutions</strong><p>From camera selection and cabling to DVR/NVR configuration and remote viewing.</p></article><article><strong>Computer & networking support</strong><p>PC setup, Windows and driver support, routers, LAN, PoE and IT peripherals.</p></article><article><strong>Service & AMC</strong><p>Ongoing troubleshooting, preventive maintenance and CCTV AMC support.</p></article></div></section>
   <section className='seo-section'><h2>Frequently Asked Questions</h2><div className='seo-grid'>{page.faqs.map(([q,a])=><article key={q}><strong>{q}</strong><p>{a}</p></article>)}</div></section>
