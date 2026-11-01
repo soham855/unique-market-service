@@ -86,7 +86,7 @@ export default {
       }
     }
 
-    const complaintMatch = url.pathname.match(/^\\/v1\\/complaints(?:\\/([^/]+))?$/);
+    const complaintMatch = url.pathname.match(/^\/v1\/complaints(?:\/([^/]+))?$/);
     if (complaintMatch) {
       const identity = await getAuthenticatedUser(request, env);
       if (identity.response) return identity.response;
