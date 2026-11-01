@@ -132,10 +132,12 @@ test("complaint endpoint rejects missing bearer token before any D1 access", asy
   assert.equal(queried, false);
 });
 
-test("complaint endpoint rejects unsupported methods", async () => {
+test("complaint creation endpoint requires bearer auth before D1 access", async () => {
+  let queried = false;
   const response = await worker.fetch(
     new Request("https://staging.example/v1/complaints", { method: "POST" }),
-    env,
+    { ...env, DB: { prepare() { queried = true; throw new Error("must not query"); } } },
   );
-  assert.equal(response.status, 405);
+  assert.equal(response.status, 401);
+  assert.equal(queried, false);
 });
