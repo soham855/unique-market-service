@@ -179,3 +179,28 @@ The helpers are not yet connected to a complaint write route. No complaint can b
 - D1 idempotency ledger has 0 rows; no synthetic or customer complaint data was inserted.
 - GitHub Actions run [41311418041](https://github.com/soham855/unique-market-service/actions/runs/41311418041): 45/45 tests passed.
 - Branch `cloudflare-d1-staging`; no Worker deployment and no production/main change.
+
+
+## Cash payment OTP / complaint closure audit (2026-11-01)
+
+**Status: BLOCKED — do not implement payment confirmation or complaint closure until the live source inconsistencies below are resolved. No production writes were made.**
+
+Live Supabase inspection found:
+
+1. `payments_technician_insert_cash` permits technicians to INSERT `mode='Cash', source='technician', status='confirmed'`. The `payments_require_cash_otp` trigger is UPDATE-only and checks OTP only when an existing payment transitions to confirmed. Therefore the current insert policy can bypass OTP on direct cash-payment creation.
+2. The existing `cash-payment-otp` Edge Function accepts only `status='pending'` payments, but the technician cash INSERT policy requires `status='confirmed'`. The supported policy and function workflow conflict.
+3. The existing Edge Function queues OTP as `event_type='cash_payment_otp'` in `whatsapp_notification_events`, but the live table CHECK constraint permits only `created`, `assigned`, and `status_changed`. The OTP outbox insert will be rejected.
+4. The active `process-whatsapp-queue` Edge Function reads from `public.whatsapp_queue`; live catalog confirms that table does not exist. The actual event table is `whatsapp_notification_events`. This queue worker cannot process the event table as written.
+5. `cash_payment_otp_challenges` has RLS enabled and no table policies were returned, so access is service-role-only (appropriate for server-side OTP handling, but not a client write path).
+6. Existing OTP verification increments attempts with a read-then-write sequence and performs challenge consumption and payment confirmation as separate HTTP writes. This needs a transactional, concurrency-safe operation before it can be treated as a reliable one-time verification flow.
+7. Payment/challan ledger logic has two separate triggers (`apply_confirmed_payment_to_challan` and `sync_challan_payment`) which both update challan totals. Their combined semantics need explicit idempotency testing before porting.
+
+**Safe migration requirements before implementation:**
+- Make technician cash payments pending until OTP verification; remove the direct-confirm bypass and enforce OTP on every path that confirms technician cash.
+- Ensure challenge creation, OTP attempt increment/consume, payment confirmation and ledger application are atomic or use a single server-side transaction/RPC with compare-and-set guards.
+- Route OTP delivery through one verified queue contract; align event type constraints and the actual queue consumer. Do not broaden the outbox CHECK blindly.
+- Use registered customer phone only; never return OTP to technician/admin; five-minute expiry, max five attempts, one-time use, resend invalidates prior challenge, rate-limit requests.
+- Only after confirmed payment and all required amount/balance rules pass may a separate complaint closure operation transition to `closed`. Unpaid / partially paid / rejected payments must not close the complaint.
+- Do not change production policies, triggers, Edge Functions, payment rows, OTP rows or WhatsApp sessions without explicit approval and backup/rollback review.
+
+Staging D1 already has schema-only `payments` and `cash_payment_otp_challenges` tables. No test payment, customer, OTP challenge or complaint rows were inserted. No Worker deployment occurred.
