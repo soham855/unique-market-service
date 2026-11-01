@@ -42,9 +42,9 @@ export async function allocateComplaintNumbers(db, { category, createdAt = new D
     sequence: "complaint_ticket",
   };
 }
-/** Mirrors live auto-assignment: only status=open and no existing technician. */
+/** Mirrors live auto-assignment: only COALESCE(status,'open')='open' and no existing technician. */
 export async function findLeastLoadedTechnician(db, { status = "open", technicianId = null } = {}) {
-  if (technicianId || status !== "open") return null;
+  if (technicianId || (status ?? "open") !== "open") return null;
   const row = await db.prepare(
     `SELECT p.id FROM profiles p WHERE p.role = 'technician'
       ORDER BY (SELECT COUNT(*) FROM complaints c WHERE c.technician_id = p.id
@@ -52,11 +52,11 @@ export async function findLeastLoadedTechnician(db, { status = "open", technicia
   ).first();
   return row?.id || null;
 }
-export function buildStatusHistoryRows({ complaintId, oldStatus, newStatus, actorId = null, remarks = null, uuid = () => crypto.randomUUID() }) {
+export function buildStatusHistoryRows({ complaintId, oldStatus, newStatus, actorId = null, uuid = () => crypto.randomUUID() }) {
   if (!complaintId || !newStatus || oldStatus === newStatus) return [];
   return [
-    { table: "complaint_status_history", values: [uuid(), complaintId, oldStatus ?? null, newStatus, actorId, remarks] },
-    { table: "ticket_status_history", values: [uuid(), complaintId, oldStatus ?? null, newStatus, null, remarks] },
+    { table: "complaint_status_history", values: [uuid(), complaintId, oldStatus ?? null, newStatus, actorId] },
+    { table: "ticket_status_history", values: [uuid(), complaintId, oldStatus ?? null, newStatus] },
   ];
 }
 /** Caller must authenticate and authorize before invoking. Both legacy histories are inserted in one D1 batch. */
@@ -65,8 +65,8 @@ export async function recordComplaintStatusChange(db, change) {
   if (!rows.length) return { recorded: 0 };
   await db.batch(rows.map((row) => db.prepare(
     row.table === "complaint_status_history"
-      ? "INSERT INTO complaint_status_history (id, complaint_id, old_status, new_status, changed_by, note) VALUES (?, ?, ?, ?, ?, ?)"
-      : "INSERT INTO ticket_status_history (id, complaint_id, old_status, new_status, changed_by, remarks) VALUES (?, ?, ?, ?, ?, ?)"
+      ? "INSERT INTO complaint_status_history (id, complaint_id, old_status, new_status, changed_by) VALUES (?, ?, ?, ?, ?)"
+      : "INSERT INTO ticket_status_history (id, complaint_id, old_status, new_status) VALUES (?, ?, ?, ?)"
   ).bind(...row.values)));
   return { recorded: rows.length };
 }
