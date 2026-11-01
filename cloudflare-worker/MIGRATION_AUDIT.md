@@ -82,3 +82,30 @@ The repository contains migrations and app code, but the live catalog is the aut
 ## Current status
 
 This is a staging code scaffold and source audit, not a completed application migration. The Worker has not been deployed, no app configuration points to it, and no user/customer/payment/WhatsApp data has been copied.
+
+
+## Complaint Engine — staging implementation update (2026-11-01)
+
+### Source behavior confirmed from live PostgreSQL
+- Ordinary complaint ticket: `UM-YYZZ/NN`, with Indian financial year changing on 1 April.
+- WhatsApp Service Request ticket: `UMWA-NN`; the same value is copied into `complaint_no`.
+- Ordinary complaint `complaint_no`: `C/NO-N`.
+- The live BEFORE INSERT trigger names sort so `complaints_assign_ticket_no` runs before `trg_generate_service_ticket_no` and `trg_set_complaint_no`. This means the generic service-ticket sequence is normally bypassed after the first trigger assigns `ticket_no`.
+- Auto-assignment only runs when technician is absent and `COALESCE(status,'open')='open'`; least-loaded count uses statuses `assigned`, `in_progress`, `open`, then profile ID as tie-break.
+- A status change writes both `complaint_status_history` (including verified actor ID) and `ticket_status_history` (legacy trigger leaves actor/remarks unset).
+
+### Staging code added
+- `src/complaint-engine.js`: FY formatter, exact ticket number formats, atomic counter allocation via SQLite `UPDATE ... RETURNING`, least-loaded technician selection, dual-history batch helper, phone normalization, and WhatsApp event builder.
+- `migrations/0001_ticket_number_counters.sql`: creates one support table with four independent counters.
+- `test/complaint-engine.test.js`: 11 unit tests.
+- `.github/workflows/d1-staging-worker-tests.yml`: Node 22 test workflow.
+
+### D1 staging application
+- D1 now has 53 tables (the original 52 plus `ticket_number_counters`).
+- Four staging-only sequence rows exist, each initialized to 1.
+- Verified the D1 `UPDATE ... RETURNING` allocation syntax returned 1; the test counter was reset to 1 and re-read successfully.
+- Current staging row counts: complaints 0, customers 0, profiles 0, WhatsApp notification events 0.
+- These initial counters are only for an empty staging database. They must NOT be used for cutover. The live Supabase counter/sequence state must be reconciled during a separately approved data migration.
+
+### Important scope limit
+The helpers are not yet connected to a complaint write route. No complaint can be created through this Worker. The caller must implement and pass the complete RLS-derived authorization checks before using any helper. Complaint create, status update, WhatsApp enqueue, and technician assignment are not production-ready.
