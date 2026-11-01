@@ -116,3 +116,28 @@ The helpers are not yet connected to a complaint write route. No complaint can b
 - The four counter rows remain at 1 after the SQL allocation probe was reset and re-read.
 - GitHub Actions run for the Worker code: 18 tests passed, 0 failed. The first run caught a syntax issue in the Worker auth URL normalization; this was corrected and the rerun passed.
 - Latest staging branch includes this audit update; production `main` remains unchanged.
+
+## Complaint creation API update (2026-11-01)
+
+### Live source details verified
+- BEFORE INSERT triggers execute alphabetically. complaints_assign_ticket_no sets ticket_no before trg_generate_service_ticket_no, so the generic C/NO- service-ticket generator is normally bypassed for ticket_no; trg_set_complaint_no then generates the separate ordinary complaint_no.
+- Ordinary complaints use the live counter-backed UM-YYZZ/NN plus C/NO-N; WhatsApp Service Request uses UMWA-NN for both fields.
+- Auto-assignment uses the least-loaded technician only for an unassigned open complaint. No eligible technician leaves the complaint open.
+- Source INSERT notification behavior fans out to the linked customer, all admins, and all technicians; it also writes a pending customer WhatsApp event when a customer phone exists.
+- The live complaint INSERT policies overlap. One legacy policy compares complaints.customer_id directly with auth.uid(), while the FK points to customers.id; another policy allows admin or matching auth ID. The Worker create route instead resolves a unique customer row from verified customers.user_id / profile_id for customer-role users, and requires an existing customer row for admin requests.
+- Live production counters/sequences are not the staging counter values. Staging counters remain at 1; production values must be reconciled only during a separately approved cutover/data migration.
+
+### Staging implementation
+- Added src/complaint-create.js and authenticated POST /v1/complaints.
+- Added migrations/0002_complaint_create_requests.sql and applied the schema-only idempotency ledger to D1 staging.
+- Server controls ticket numbers, complaint numbers, initial status, technician assignment, and customer identity fields; client-supplied versions are ignored.
+- Customer creation requires exactly one linked customer record. Admin creation requires an existing customerId. Technician creation is denied.
+- Requires an actor-scoped Idempotency-Key; complaint, idempotency ledger, role notifications, and pending WhatsApp event are written in a single D1 batch. Ticket counter allocation is atomic but separate; failed requests may leave a harmless number gap.
+- The WhatsApp event is queued only; no message is sent and no bot/session/auth state is touched.
+- No status-update route, customer provisioning, or data copy was performed.
+
+### Verification
+- D1 staging now has 54 application tables; complaint_create_requests has 0 rows.
+- D1 PRAGMA foreign_key_check returned no violations; all four staging counters remain at 1; no customer/complaint/profile rows were inserted.
+- GitHub Actions run 41304722771: 31/31 Worker tests passed.
+- Branch: cloudflare-d1-staging; no deployment and no production/main change.
