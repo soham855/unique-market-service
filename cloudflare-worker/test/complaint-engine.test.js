@@ -45,26 +45,26 @@ test("WhatsApp complaint reuses UMWA ticket as complaint number", async () => {
   assert.equal(result.ticketNo, "UMWA-12");
   assert.equal(result.complaintNo, "UMWA-12");
 });
-test("auto-assignment only queries when status is open and technician is absent", async () => {
+test("auto-assignment mirrors null status and existing technician rules", async () => {
   let queried = false;
   const db = { prepare() { queried = true; return { first: async () => ({ id: "tech-1" }) }; } };
   assert.equal(await findLeastLoadedTechnician(db, { status: "New" }), null);
   assert.equal(await findLeastLoadedTechnician(db, { status: "open", technicianId: "tech-2" }), null);
   assert.equal(queried, false);
-  assert.equal(await findLeastLoadedTechnician(db), "tech-1");
+  assert.equal(await findLeastLoadedTechnician(db, { status: null }), "tech-1");
   assert.equal(queried, true);
 });
 test("status history builder mirrors both legacy history tables", () => {
   let id = 0;
   const rows = buildStatusHistoryRows({
     complaintId: "complaint-1", oldStatus: "open", newStatus: "assigned",
-    actorId: "admin-1", remarks: "Assigned to technician", uuid: () => `uuid-${++id}`,
+    actorId: "admin-1", uuid: () => `uuid-${++id}`,
   });
   assert.equal(rows.length, 2);
   assert.equal(rows[0].table, "complaint_status_history");
-  assert.deepEqual(rows[0].values, ["uuid-1", "complaint-1", "open", "assigned", "admin-1", "Assigned to technician"]);
+  assert.deepEqual(rows[0].values, ["uuid-1", "complaint-1", "open", "assigned", "admin-1"]);
   assert.equal(rows[1].table, "ticket_status_history");
-  assert.deepEqual(rows[1].values, ["uuid-2", "complaint-1", "open", "assigned", null, "Assigned to technician"]);
+  assert.deepEqual(rows[1].values, ["uuid-2", "complaint-1", "open", "assigned"]);
   assert.deepEqual(buildStatusHistoryRows({ complaintId: "x", oldStatus: "open", newStatus: "open" }), []);
 });
 test("status history inserts both legacy records in one batch", async () => {
