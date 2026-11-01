@@ -35,3 +35,12 @@ Supabase Auth remains the identity provider during the compatibility phase. The 
 4. Port notification and WhatsApp outbox enqueueing with idempotency keys.
 5. Port payment state changes only after a verified provider webhook or the existing customer WhatsApp OTP flow.
 6. Implement and test the full authorization matrix before enabling any writes.
+
+
+## Complaint engine (staging only)
+
+The complaint engine helpers are implemented in `src/complaint-engine.js`, with 11 Node unit tests in `test/complaint-engine.test.js`.
+
+The D1 staging database has an additional `ticket_number_counters` support table. It contains four empty-stage counters initialized to 1. These are not production counter values and must not be used for cutover. Reconcile source PostgreSQL sequence/counter state only during an explicitly approved data migration.
+
+The helper module is not wired to any complaint write route. There is no complaint creation, assignment, status update, or WhatsApp enqueue endpoint yet. Authorization must be implemented from the complete RLS matrix before these helpers can be exposed.
