@@ -31,7 +31,7 @@ function mockDb(complaint = { id: complaintId, customer_id: "customer-1", techni
       calls.push({ batch: statements });
       const insert = statements[1];
       payment = {
-        id: insert.values[0], complaint_id: insert.values[9], customer_id: insert.values[10],
+        id: insert.values[0], complaint_id: insert.values[8], customer_id: insert.values[9],
         amount: insert.values[2], mode: "Cash", status: "pending", payment_status: "Pending",
       };
       return [{ success: true }, { success: true }];
