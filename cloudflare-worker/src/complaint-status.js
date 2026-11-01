@@ -32,7 +32,7 @@ const cleanText = (value, max, field) => {
   return value.trim() || null;
 };
 
-function transitionAllowed(role, oldStatus, newStatus, assignedToActor) {
+function normalizeStatus(status) {\n  const aliases = { "New":"open", "Assigned":"assigned", "In Service":"in_progress", "Completed":"resolved", "technician on way":"technician_on_way", "in progress":"in_progress", "on hold":"on_hold" };\n  return aliases[status] || status;\n}\n\nfunction transitionAllowed(role, oldStatus, newStatus, assignedToActor) {\n  oldStatus = normalizeStatus(oldStatus);
   if (!ALLOWED_STATUSES.has(newStatus)) return false;
   if (role === "admin") return (ADMIN_TRANSITIONS[oldStatus] || []).includes(newStatus);
   if (role === "technician") {
@@ -87,7 +87,7 @@ export async function updateComplaintStatus(db, profile, actorId, complaintId, i
   if (!transitionAllowed(profile.role, current.status, newStatus, isAssignedTechnician || isClaimingOpen)) {
     throw new ComplaintStatusError(409, "invalid_status_transition");
   }
-  if (profile.role === "admin" && current.status === "open" && newStatus === "assigned" && !current.technician_id) {
+  if (profile.role === "admin" && normalizedCurrentStatus === "open" && newStatus === "assigned" && !current.technician_id) {
     throw new ComplaintStatusError(409, "assign_technician_before_marking_assigned");
   }
 
@@ -127,9 +127,9 @@ export async function updateComplaintStatus(db, profile, actorId, complaintId, i
       FROM complaints c
       WHERE c.id = ? AND c.status = ?
         AND (? = 'admin' OR c.technician_id = ? OR
-          (? = 'technician' AND c.technician_id IS NULL AND c.status = 'open' AND ? = 'assigned'))`)
+          (? = 'technician' AND c.technician_id IS NULL AND c.status = ? AND ? = 'assigned'))`)
       .bind(requestId, actorId, idempotencyKey, newStatus, note, changedAt, complaintId, expectedStatus,
-        profile.role, actorId, profile.role, newStatus),
+        profile.role, actorId, profile.role, expectedStatus, newStatus),
     db.prepare(`UPDATE complaints
       SET status = ?, updated_at = ?,
           technician_id = CASE WHEN ? = 1 THEN ? ELSE technician_id END,
