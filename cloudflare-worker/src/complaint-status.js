@@ -203,6 +203,10 @@ export async function updateComplaintStatus(db, profile, actorId, complaintId, i
     "SELECT request_id, complaint_id, old_status, new_status, created_at FROM complaint_status_update_requests WHERE request_id = ? LIMIT 1"
   ).bind(requestId).first();
   if (!saved) {
+    const concurrentReplay = await db.prepare(
+      "SELECT request_id, complaint_id, old_status, new_status, created_at FROM complaint_status_update_requests WHERE actor_id = ? AND idempotency_key = ? LIMIT 1"
+    ).bind(actorId, idempotencyKey).first();
+    if (concurrentReplay) return { update: concurrentReplay, replayed: true };
     const now = await db.prepare("SELECT status FROM complaints WHERE id = ? LIMIT 1").bind(complaintId).first();
     if (now?.status !== expectedStatus) throw new ComplaintStatusError(409, "complaint_status_conflict");
     throw new ComplaintStatusError(403, "complaint_update_not_authorized");
