@@ -18,7 +18,7 @@ function json(body, status = 200, origin = "") {
     headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type";
     headers["Access-Control-Max-Age"] = "600";
   }
-  return new Response(JSON.stringify(body), { status, headers });
+  return new Response(status === 204 ? null : JSON.stringify(body), { status, headers });
 }
 
 function requestOrigin(request) {
@@ -28,7 +28,7 @@ function requestOrigin(request) {
 
 async function getAuthenticatedUser(request, env) {
   const authorization = request.headers.get("Authorization") || "";
-  if (!/^Bearer\s+\S+$/i.test(authorization)) {
+  if (!/^Bearer\\s+\\S+$/i.test(authorization)) {
     return { response: json({ error: "Sign in required" }, 401, requestOrigin(request) || "") };
   }
   if (!env.SUPABASE_URL || !env.SUPABASE_PUBLISHABLE_KEY) {
@@ -37,7 +37,7 @@ async function getAuthenticatedUser(request, env) {
 
   let response;
   try {
-    response = await fetch(`${env.SUPABASE_URL.replace(/\/+$/, "")}/auth/v1/user`, {
+    response = await fetch(`${env.SUPABASE_URL.replace(/\\/+$/, "")}/auth/v1/user`, {
       method: "GET",
       headers: {
         apikey: env.SUPABASE_PUBLISHABLE_KEY,
