@@ -159,7 +159,7 @@ The helpers are not yet connected to a complaint write route. No complaint can b
 - No synthetic customer, complaint, or profile rows were inserted; no WhatsApp message was sent.
 
 ### Verification
-- GitHub Actions run 41306979180: 44/44 tests passed, 0 failed (before the final admin-unassign test was added).
+- GitHub Actions run 41307179357: 45/45 tests passed, 0 failed.
 - D1 EXPLAIN checks passed for the status ledger insert, complaint update, both history inserts, notifications, WhatsApp outbox, and admin activity audit SQL; all EXPLAIN probes wrote 0 rows.
 - D1 status idempotency ledger contains 0 rows; complaints, profiles, notifications, WhatsApp events, and both history tables remain empty.
 - D1 PRAGMA foreign_key_check returned no violations.
