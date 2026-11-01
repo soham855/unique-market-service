@@ -105,3 +105,31 @@ Example body:
 - closed is deliberately blocked. Payment verification / customer WhatsApp OTP must be ported and tested before a close endpoint is introduced.
 - WhatsApp events are queued only; this route never sends a message or accesses WhatsApp bot auth/session state.
 - CORS allows PATCH and the Idempotency-Key header for the known Unique Market origins.
+
+## Complaint status update API (staging only)
+
+Request:
+```http
+PATCH /v1/complaints/<complaint-id>/status
+Authorization: Bearer <Supabase access token>
+Idempotency-Key: <unique request key>
+Content-Type: application/json
+```
+
+Example body:
+```json
+{
+  "expectedStatus": "assigned",
+  "status": "in_progress",
+  "note": "Technician reached the site"
+}
+```
+
+- Only admins and the assigned technician may update a complaint; a technician may claim an unassigned open complaint.
+- Updates use an expected-status compare-and-set guard, preventing stale status writes.
+- Both legacy history tables are updated in the same D1 batch as the complaint status.
+- App notifications, admin activity audit (admin actions only), and pending customer WhatsApp status events are enqueued in that same batch.
+- `closed` is explicitly blocked. Payment verification / customer cash OTP must be integrated before any close endpoint is implemented.
+- Status events only enqueue WhatsApp work; no message is sent by this Worker.
+- The resolved status event uses the Unique Market Google review link.
+- Idempotency is actor-scoped through `complaint_status_update_requests`.
