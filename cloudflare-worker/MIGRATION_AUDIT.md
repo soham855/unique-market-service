@@ -141,3 +141,24 @@ The helpers are not yet connected to a complaint write route. No complaint can b
 - D1 PRAGMA foreign_key_check returned no violations; all four staging counters remain at 1; no customer/complaint/profile rows were inserted.
 - GitHub Actions run 41304722771: 31/31 Worker tests passed.
 - Branch: cloudflare-d1-staging; no deployment and no production/main change.
+## Complaint status update API update (2026-11-01)
+
+### Source behavior and authorization
+- Live RLS has overlapping complaint UPDATE policies. The effective intended technician rule is: update an assigned complaint only when technician_id equals auth.uid(), or claim an unassigned open complaint; the WITH CHECK requires the new technician_id to equal the authenticated technician or the actor to be admin.
+- Admin and technician update policies overlap. Customer UPDATE policies compare customer_id to auth.uid() even though customer_id references customers.id; the Worker intentionally denies customer status changes.
+- React app uses lower-case statuses including open, assigned, technician_on_way, in_progress, on_hold, resolved, closed, cancelled. Flutter also contains legacy labels New, Assigned, In Service, Completed. The Worker recognizes these legacy prior-state labels but writes canonical lower-case values.
+- Source triggers write both complaint_status_history and ticket_status_history, fan out role notifications, enqueue WhatsApp events for assigned/technician_on_way/in_progress/resolved/closed, and append a Google review link to resolved/closed/completed status messages.
+- closed is intentionally excluded from this endpoint because the product rule requires verified payment or customer WhatsApp OTP before closing. A separate payment-gated close flow remains unimplemented.
+
+### Staging implementation
+- Added src/complaint-status.js and PATCH /v1/complaints/:id/status.
+- Added migrations/0003_complaint_status_update_requests.sql and applied schema-only ledger to D1 staging.
+- Requires expectedStatus, allowed transition, authenticated admin/assigned technician, and actor-scoped Idempotency-Key.
+- Technician may claim only unassigned open/New complaint; server sets technician_id, assigned_at, and scheduled_visit_date.
+- Status update, both history rows, role notifications, admin audit log, and eligible pending customer WhatsApp event are batched together.
+- No synthetic customer, complaint, or profile rows were inserted; no WhatsApp message was sent.
+
+### Verification pending
+- Run Worker unit tests after the latest staging-branch changes.
+- D1 status idempotency ledger schema was created successfully; it is empty by design.
+- No Worker deployment or production change.
