@@ -158,7 +158,10 @@ The helpers are not yet connected to a complaint write route. No complaint can b
 - Status update, both history rows, role notifications, admin audit log, and eligible pending customer WhatsApp event are batched together.
 - No synthetic customer, complaint, or profile rows were inserted; no WhatsApp message was sent.
 
-### Verification pending
-- Run Worker unit tests after the latest staging-branch changes.
-- D1 status idempotency ledger schema was created successfully; it is empty by design.
+### Verification
+- GitHub Actions run 41306979180: 44/44 tests passed, 0 failed (before the final admin-unassign test was added).
+- D1 EXPLAIN checks passed for the status ledger insert, complaint update, both history inserts, notifications, WhatsApp outbox, and admin activity audit SQL; all EXPLAIN probes wrote 0 rows.
+- D1 status idempotency ledger contains 0 rows; complaints, profiles, notifications, WhatsApp events, and both history tables remain empty.
+- D1 PRAGMA foreign_key_check returned no violations.
+- Admin reopening to open clears technician_id, assigned_at, and scheduled_visit_date; the technician claim path sets them.
 - No Worker deployment or production change.
