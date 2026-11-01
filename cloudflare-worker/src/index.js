@@ -1,3 +1,5 @@
+import { readComplaints } from "./complaint-api.js";
+
 const ALLOWED_ORIGINS = new Set([
   "https://salesuniquemarket.com",
   "https://www.salesuniquemarket.com",
@@ -81,6 +83,41 @@ export default {
         return json({ ok: true, service: "unique-market-d1-staging-worker", database: "connected" }, 200, origin || "");
       } catch {
         return json({ ok: false, service: "unique-market-d1-staging-worker", database: "unavailable" }, 503, origin || "");
+      }
+    }
+
+    const complaintMatch = url.pathname.match(/^\\/v1\\/complaints(?:\\/([^/]+))?$/);
+    if (complaintMatch) {
+      const identity = await getAuthenticatedUser(request, env);
+      if (identity.response) return identity.response;
+      try {
+        const profile = await env.DB.prepare(
+          "SELECT id, role FROM profiles WHERE id = ? LIMIT 1"
+        ).bind(identity.user.id).first();
+        if (!profile) return json({ error: "Profile is not provisioned in staging" }, 404, origin || "");
+        if (!["admin", "technician", "customer"].includes(profile.role)) {
+          return json({ error: "Profile role is invalid" }, 403, origin || "");
+        }
+        let complaintId = null;
+        if (complaintMatch[1]) {
+          try { complaintId = decodeURIComponent(complaintMatch[1]); }
+          catch { return json({ error: "Invalid complaint ID" }, 400, origin || ""); }
+          if (!complaintId || complaintId.length > 128) {
+            return json({ error: "Invalid complaint ID" }, 400, origin || "");
+          }
+        }
+        const rawLimit = Number(url.searchParams.get("limit") || 50);
+        const rawOffset = Number(url.searchParams.get("offset") || 0);
+        const rows = await readComplaints(env.DB, profile, {
+          complaintId,
+          status: url.searchParams.get("status"),
+          limit: Number.isFinite(rawLimit) ? Math.trunc(rawLimit) : 50,
+          offset: Number.isFinite(rawOffset) ? Math.trunc(rawOffset) : 0,
+        });
+        return json({ complaints: rows, count: rows.length }, 200, origin || "");
+      } catch (error) {
+        if (error?.message === "Forbidden profile") return json({ error: "Forbidden" }, 403, origin || "");
+        return json({ error: "Complaint lookup failed" }, 503, origin || "");
       }
     }
 
