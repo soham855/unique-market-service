@@ -85,8 +85,9 @@ export async function updateComplaintStatus(db, profile, actorId, complaintId, i
   ).bind(complaintId).first();
   if (!current) throw new ComplaintStatusError(404, "complaint_not_found");
   if (current.status !== expectedStatus) throw new ComplaintStatusError(409, "complaint_status_conflict");
+  const normalizedCurrentStatus = normalizeStatus(current.status);
   const isAssignedTechnician = profile.role === "technician" && current.technician_id === actorId;
-  const isClaimingOpen = profile.role === "technician" && current.status === "open" && !current.technician_id && newStatus === "assigned";
+  const isClaimingOpen = profile.role === "technician" && normalizedCurrentStatus === "open" && !current.technician_id && newStatus === "assigned";
   if (profile.role === "technician" && !isAssignedTechnician && !isClaimingOpen) {
     throw new ComplaintStatusError(403, "technician_not_assigned_to_complaint");
   }
