@@ -45,3 +45,16 @@ test("non-GET requests are rejected", async () => {
   );
   assert.equal(response.status, 405);
 });
+
+test("CORS preflight returns an empty 204 response", async () => {
+  const response = await worker.fetch(
+    new Request("https://staging.example/health", {
+      method: "OPTIONS",
+      headers: { Origin: "https://salesuniquemarket.com" },
+    }),
+    env,
+  );
+  assert.equal(response.status, 204);
+  assert.equal(await response.text(), "");
+  assert.equal(response.headers.get("access-control-allow-origin"), "https://salesuniquemarket.com");
+});
