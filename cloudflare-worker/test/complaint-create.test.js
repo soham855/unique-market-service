@@ -7,7 +7,7 @@ function fakeDb({ customer = { id:"cust-1",name:"Test Customer",mobile:"+91 9000
   return {
     calls,
     prepare(sql) {
-      return { bind(...values) { return {
+      return { first: async () => {\n          calls.push({kind:"first-unbound",sql,values:[]});\n          if (sql.includes("SELECT p.id FROM profiles p")) return technicians[0] ? {id:technicians[0].id} : null;\n          return null;\n        }, bind(...values) { return {
         first: async () => {
           calls.push({kind:"first",sql,values});
           if (sql.includes("complaint_create_requests")) return previous;
