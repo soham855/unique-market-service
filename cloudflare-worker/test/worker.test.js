@@ -56,7 +56,9 @@ test("CORS preflight returns an empty 204 response", async () => {
   );
   assert.equal(response.status, 204);
   assert.equal(await response.text(), "");
-  assert.equal(response.headers.get("access-control-allow-origin"), "https://salesuniquemarket.com");\n  assert.match(response.headers.get("access-control-allow-methods"), /PATCH/);\n  assert.match(response.headers.get("access-control-allow-headers"), /Idempotency-Key/);
+  assert.equal(response.headers.get("access-control-allow-origin"), "https://salesuniquemarket.com");
+  assert.match(response.headers.get("access-control-allow-methods"), /PATCH/);
+  assert.match(response.headers.get("access-control-allow-headers"), /Idempotency-Key/);
 });
 
 test("authenticated profile lookup uses verified Auth identity and D1 role", async () => {
