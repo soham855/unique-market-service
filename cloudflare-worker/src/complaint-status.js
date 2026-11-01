@@ -32,7 +32,13 @@ const cleanText = (value, max, field) => {
   return value.trim() || null;
 };
 
-function normalizeStatus(status) {\n  const aliases = { "New":"open", "Assigned":"assigned", "In Service":"in_progress", "Completed":"resolved", "technician on way":"technician_on_way", "in progress":"in_progress", "on hold":"on_hold" };\n  return aliases[status] || status;\n}\n\nfunction transitionAllowed(role, oldStatus, newStatus, assignedToActor) {\n  oldStatus = normalizeStatus(oldStatus);
+function normalizeStatus(status) {
+  const aliases = { "New":"open", "Assigned":"assigned", "In Service":"in_progress", "Completed":"resolved", "technician on way":"technician_on_way", "in progress":"in_progress", "on hold":"on_hold" };
+  return aliases[status] || status;
+}
+
+function transitionAllowed(role, oldStatus, newStatus, assignedToActor) {
+  oldStatus = normalizeStatus(oldStatus);
   if (!ALLOWED_STATUSES.has(newStatus)) return false;
   if (role === "admin") return (ADMIN_TRANSITIONS[oldStatus] || []).includes(newStatus);
   if (role === "technician") {
