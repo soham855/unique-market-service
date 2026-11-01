@@ -9,7 +9,7 @@ async function makeHash(otp,s){const salt=crypto.getRandomValues(new Uint8Array(
 async function checkHash(otp,encoded,s){const p=String(encoded||"").split("$");if(p.length!==4||p[0]!=="pbkdf2-sha256"||p[1]!=="150000")return false;const salt=Uint8Array.from(atob(p[2]),c=>c.charCodeAt(0));return hashOtp(otp,salt,s)===p[3];}
 async function encrypt(value,encoded){let raw;try{raw=Uint8Array.from(atob(encoded),c=>c.charCodeAt(0));}catch{throw new CashPaymentOtpError(503,"otp_encryption_key_invalid");}if(![16,24,32].includes(raw.length))throw new CashPaymentOtpError(503,"otp_encryption_key_invalid");const key=await crypto.subtle.importKey("raw",raw,"AES-GCM",false,["encrypt"]);const iv=crypto.getRandomValues(new Uint8Array(12));const data=await crypto.subtle.encrypt({name:"AES-GCM",iv},key,new TextEncoder().encode(JSON.stringify(value)));return "v1."+b64(iv)+"."+b64(data);}
 const phoneDigits=v=>String(v||"").replace(/[^0-9]/g,"");
-async function getPayment(db,id){return db.prepare(`SELECT p.id,p.status,p.mode,p.recorded_by,p.customer_id,p.complaint_id,p.amount,c.technician_id,c.customer_id AS complaint_customer_id,cu.mobile AS customer_phone FROM payments p LEFT JOIN complaints c ON c.id=p.complaint_id LEFT JOIN customers cu ON cu.id=COALESCE(p.customer_id,c.customer_id) WHERE p.id=? LIMIT 1`).bind(id).first();}
+async function getPayment(db,id){return db.prepare(`SELECT p.id,p.status,p.mode,p.payment_status,p.challan_id,p.recorded_by,p.customer_id,p.complaint_id,p.amount,c.technician_id,c.customer_id AS complaint_customer_id,cu.mobile AS customer_phone FROM payments p LEFT JOIN complaints c ON c.id=p.complaint_id LEFT JOIN customers cu ON cu.id=COALESCE(p.customer_id,c.customer_id) WHERE p.id=? LIMIT 1`).bind(id).first();}
 export async function requestCashPaymentOtp(db,profile,actorId,paymentId,idempotencyKey,env){
  if(!profile?.id||!["admin","technician"].includes(profile.role))throw new CashPaymentOtpError(403,"role_not_allowed");
  if(!/^[0-9a-f-]{36}$/i.test(paymentId||""))throw new CashPaymentOtpError(400,"invalid_payment_id");
@@ -44,10 +44,12 @@ export async function verifyCashPaymentOtp(db,profile,actorId,paymentId,input,en
  if(!input||typeof input.otp!=="string"||!/^\d{6}$/.test(input.otp))throw new CashPaymentOtpError(400,"invalid_otp");
  const hsecret=secret(env.OTP_HASH_SECRET,"otp_hash_secret");
  const p=await getPayment(db,paymentId);if(!p)throw new CashPaymentOtpError(404,"payment_not_found");
- if(p.status!=="pending"||p.mode!=="Cash")throw new CashPaymentOtpError(409,"pending_cash_payment_required");
  const linked=await db.prepare("SELECT 1 AS ok FROM customers WHERE id=? AND (user_id=? OR profile_id=?) LIMIT 1").bind(p.customer_id,actorId,actorId).first();
  if(!linked)throw new CashPaymentOtpError(403,"payment_not_linked_to_customer");
  const c=await db.prepare("SELECT otp_hash,expires_at,attempts,used_at FROM cash_payment_otp_challenges WHERE payment_id=? LIMIT 1").bind(paymentId).first();
+ if(p.status==="confirmed"&&p.payment_status==="Confirmed"&&c?.used_at)return{payment_id:paymentId,status:"confirmed",verified_at:c.used_at,replayed:true};
+ if(p.status!=="pending"||p.mode!=="Cash")throw new CashPaymentOtpError(409,"pending_cash_payment_required");
+ if(p.challan_id)throw new CashPaymentOtpError(409,"challan_payment_flow_not_ported_yet");
  if(!c||c.used_at)throw new CashPaymentOtpError(409,"otp_not_active");
  const now=new Date().toISOString();if(new Date(c.expires_at).getTime()<=Date.now())throw new CashPaymentOtpError(410,"otp_expired");
  if(c.attempts>=5)throw new CashPaymentOtpError(429,"otp_attempt_limit_reached");
