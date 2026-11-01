@@ -17,7 +17,7 @@ function fakeDb({ customer = { id:"cust-1", name:"Test Customer", mobile:"+91 90
           return {
             first: async () => {
               calls.push({ kind:"first", sql, values });
-              if (sql.includes("complaint_create_requests")) return previous;
+              if (sql.includes("complaint_create_requests")) return previous;\n              if (sql.includes("UPDATE ticket_number_counters")) { const key = values[0]; const allocated = counters[key]; counters[key] += 1; return { allocated }; }
               if (sql.includes("FROM customers WHERE id")) return customer;
               return null;
             },
