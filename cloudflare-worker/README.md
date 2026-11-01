@@ -97,7 +97,7 @@ Example body:
 }
 ```
 
-- Only admins and the assigned technician may update status. A technician may claim an unassigned open/New request by moving it to assigned; the Worker assigns that technician ID itself.
+- Only admins and the assigned technician may update status. A technician may claim an unassigned open/New request by moving it to assigned; the Worker assigns that technician ID itself. Admin reopening to open clears the prior technician assignment.
 - Customer status updates are denied. Ticket number, customer ownership, and actor ID are never accepted from the request body.
 - Uses expectedStatus compare-and-set semantics to reject stale/concurrent transitions, plus actor-scoped Idempotency-Key.
 - Writes both complaint_status_history and ticket_status_history, role notifications, admin activity audit, and eligible customer WhatsApp status event in the same D1 batch.
