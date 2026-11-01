@@ -1,5 +1,6 @@
 import { readComplaints } from "./complaint-api.js";
 import { createComplaint, ComplaintCreateError } from "./complaint-create.js";
+import { updateComplaintStatus, ComplaintStatusError } from "./complaint-status.js";
 
 const ALLOWED_ORIGINS = new Set([
   "https://salesuniquemarket.com",
@@ -77,7 +78,12 @@ export default {
 
     const url = new URL(request.url);
     const isComplaintCollection = url.pathname === "/v1/complaints";
-    if (request.method !== "GET" && !(request.method === "POST" && isComplaintCollection)) return json({ error: "Method not allowed" }, 405, origin || "");
+    const statusUpdateMatch = url.pathname.match(/^\/v1\/complaints\/([^/]+)\/status$/);
+    if (request.method !== "GET" &&
+        !(request.method === "POST" && isComplaintCollection) &&
+        !(request.method === "PATCH" && statusUpdateMatch)) {
+      return json({ error: "Method not allowed" }, 405, origin || "");
+    }
     if (url.pathname === "/health") {
       try {
         const row = await env.DB.prepare("SELECT 1 AS ok").first();
@@ -100,6 +106,28 @@ export default {
       } catch (error) {
         if (error instanceof ComplaintCreateError) return json({ error: error.code }, error.status, origin || "");
         return json({ error: "Complaint creation failed" }, 503, origin || "");
+      }
+    }
+
+    if (request.method === "PATCH" && statusUpdateMatch) {
+      const identity = await getAuthenticatedUser(request, env);
+      if (identity.response) return identity.response;
+      try {
+        const profile = await env.DB.prepare("SELECT id, role FROM profiles WHERE id = ? LIMIT 1")
+          .bind(identity.user.id).first();
+        if (!profile) return json({ error: "Profile is not provisioned in staging" }, 404, origin || "");
+        let complaintId;
+        try { complaintId = decodeURIComponent(statusUpdateMatch[1]); }
+        catch { return json({ error: "Invalid complaint ID" }, 400, origin || ""); }
+        const body = await request.json().catch(() => null);
+        const result = await updateComplaintStatus(
+          env.DB, profile, identity.user.id, complaintId, body,
+          request.headers.get("Idempotency-Key"),
+        );
+        return json(result, result.replayed ? 200 : 200, origin || "");
+      } catch (error) {
+        if (error instanceof ComplaintStatusError) return json({ error: error.code }, error.status, origin || "");
+        return json({ error: "Complaint status update failed" }, 503, origin || "");
       }
     }
 
