@@ -120,7 +120,7 @@ export async function updateComplaintStatus(db, profile, actorId, complaintId, i
   if (normalizedPhone && ["assigned", "technician_on_way", "in_progress", "resolved"].includes(newStatus)) {
     let message = `Unique Market: Complaint "${current.title || "Service Request"}" status is now ${statusLabel}.`;
     if (["resolved"].includes(newStatus)) {
-      message += "\n⭐ Google Review: https://g.page/r/CWY_3B12wn32EBI/review";
+      message += "\n⭐ Google Review: https://maps.app.goo.gl/tV6TUsacb9CtqibY8?g_st=ac";
     }
     waEvent = buildWhatsAppEvent({
       complaintId, recipientUserId: customerUserId, phone: normalizedPhone,
@@ -186,12 +186,14 @@ export async function updateComplaintStatus(db, profile, actorId, complaintId, i
         waEvent.message, waEvent.event_key, changedAt, requestId, newStatus, changedAt));
   }
 
-  statements.push(db.prepare(`INSERT INTO admin_activity_log
-    (id, admin_user_id, action, module, record_id, details, created_at)
-    SELECT ?, ?, 'UPDATE', 'Complaints', c.id, ?, ?
-    FROM complaints c JOIN complaint_status_update_requests r ON r.complaint_id = c.id
-    WHERE r.request_id = ? AND c.status = ? AND c.updated_at = ?`)
-    .bind(crypto.randomUUID(), actorId, JSON.stringify({ old_status: current.status, status: newStatus, priority: current.priority }), changedAt, requestId, newStatus, changedAt));
+  if (profile.role === "admin") {
+    statements.push(db.prepare(`INSERT INTO admin_activity_log
+      (id, admin_user_id, action, module, record_id, details, created_at)
+      SELECT ?, ?, 'UPDATE', 'Complaints', c.id, ?, ?
+      FROM complaints c JOIN complaint_status_update_requests r ON r.complaint_id = c.id
+      WHERE r.request_id = ? AND c.status = ? AND c.updated_at = ?`)
+      .bind(crypto.randomUUID(), actorId, JSON.stringify({ old_status: current.status, status: newStatus, priority: current.priority }), changedAt, requestId, newStatus, changedAt));
+  }
 
   try {
     await db.batch(statements);
