@@ -28,7 +28,7 @@ function requestOrigin(request) {
 
 async function getAuthenticatedUser(request, env) {
   const authorization = request.headers.get("Authorization") || "";
-  if (!/^Bearer\\s+\\S+$/i.test(authorization)) {
+  if (!/^Bearer\s+\S+$/i.test(authorization)) {
     return { response: json({ error: "Sign in required" }, 401, requestOrigin(request) || "") };
   }
   if (!env.SUPABASE_URL || !env.SUPABASE_PUBLISHABLE_KEY) {
@@ -37,7 +37,8 @@ async function getAuthenticatedUser(request, env) {
 
   let response;
   try {
-    response = await fetch(`${env.SUPABASE_URL.replace(/\\/+$/, "")}/auth/v1/user`, {
+    const supabaseUrl = env.SUPABASE_URL.replace(/\/+$/, "");
+    response = await fetch(`${supabaseUrl}/auth/v1/user`, {
       method: "GET",
       headers: {
         apikey: env.SUPABASE_PUBLISHABLE_KEY,
