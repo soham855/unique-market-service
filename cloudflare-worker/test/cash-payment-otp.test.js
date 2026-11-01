@@ -18,7 +18,7 @@ test("technician can queue OTP only for their own pending cash payment; OTP is e
  assert.equal(batch.statements.length,4);
  const outbox=batch.statements[3];
  assert.match(outbox.sql,/encrypted_payload/);
- assert.equal(outbox.values[3],"9000000000");
+ assert.equal(outbox.values[3],"919000000000");
  assert.match(outbox.values[4],/^v1\./);
  assert.equal(JSON.stringify(result).includes("otp"),false);
 });
