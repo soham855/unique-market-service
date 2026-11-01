@@ -165,3 +165,17 @@ The helpers are not yet connected to a complaint write route. No complaint can b
 - D1 PRAGMA foreign_key_check returned no violations.
 - Admin reopening to open clears technician_id, assigned_at, and scheduled_visit_date; the technician claim path sets them.
 - No Worker deployment or production change.
+
+## Complaint status update API update (2026-11-01)
+
+- Live UPDATE RLS policies were inspected: admins can update; assigned technicians can update; technicians may claim unassigned open complaints. Customer-role status writes are denied.
+- Live notification type constraint includes `complaint_status`; WhatsApp event types include `created`, `assigned`, and `status_changed`, with event state limited to pending/sent/failed.
+- Added staging idempotency table `complaint_status_update_requests` (request_id primary key; actor + idempotency key unique).
+- PATCH `/v1/complaints/:id/status` requires verified Supabase Auth identity, D1 role, an expected status, a supported next status, and an idempotency key.
+- Technician status transitions are restricted to their assigned complaint; they may claim an unassigned open complaint. Admin transitions use an explicit allowlist.
+- The endpoint refuses `closed` with `payment_verification_required_before_closing`; cash OTP/payment verification is not bypassed.
+- Complaint row, both history tables, app notifications, pending WhatsApp outbox event, idempotency record, and (for admin actions only) admin activity log are committed through one D1 batch.
+- Resolved status event uses the saved Unique Market review URL. WhatsApp remains queued only; this Worker does not send messages or touch WhatsApp pairing/auth.
+- D1 idempotency ledger has 0 rows; no synthetic or customer complaint data was inserted.
+- GitHub Actions run [41311418041](https://github.com/soham855/unique-market-service/actions/runs/41311418041): 45/45 tests passed.
+- Branch `cloudflare-d1-staging`; no Worker deployment and no production/main change.
