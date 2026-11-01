@@ -54,7 +54,7 @@ test("assigned technician can move complaint to in_progress and writes both hist
   assert.match(sqls,/complaint_status_history/);
   assert.match(sqls,/ticket_status_history/);
   assert.match(sqls,/whatsapp_notification_events/);
-  assert.match(sqls,/admin_activity_log/);
+  assert.doesNotMatch(sqls,/admin_activity_log/);
 });
 test("technician can claim only an unassigned open complaint",async()=>{
   const open={...baseComplaint,status:"open",technician_id:null};
@@ -107,6 +107,7 @@ test("admin can cancel an open complaint but cannot mark it closed",async()=>{
   const db=fakeDb({complaint:open});
   const result=await updateComplaintStatus(db,{id:"admin-1",role:"admin"},"admin-1",open.id,{expectedStatus:"open",status:"cancelled"},key);
   assert.equal(result.replayed,false);
+  assert.ok(db.calls.find(x=>x.kind==="batch").sqls.some(s=>s.includes("admin_activity_log")));
 });
 test("invalid status and missing idempotency key are rejected before writes",async()=>{
   const db=fakeDb();
