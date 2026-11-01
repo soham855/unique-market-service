@@ -114,3 +114,11 @@ test("invalid status and missing idempotency key are rejected before writes",asy
   await assert.rejects(()=>updateComplaintStatus(db,{id:"tech-1",role:"technician"},"tech-1",baseComplaint.id,{expectedStatus:"assigned",status:"in_progress"},""),e=>e.code==="valid_idempotency_key_required");
   assert.equal(db.calls.some(x=>x.kind==="batch"),false);
 });
+
+test("admin reopening an assigned complaint clears its technician assignment",async()=>{
+  const db=fakeDb();
+  const result=await updateComplaintStatus(db,{id:"admin-1",role:"admin"},"admin-1",baseComplaint.id,{expectedStatus:"assigned",status:"open"},key);
+  assert.equal(result.replayed,false);
+  const batch=db.calls.find(x=>x.kind==="batch");
+  assert.ok(batch.sqls.some(s=>s.includes("technician_id = CASE WHEN")));
+});
