@@ -94,14 +94,16 @@ export async function updateComplaintStatus(db, profile, actorId, complaintId, i
   if (!transitionAllowed(profile.role, current.status, newStatus, isAssignedTechnician || isClaimingOpen)) {
     throw new ComplaintStatusError(409, "invalid_status_transition");
   }
-  if (profile.role === "admin" && normalizedCurrentStatus === "open" && newStatus === "assigned" && !current.technician_id) {
+  if (profile.role === "admin" && newStatus === "assigned" && !current.technician_id) {
     throw new ComplaintStatusError(409, "assign_technician_before_marking_assigned");
   }
 
   const requestId = crypto.randomUUID();
   const changedAt = new Date().toISOString();
+  const isAdminUnassign = profile.role === "admin" && newStatus === "open" && Boolean(current.technician_id);
+  const assignmentChanged = isClaimingOpen || isAdminUnassign;
   const claim = isClaimingOpen ? 1 : 0;
-  const technicianId = isClaimingOpen ? actorId : current.technician_id;
+  const technicianId = isClaimingOpen ? actorId : (isAdminUnassign ? null : current.technician_id);
   const customerUserId = current.customer_user_id || current.customer_profile_id || null;
   const recipients = await db.prepare(
     "SELECT id FROM profiles WHERE role = 'admin' OR id = ? ORDER BY id"
@@ -140,14 +142,16 @@ export async function updateComplaintStatus(db, profile, actorId, complaintId, i
     db.prepare(`UPDATE complaints
       SET status = ?, updated_at = ?,
           technician_id = CASE WHEN ? = 1 THEN ? ELSE technician_id END,
-          assigned_at = CASE WHEN ? = 1 THEN COALESCE(assigned_at, ?) ELSE assigned_at END,
-          scheduled_visit_date = CASE WHEN ? = 1 THEN COALESCE(scheduled_visit_date, substr(?,1,10)) ELSE scheduled_visit_date END,
+          assigned_at = CASE WHEN ? = 1 THEN CASE WHEN ? = 1 THEN COALESCE(assigned_at, ?) ELSE NULL END ELSE assigned_at END,
+          scheduled_visit_date = CASE WHEN ? = 1 THEN CASE WHEN ? = 1 THEN COALESCE(scheduled_visit_date, substr(?,1,10)) ELSE NULL END ELSE scheduled_visit_date END,
           started_at = CASE WHEN ? = 'in_progress' THEN COALESCE(started_at, ?) ELSE started_at END,
           completed_at = CASE WHEN ? = 'resolved' THEN COALESCE(completed_at, ?) ELSE completed_at END,
           resolution_notes = CASE WHEN ? IS NULL THEN resolution_notes ELSE ? END
       WHERE id = ? AND status = ?
         AND EXISTS (SELECT 1 FROM complaint_status_update_requests WHERE request_id = ? AND complaint_id = ?)`)
-      .bind(newStatus, changedAt, claim, technicianId, claim, changedAt, claim, changedAt,
+      .bind(newStatus, changedAt, assignmentChanged ? 1 : 0, technicianId,
+        assignmentChanged ? 1 : 0, claim, changedAt,
+        assignmentChanged ? 1 : 0, claim, changedAt,
         newStatus, changedAt, newStatus, changedAt, note, note, complaintId, expectedStatus, requestId, complaintId),
     db.prepare(`INSERT INTO complaint_status_history
       (id, complaint_id, old_status, new_status, changed_by, note, created_at)
