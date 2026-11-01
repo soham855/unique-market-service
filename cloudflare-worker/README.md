@@ -78,3 +78,30 @@ Example body:
 - Attachment URLs must use HTTPS. Latitude/longitude are range-checked.
 - The customer mapping must be provisioned in staging before testing; no production or customer data was copied.
 - The live Supabase INSERT policy set contains overlapping rules, including a legacy customer_id = auth.uid() predicate even though complaints.customer_id references customers.id. The Worker uses the verified profile-to-customer mapping explicitly instead of trusting a request-supplied ID. This rule still needs formal consolidation in the 148-policy authorization matrix.
+## Complaint status update API (staging only)
+
+Request:
+```http
+PATCH /v1/complaints/<complaint-uuid>/status
+Authorization: Bearer <Supabase access token>
+Idempotency-Key: <unique request key>
+Content-Type: application/json
+```
+
+Example body:
+```json
+{
+  "expectedStatus": "assigned",
+  "status": "in_progress",
+  "note": "Technician reached site"
+}
+```
+
+- Only admins and the assigned technician may update status. A technician may claim an unassigned open/New request by moving it to assigned; the Worker assigns that technician ID itself.
+- Customer status updates are denied. Ticket number, customer ownership, and actor ID are never accepted from the request body.
+- Uses expectedStatus compare-and-set semantics to reject stale/concurrent transitions, plus actor-scoped Idempotency-Key.
+- Writes both complaint_status_history and ticket_status_history, role notifications, admin activity audit, and eligible customer WhatsApp status event in the same D1 batch.
+- Preserves known legacy status labels New, Assigned, In Service, and Completed when interpreting the prior state; new API writes canonical lower-case statuses.
+- closed is deliberately blocked. Payment verification / customer WhatsApp OTP must be ported and tested before a close endpoint is introduced.
+- WhatsApp events are queued only; this route never sends a message or accesses WhatsApp bot auth/session state.
+- CORS allows PATCH and the Idempotency-Key header for the known Unique Market origins.
