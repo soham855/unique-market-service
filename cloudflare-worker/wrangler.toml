@@ -1,0 +1,14 @@
+name = "unique-market-d1-staging-api"
+main = "src/index.js"
+compatibility_date = "2026-10-31"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "unique-market-staging"
+database_id = "a4840403-fcc2-4e94-8c27-a42cb84603a8"
+
+[vars]
+SUPABASE_URL = "https://tfscvycomllamoubtlcf.supabase.co"
+
+# Set SUPABASE_PUBLISHABLE_KEY as a Worker secret before deployment.
+# This Worker is staging-only and must not be connected to production traffic.
