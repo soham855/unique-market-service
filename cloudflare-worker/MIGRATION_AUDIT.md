@@ -109,3 +109,10 @@ This is a staging code scaffold and source audit, not a completed application mi
 
 ### Important scope limit
 The helpers are not yet connected to a complaint write route. No complaint can be created through this Worker. The caller must implement and pass the complete RLS-derived authorization checks before using any helper. Complaint create, status update, WhatsApp enqueue, and technician assignment are not production-ready.
+
+
+### Final verification for this phase
+- D1 contains 53 application tables plus Cloudflare's internal `_cf_KV` table; 314 previously created constraint/FK triggers remain present.
+- The four counter rows remain at 1 after the SQL allocation probe was reset and re-read.
+- GitHub Actions run for the Worker code: 18 tests passed, 0 failed. The first run caught a syntax issue in the Worker auth URL normalization; this was corrected and the rerun passed.
+- Latest staging branch includes this audit update; production `main` remains unchanged.
