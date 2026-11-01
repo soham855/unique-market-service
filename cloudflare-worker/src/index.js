@@ -18,8 +18,8 @@ function json(body, status = 200, origin = "") {
   };
   if (origin && ALLOWED_ORIGINS.has(origin)) {
     headers["Access-Control-Allow-Origin"] = origin;
-    headers["Access-Control-Allow-Methods"] = "GET, OPTIONS";
-    headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type";
+    headers["Access-Control-Allow-Methods"] = "GET, POST, PATCH, OPTIONS";
+    headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type, Idempotency-Key";
     headers["Access-Control-Max-Age"] = "600";
   }
   return new Response(status === 204 ? null : JSON.stringify(body), { status, headers });
