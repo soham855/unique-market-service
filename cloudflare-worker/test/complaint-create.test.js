@@ -13,6 +13,7 @@ function fakeDb({ customer = { id:"cust-1",name:"Test Customer",mobile:"+91 9000
           if (sql.includes("complaint_create_requests")) return previous;
           if (sql.includes("FROM customers WHERE user_id")) return customer ? {results:[customer]} : {results:[]};
           if (sql.includes("FROM customers WHERE id")) return customer;
+          if (sql.includes("SELECT p.id FROM profiles p")) return technicians[0] ? {id:technicians[0].id} : null;
           if (sql.includes("FROM profiles WHERE role")) return null;
           return null;
         },
