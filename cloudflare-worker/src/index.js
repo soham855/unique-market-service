@@ -2,6 +2,7 @@ import { readComplaints } from "./complaint-api.js";
 import { createComplaint, ComplaintCreateError } from "./complaint-create.js";
 import { updateComplaintStatus, ComplaintStatusError } from "./complaint-status.js";
 import { requestCashPaymentOtp, verifyCashPaymentOtp, CashPaymentOtpError } from "./cash-payment-otp.js";
+import { createPendingCashPayment, CashPaymentCreateError } from "./payment-create.js";
 
 const ALLOWED_ORIGINS = new Set([
   "https://salesuniquemarket.com",
@@ -85,7 +86,7 @@ export default {
     if (request.method !== "GET" &&
         !(request.method === "POST" && isComplaintCollection) &&
         !(request.method === "PATCH" && statusUpdateMatch) &&
-        !(request.method === "POST" && (cashOtpRequestMatch || cashOtpVerifyMatch))) {
+        !(request.method === "POST" && (cashPaymentCreateMatch || cashOtpRequestMatch || cashOtpVerifyMatch))) {
       return json({ error: "Method not allowed" }, 405, origin || "");
     }
     if (url.pathname === "/health") {
@@ -95,6 +96,24 @@ export default {
         return json({ ok: true, service: "unique-market-d1-staging-worker", database: "connected" }, 200, origin || "");
       } catch {
         return json({ ok: false, service: "unique-market-d1-staging-worker", database: "unavailable" }, 503, origin || "");
+      }
+    }
+
+    if (request.method === "POST" && cashPaymentCreateMatch) {
+      const identity = await getAuthenticatedUser(request, env);
+      if (identity.response) return identity.response;
+      try {
+        const profile = await env.DB.prepare("SELECT id, role FROM profiles WHERE id = ? LIMIT 1")
+          .bind(identity.user.id).first();
+        if (!profile) return json({ error: "Profile is not provisioned in staging" }, 404, origin || "");
+        const body = await request.json().catch(() => null);
+        const result = await createPendingCashPayment(
+          env.DB, profile, identity.user.id, body, request.headers.get("Idempotency-Key"),
+        );
+        return json(result, result.replayed ? 200 : 201, origin || "");
+      } catch (error) {
+        if (error instanceof CashPaymentCreateError) return json({ error: error.code }, error.status, origin || "");
+        return json({ error: "Cash payment creation failed" }, 503, origin || "");
       }
     }
 
