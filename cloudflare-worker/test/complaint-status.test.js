@@ -36,7 +36,7 @@ function fakeDb({ complaint=baseComplaint, previous=null, admins=[{id:"admin-1"}
     async batch(statements) {
       calls.push({kind:"batch",count:statements.length,sqls:statements.map(s=>s.sql)});
       const v=statements[0].values;
-      saved={request_id:v[0],complaint_id:complaint.id,old_status:complaint.status,new_status:v[3],created_at:v[5]};
+      if (concurrent) saved=concurrent;\n      else saved={request_id:v[0],complaint_id:complaint.id,old_status:complaint.status,new_status:v[3],created_at:v[5]};
       return statements.map(()=>({success:true}));
     },
   };
@@ -104,4 +104,12 @@ test("invalid status and missing idempotency key are rejected before writes",asy
   await assert.rejects(()=>updateComplaintStatus(db,{id:"tech-1",role:"technician"},"tech-1",baseComplaint.id,{expectedStatus:"assigned",status:"arbitrary"},key),e=>e.code==="unsupported_status");
   await assert.rejects(()=>updateComplaintStatus(db,{id:"tech-1",role:"technician"},"tech-1",baseComplaint.id,{expectedStatus:"assigned",status:"in_progress"},""),e=>e.code==="valid_idempotency_key_required");
   assert.equal(db.calls.some(x=>x.kind==="batch"),false);
+});
+
+test("concurrent request with same idempotency key returns the first committed update",async()=>{
+  const concurrent={request_id:"first-request",complaint_id:baseComplaint.id,old_status:"assigned",new_status:"in_progress",created_at:"2026-11-01T10:00:00.000Z"};
+  const db=fakeDb({racedPrevious:concurrent});
+  const result=await updateComplaintStatus(db,{id:"tech-1",role:"technician"},"tech-1",baseComplaint.id,{expectedStatus:"assigned",status:"in_progress"},key);
+  assert.equal(result.replayed,true);
+  assert.deepEqual(result.update,concurrent);
 });
