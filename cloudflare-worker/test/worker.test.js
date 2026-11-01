@@ -116,3 +116,26 @@ test("invalid D1 roles fail closed", async () => {
     globalThis.fetch = originalFetch;
   }
 });
+
+test("complaint endpoint rejects missing bearer token before any D1 access", async () => {
+  let queried = false;
+  const response = await worker.fetch(
+    new Request("https://staging.example/v1/complaints?limit=500"),
+    {
+      SUPABASE_URL: "https://auth.example",
+      SUPABASE_PUBLISHABLE_KEY: "test-key",
+      DB: { prepare() { queried = true; throw new Error("D1 must not be queried"); } },
+    },
+  );
+  assert.equal(response.status, 401);
+  assert.deepEqual(await response.json(), { error: "Sign in required" });
+  assert.equal(queried, false);
+});
+
+test("complaint endpoint rejects unsupported methods", async () => {
+  const response = await worker.fetch(
+    new Request("https://staging.example/v1/complaints", { method: "POST" }),
+    env,
+  );
+  assert.equal(response.status, 405);
+});
