@@ -17,8 +17,11 @@ export async function requestCashPaymentOtp(db,profile,actorId,paymentId,idempot
  const hsecret=secret(env.OTP_HASH_SECRET,"otp_hash_secret"),ekey=secret(env.OTP_ENCRYPTION_KEY,"otp_encryption_key");
  const prior=await db.prepare("SELECT payment_id FROM cash_payment_otp_request_ledger WHERE actor_id=? AND idempotency_key=? LIMIT 1").bind(actorId,idempotencyKey).first();
  if(prior)return{payment_id:prior.payment_id,queued:true,replayed:true};
+ const rate=await db.prepare("SELECT COUNT(*) AS request_count FROM cash_payment_otp_request_ledger WHERE payment_id=? AND actor_id=? AND created_at >= datetime('now','-1 hour')").bind(paymentId,actorId).first();
+ if(Number(rate?.request_count||0)>=3)throw new CashPaymentOtpError(429,"otp_request_rate_limit_reached");
  const p=await getPayment(db,paymentId);if(!p)throw new CashPaymentOtpError(404,"payment_not_found");
  if(p.status!=="pending"||p.mode!=="Cash")throw new CashPaymentOtpError(409,"pending_cash_payment_required");
+ if(!(Number(p.amount)>0))throw new CashPaymentOtpError(409,"positive_payment_amount_required");
  if(profile.role==="technician"&&(p.recorded_by!==actorId||p.technician_id!==actorId))throw new CashPaymentOtpError(403,"payment_not_owned_by_technician");
  if(!p.complaint_id||!p.customer_id||p.customer_id!==p.complaint_customer_id)throw new CashPaymentOtpError(409,"payment_customer_mapping_invalid");
  const phone=phoneDigits(p.customer_phone);if(phone.length<10||phone.length>15)throw new CashPaymentOtpError(409,"customer_whatsapp_phone_unavailable");
