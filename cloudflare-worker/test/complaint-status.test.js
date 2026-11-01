@@ -10,13 +10,18 @@ const baseComplaint = {
 };
 function fakeDb({ complaint=baseComplaint, previous=null, admins=[{id:"admin-1"}] }={}) {
   const calls=[];
+  let saved=previous;
   return {
     calls,
     prepare(sql) {
       return { bind(...values) { return {
+        sql, values,
         first: async () => {
           calls.push({kind:"first",sql,values});
-          if (sql.includes("complaint_status_update_requests")) return previous;
+          if (sql.includes("complaint_status_update_requests")) {
+            if (sql.includes("request_id = ?")) return saved?.request_id === values[0] ? saved : saved;
+            return saved;
+          }
           if (sql.includes("FROM complaints c")) return complaint;
           if (sql.includes("SELECT status FROM complaints")) return {status:complaint?.status};
           return null;
@@ -30,6 +35,8 @@ function fakeDb({ complaint=baseComplaint, previous=null, admins=[{id:"admin-1"}
     },
     async batch(statements) {
       calls.push({kind:"batch",count:statements.length,sqls:statements.map(s=>s.sql)});
+      const v=statements[0].values;
+      saved={request_id:v[0],complaint_id:complaint.id,old_status:complaint.status,new_status:v[3],created_at:v[5]};
       return statements.map(()=>({success:true}));
     },
   };
@@ -53,6 +60,13 @@ test("technician can claim only an unassigned open complaint",async()=>{
   assert.equal(result.replayed,false);
   const batch=db.calls.find(x=>x.kind==="batch");
   assert.ok(batch.sqls.some(s=>s.includes("technician_id = CASE WHEN")));
+});
+test("technician can claim legacy New status without changing source spelling in history",async()=>{
+  const legacy={...baseComplaint,status:"New",technician_id:null};
+  const db=fakeDb({complaint:legacy});
+  const result=await updateComplaintStatus(db,{id:"tech-1",role:"technician"},"tech-1",legacy.id,{expectedStatus:"New",status:"assigned"},key);
+  assert.equal(result.replayed,false);
+  assert.equal(db.calls.find(x=>x.kind==="batch").sqls[0].includes("c.status = ?"),true);
 });
 test("technician cannot update another technician's complaint",async()=>{
   const db=fakeDb();
