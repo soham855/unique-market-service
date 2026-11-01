@@ -81,7 +81,7 @@ export default {
 
     const url = new URL(request.url);
     const isComplaintCollection = url.pathname === "/v1/complaints";
-    const complaintCloseMatch = url.pathname.match(/^\\/v1\\/complaints\\/([^/]+)\\/close$/);
+    const complaintCloseMatch = url.pathname.match(/^\/v1\/complaints\/([^/]+)\/close$/);
     const statusUpdateMatch = url.pathname.match(/^\/v1\/complaints\/([^/]+)\/status$/);
     const cashPaymentCreateMatch = url.pathname === "/v1/payments/cash";
     const cashOtpRequestMatch = url.pathname.match(/^\/v1\/payments\/([^/]+)\/cash-otp\/request$/);
