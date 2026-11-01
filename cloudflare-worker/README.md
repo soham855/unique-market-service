@@ -6,6 +6,7 @@ This is an isolated staging Worker. It is not wired into the website, Flutter ap
 
 - `GET /health`: verifies the D1 binding with a read-only query.
 - `GET /v1/me`: validates the caller's Supabase access token against Supabase Auth, then looks up the matching profile in the D1 staging database.
+- `GET /v1/complaints` and `GET /v1/complaints/:id`: read-only complaint queries with role-based row scoping (admin, linked customer, assigned technician, or unassigned open technician queue). Supports bounded `limit`/`offset` and an optional exact `status` filter.
 - CORS is restricted to the known Unique Market web origins and local Vite development.
 - No write routes, customer-data migration, payment actions, or WhatsApp operations are implemented.
 
@@ -43,4 +44,4 @@ The complaint engine helpers are implemented in `src/complaint-engine.js`, with 
 
 The D1 staging database has an additional `ticket_number_counters` support table. It contains four empty-stage counters initialized to 1. These are not production counter values and must not be used for cutover. Reconcile source PostgreSQL sequence/counter state only during an explicitly approved data migration.
 
-The helper module is not wired to any complaint write route. There is no complaint creation, assignment, status update, or WhatsApp enqueue endpoint yet. Authorization must be implemented from the complete RLS matrix before these helpers can be exposed.
+The ticket/status helper module is not wired to any complaint write route. Complaint GET endpoints are now wired through verified Supabase Auth identity and D1 profile role. No complaint creation, assignment, status update, or WhatsApp enqueue endpoint exists yet. The complete 148-policy RLS matrix still needs reconciliation before write routes can be exposed.
