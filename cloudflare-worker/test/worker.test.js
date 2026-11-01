@@ -56,7 +56,7 @@ test("CORS preflight returns an empty 204 response", async () => {
   );
   assert.equal(response.status, 204);
   assert.equal(await response.text(), "");
-  assert.equal(response.headers.get("access-control-allow-origin"), "https://salesuniquemarket.com");
+  assert.equal(response.headers.get("access-control-allow-origin"), "https://salesuniquemarket.com");\n  assert.match(response.headers.get("access-control-allow-methods"), /PATCH/);\n  assert.match(response.headers.get("access-control-allow-headers"), /Idempotency-Key/);
 });
 
 test("authenticated profile lookup uses verified Auth identity and D1 role", async () => {
@@ -140,4 +140,26 @@ test("complaint creation endpoint requires bearer auth before D1 access", async 
   );
   assert.equal(response.status, 401);
   assert.equal(queried, false);
+});
+
+test("complaint status update requires bearer auth before D1 access", async () => {
+  let queried = false;
+  const response = await worker.fetch(
+    new Request("https://staging.example/v1/complaints/11111111-1111-4111-8111-111111111111/status", { method: "PATCH" }),
+    {
+      SUPABASE_URL: "https://auth.example",
+      SUPABASE_PUBLISHABLE_KEY: "test-key",
+      DB: { prepare() { queried = true; throw new Error("D1 must not be queried"); } },
+    },
+  );
+  assert.equal(response.status, 401);
+  assert.equal(queried, false);
+});
+
+test("status endpoint rejects unsupported method before authentication", async () => {
+  const response = await worker.fetch(
+    new Request("https://staging.example/v1/complaints/11111111-1111-4111-8111-111111111111/status", { method: "POST" }),
+    env,
+  );
+  assert.equal(response.status, 405);
 });
