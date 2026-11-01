@@ -1,6 +1,7 @@
 import { readComplaints } from "./complaint-api.js";
 import { createComplaint, ComplaintCreateError } from "./complaint-create.js";
 import { updateComplaintStatus, ComplaintStatusError } from "./complaint-status.js";
+import { requestCashPaymentOtp, verifyCashPaymentOtp, CashPaymentOtpError } from "./cash-payment-otp.js";
 
 const ALLOWED_ORIGINS = new Set([
   "https://salesuniquemarket.com",
@@ -79,9 +80,12 @@ export default {
     const url = new URL(request.url);
     const isComplaintCollection = url.pathname === "/v1/complaints";
     const statusUpdateMatch = url.pathname.match(/^\/v1\/complaints\/([^/]+)\/status$/);
+    const cashOtpRequestMatch = url.pathname.match(/^\/v1\/payments\/([^/]+)\/cash-otp\/request$/);
+    const cashOtpVerifyMatch = url.pathname.match(/^\/v1\/payments\/([^/]+)\/cash-otp\/verify$/);
     if (request.method !== "GET" &&
         !(request.method === "POST" && isComplaintCollection) &&
-        !(request.method === "PATCH" && statusUpdateMatch)) {
+        !(request.method === "PATCH" && statusUpdateMatch) &&
+        !(request.method === "POST" && (cashOtpRequestMatch || cashOtpVerifyMatch))) {
       return json({ error: "Method not allowed" }, 405, origin || "");
     }
     if (url.pathname === "/health") {
@@ -128,6 +132,26 @@ export default {
       } catch (error) {
         if (error instanceof ComplaintStatusError) return json({ error: error.code }, error.status, origin || "");
         return json({ error: "Complaint status update failed" }, 503, origin || "");
+      }
+    }
+
+    if (request.method === "POST" && (cashOtpRequestMatch || cashOtpVerifyMatch)) {
+      const identity = await getAuthenticatedUser(request, env);
+      if (identity.response) return identity.response;
+      try {
+        const profile = await env.DB.prepare("SELECT id, role FROM profiles WHERE id = ? LIMIT 1").bind(identity.user.id).first();
+        if (!profile) return json({ error: "Profile is not provisioned in staging" }, 404, origin || "");
+        let paymentId;
+        try { paymentId = decodeURIComponent((cashOtpRequestMatch || cashOtpVerifyMatch)[1]); }
+        catch { return json({ error: "Invalid payment ID" }, 400, origin || ""); }
+        const body = await request.json().catch(() => null);
+        const result = cashOtpRequestMatch
+          ? await requestCashPaymentOtp(env.DB, profile, identity.user.id, paymentId, request.headers.get("Idempotency-Key"), env)
+          : await verifyCashPaymentOtp(env.DB, profile, identity.user.id, paymentId, body, env);
+        return json(result, 200, origin || "");
+      } catch (error) {
+        if (error instanceof CashPaymentOtpError) return json({ error: error.code }, error.status, origin || "");
+        return json({ error: "Cash payment OTP operation failed" }, 503, origin || "");
       }
     }
 
