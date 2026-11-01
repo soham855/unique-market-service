@@ -1,0 +1,31 @@
+name: D1 staging Worker tests
+
+on:
+  push:
+    branches:
+      - cloudflare-d1-staging
+    paths:
+      - "cloudflare-worker/**"
+      - ".github/workflows/d1-staging-worker-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  worker-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cloudflare-worker
+    steps:
+      - name: Checkout staging branch
+        uses: actions/checkout@v4
+        with:
+          ref: cloudflare-d1-staging
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Run Worker unit tests
+        run: node --test
