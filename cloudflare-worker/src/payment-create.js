@@ -30,10 +30,11 @@ export async function createPendingCashPayment(db, profile, actorId, input, idem
   if (previous) return { payment: previous, replayed: true };
 
   const complaint = await db.prepare(
-    "SELECT id,customer_id,technician_id FROM complaints WHERE id=? LIMIT 1"
+    "SELECT id,customer_id,technician_id,status FROM complaints WHERE id=? LIMIT 1"
   ).bind(complaintId).first();
   if (!complaint) throw new CashPaymentCreateError(404, "complaint_not_found");
   if (!complaint.customer_id) throw new CashPaymentCreateError(409, "complaint_customer_missing");
+  if (["closed", "cancelled"].includes(String(complaint.status || "").toLowerCase())) throw new CashPaymentCreateError(409, "complaint_not_payable");
   if (profile.role === "technician" && complaint.technician_id !== actorId) {
     throw new CashPaymentCreateError(403, "technician_not_assigned_to_complaint");
   }
