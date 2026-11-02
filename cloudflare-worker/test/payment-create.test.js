@@ -75,6 +75,21 @@ test("rejects invalid amounts before any write", async () => {
   }
 });
 
+test("rejects closed and cancelled complaints but permits resolved payment workflow", async () => {
+  for (const status of ["closed", "cancelled"]) {
+    const db = mockDb({ id: complaintId, customer_id: "customer-1", technician_id: "tech-1", status });
+    await assert.rejects(
+      () => createPendingCashPayment(db, technician, technician.id, { complaintId, amount: 100 }, "payment-create-status"),
+      error => error.code === "complaint_not_payable",
+    );
+    assert.equal(db.calls.some(call => call.batch), false);
+  }
+  const resolvedDb = mockDb({ id: complaintId, customer_id: "customer-1", technician_id: "tech-1", status: "resolved" });
+  const result = await createPendingCashPayment(resolvedDb, technician, technician.id,
+    { complaintId, amount: 100 }, "payment-create-resolved");
+  assert.equal(result.replayed, false);
+});
+
 test("requires a valid idempotency key", async () => {
   const db = mockDb();
   await assert.rejects(
