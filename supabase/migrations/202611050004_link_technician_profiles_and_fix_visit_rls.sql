@@ -39,7 +39,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path = pg_catalog, public
-as $
+as $$
 declare
   normalized_phone text;
   matching_count integer;
@@ -68,7 +68,7 @@ begin
 
   return new;
 end;
-$;
+$$;
 
 revoke all on function public.link_technician_row_after_profile_insert()
   from public, anon, authenticated;
