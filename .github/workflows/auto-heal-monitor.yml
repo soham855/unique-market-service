@@ -3,13 +3,18 @@ name: Unique Market Auto-Heal Monitor
 on:
   workflow_run:
     workflows:
-      - "Android APK"
-      - "Android AAB"
+      - "Build Instant Services Android APK"
+      - "Build Instant Services Android AAB"
       - "Flutter Android"
       - "Network Agent Windows"
       - "Workspace Reminder Android"
     types: [completed]
   workflow_dispatch:
+    inputs:
+      run_id:
+        description: "Failed GitHub Actions run ID to diagnose"
+        required: true
+        type: string
 
 permissions:
   actions: read
@@ -24,14 +29,15 @@ jobs:
       - name: Download failed run logs
         env:
           GH_TOKEN: ${{ github.token }}
-          RUN_ID: ${{ github.event.workflow_run.id }}
+          RUN_ID: ${{ github.event_name == 'workflow_dispatch' && inputs.run_id || github.event.workflow_run.id }}
         run: |
           set -euo pipefail
+          test -n "$RUN_ID"
           mkdir -p auto-heal
           curl -fsSL \
             -H "Authorization: Bearer $GH_TOKEN" \
             -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${{ github.repository }}/actions/runs/$RUN_ID/logs" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/$RUN_ID/logs" \
             -o auto-heal/logs.zip
           unzip -q -o auto-heal/logs.zip -d auto-heal/logs
           find auto-heal/logs -type f -print0 | xargs -0 cat > auto-heal/combined.log || true
@@ -40,13 +46,16 @@ jobs:
       - name: Create diagnostic issue
         env:
           GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.event_name == 'workflow_dispatch' && inputs.run_id || github.event.workflow_run.id }}
         run: |
           set -euo pipefail
-          RUN_URL="${{ github.event.workflow_run.html_url }}"
-          TITLE="Auto-Heal: failed deployment/workflow ${{ github.event.workflow_run.name }}"
+          RUN_DATA="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/$RUN_ID")"
+          RUN_URL="$(jq -r '.html_url' <<< "$RUN_DATA")"
+          RUN_NAME="$(jq -r '.name' <<< "$RUN_DATA")"
+          TITLE="Auto-Heal: failed workflow $RUN_NAME"
           BODY="$(cat auto-heal/error.log)"
           gh issue create \
-            --repo "${{ github.repository }}" \
+            --repo "$GITHUB_REPOSITORY" \
             --title "$TITLE" \
             --body "## Unique Market Auto-Heal Diagnostic
 
@@ -58,4 +67,4 @@ The error log captured from the failed run:
 $BODY
 ```
 
-This issue is intentionally diagnostic-only until the AI repair agent is enabled."
+This issue is diagnostic-only; it does not modify production services or customer data."
