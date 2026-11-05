@@ -57,7 +57,7 @@ security definer
 set search_path = pg_catalog, public
 as $$
 begin
-  if new.status = 'Completed' and old.status is distinct from new.status then
+  if lower(coalesce(new.status, '')) = 'completed' and lower(coalesce(old.status, '')) <> 'completed' then
     if not exists (
       select 1
       from public.service_reports r
