@@ -3,9 +3,14 @@
 drop policy if exists service_visits_customer_select_linked on public.service_visits;
 drop policy if exists visits_related_select on public.service_visits;
 drop policy if exists visits_related_select_hardened on public.service_visits;
-drop policy if exists visits_admin_all on public.service_visits;
 drop policy if exists visits_technician_insert_hardened on public.service_visits;
 drop policy if exists visits_technician_update on public.service_visits;
+
+create policy visits_admin_all
+on public.service_visits
+for all to authenticated
+using (public.is_admin())
+with check (public.is_admin());
 
 create policy service_visits_select_related
 on public.service_visits
