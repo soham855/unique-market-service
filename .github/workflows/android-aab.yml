@@ -32,6 +32,8 @@ jobs:
           packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
       - name: Add Android platform
         run: npx cap add android
+      - name: Configure Firebase
+        run: cp flutter_app/android/app/google-services.json android/app/google-services.json
       - name: Sync Capacitor
         run: npx cap sync android
       - name: Ensure precise Android location permissions
