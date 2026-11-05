@@ -13,16 +13,10 @@ class TechnicianService {
   }
 
   Future<Map<String, dynamic>?> technician() async {
-    final p = await profile();
-    if (p == null) return null;
-    final mobile = (p['phone'] ?? p['mobile'])?.toString();
-    if (mobile == null || mobile.isEmpty) return null;
-    final byMobile = await client.from('technicians').select().eq('mobile', mobile).maybeSingle();
-    if (byMobile != null) return byMobile;
-    final name = p['full_name']?.toString().trim();
-    if (name == null || name.isEmpty) return null;
-    final rows = await client.from('technicians').select().ilike('name', name).limit(1);
-    return rows.isEmpty ? null : Map<String,dynamic>.from(rows.first);
+    final user = client.auth.currentUser;
+    if (user == null) return null;
+    final row = await client.from('technicians').select().eq('profile_id', user.id).maybeSingle();
+    return row == null ? null : Map<String, dynamic>.from(row);
   }
 
   Future<List<Map<String, dynamic>>> jobs() async {
