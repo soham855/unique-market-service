@@ -5,7 +5,7 @@ on:
     workflows:
       - "Build Instant Services Android APK"
       - "Build Instant Services Android AAB"
-      - "Flutter Android"
+      - "Flutter Android Build"
       - "Network Agent Windows"
       - "Workspace Reminder Android"
     types: [completed]
