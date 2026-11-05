@@ -1,6 +1,6 @@
 import React,{useEffect,useState} from 'react'
 
-const PHONE='8554887026'
+const PHONE='7350060071'
 const ADDRESS='Station Road, Hotel Rajdoot, Ichalkaranji, Maharashtra'
 const WHATSAPP_TEXT='मला सीसीटीव्ही/सर्व्हिस कोटेशन हवे आहे'
 const localPages=[
