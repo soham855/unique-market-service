@@ -13,6 +13,7 @@ declare
     or session_user in ('postgres', 'supabase_admin');
   is_existing_admin boolean := coalesce(public.is_admin(), false);
   profile_phone text;
+  verified_auth_phone text;
 begin
   if tg_op = 'INSERT' then
     if new.role = 'admin' and not is_service and not is_existing_admin then
@@ -22,13 +23,21 @@ begin
 
     if new.role = 'technician' and not is_service and not is_existing_admin then
       profile_phone := right(regexp_replace(coalesce(new.phone, ''), '\D', '', 'g'), 10);
-      if length(profile_phone) <> 10 or not exists (
-        select 1
-        from public.technicians t
-        where right(regexp_replace(coalesce(t.mobile, ''), '\D', '', 'g'), 10) = profile_phone
-          and lower(coalesce(t.status, 'active')) in ('active', 'online', 'available')
-      ) then
-        raise exception 'Technician profile requires an active registered technician mobile'
+      select right(regexp_replace(coalesce(u.phone, ''), '\D', '', 'g'), 10)
+        into verified_auth_phone
+      from auth.users u
+      where u.id = auth.uid();
+
+      if length(profile_phone) <> 10
+         or verified_auth_phone is null
+         or verified_auth_phone <> profile_phone
+         or not exists (
+           select 1
+           from public.technicians t
+           where right(regexp_replace(coalesce(t.mobile, ''), '\D', '', 'g'), 10) = profile_phone
+             and lower(coalesce(t.status, 'active')) in ('active', 'online', 'available')
+         ) then
+        raise exception 'Technician profile must match the authenticated phone and an active technician record'
           using errcode = '42501';
       end if;
     end if;
