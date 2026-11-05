@@ -31,6 +31,53 @@ where c.technician_id = t.id
   and c.profile_match_count = 1
   and t.profile_id is null;
 
+-- Auto-link a newly provisioned technician profile when exactly one technician
+-- record has the same verified mobile. Ambiguous records are deliberately left
+-- for an administrator to map.
+create or replace function public.link_technician_row_after_profile_insert()
+returns trigger
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $
+declare
+  normalized_phone text;
+  matching_count integer;
+begin
+  if new.role <> 'technician' then
+    return new;
+  end if;
+
+  normalized_phone := right(regexp_replace(coalesce(new.phone, ''), '\D', '', 'g'), 10);
+  if length(normalized_phone) <> 10 then
+    return new;
+  end if;
+
+  select count(*) into matching_count
+  from public.technicians t
+  where right(regexp_replace(coalesce(t.mobile, ''), '\D', '', 'g'), 10) = normalized_phone
+    and lower(coalesce(t.status, 'active')) in ('active', 'online', 'available');
+
+  if matching_count = 1 then
+    update public.technicians
+    set profile_id = new.id
+    where right(regexp_replace(coalesce(mobile, ''), '\D', '', 'g'), 10) = normalized_phone
+      and lower(coalesce(status, 'active')) in ('active', 'online', 'available')
+      and profile_id is null;
+  end if;
+
+  return new;
+end;
+$;
+
+revoke all on function public.link_technician_row_after_profile_insert()
+  from public, anon, authenticated;
+drop trigger if exists profiles_link_technician_row on public.profiles;
+create trigger profiles_link_technician_row
+after insert on public.profiles
+for each row
+execute function public.link_technician_row_after_profile_insert();
+
 -- A customer can read their own customer row by its linked auth profile.
 create policy customers_linked_profile_select
   on public.customers
