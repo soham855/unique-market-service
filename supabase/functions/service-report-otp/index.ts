@@ -54,6 +54,13 @@ Deno.serve(async (req: Request) => {
   if (role !== "admin" && complaint.technician_id !== userId) return json(403, { error: "This job is not assigned to you" });
 
   if (body.action === "request") {
+    const priorResponse = await fetch(`${url}/rest/v1/service_report_otp_challenges?service_report_id=eq.${reportId}&select=expires_at,attempts,used_at`, { headers: restHeaders });
+    const priorRows = priorResponse.ok ? await priorResponse.json() : [];
+    const prior = priorRows?.[0];
+    if (prior && !prior.used_at && new Date(prior.expires_at).getTime() > Date.now() && Number(prior.attempts) < 5) {
+      return json(409, { error: "An OTP is already active. Ask the customer to use the latest message or wait for it to expire." });
+    }
+
     let phone = String(complaint.customer_phone || "").replace(/\D/g, "");
     if (phone.length < 10 && complaint.customer_id) {
       const customerResponse = await fetch(`${url}/rest/v1/customers?id=eq.${complaint.customer_id}&select=mobile`, { headers: restHeaders });
