@@ -46,7 +46,7 @@ revoke all on function public.guard_service_report_customer_approval()
   from public, anon, authenticated;
 drop trigger if exists service_reports_guard_customer_approval on public.service_reports;
 create trigger service_reports_guard_customer_approval
-before update of customer_otp_verified, customer_approved_at on public.service_reports
+before update of customer_otp, customer_otp_verified, customer_approved_at on public.service_reports
 for each row execute function public.guard_service_report_customer_approval();
 
 -- Even direct API updates cannot complete a complaint without a verified report
