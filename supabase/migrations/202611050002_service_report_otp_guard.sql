@@ -12,6 +12,9 @@ create table if not exists public.service_report_otp_challenges (
 alter table public.service_report_otp_challenges enable row level security;
 revoke all on public.service_report_otp_challenges from anon, authenticated;
 
+-- Invalidate legacy OTPs that were generated in the technician app and stored in plaintext.
+update public.service_reports set customer_otp = null where customer_otp is not null;
+
 -- Client-side updates must never mark a service report as customer-approved.
 create or replace function public.guard_service_report_customer_approval()
 returns trigger
@@ -20,7 +23,8 @@ set search_path = pg_catalog, public, auth
 as $$
 begin
   if (
-       new.customer_otp_verified is distinct from old.customer_otp_verified
+       new.customer_otp is distinct from old.customer_otp
+       or new.customer_otp_verified is distinct from old.customer_otp_verified
        or new.customer_approved_at is distinct from old.customer_approved_at
      )
      and coalesce(auth.role(), '') <> 'service_role'
