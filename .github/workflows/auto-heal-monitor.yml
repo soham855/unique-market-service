@@ -8,6 +8,7 @@ on:
       - "Flutter Android Build"
       - "Network Agent Windows"
       - "Workspace Reminder Android"
+      - "Technician Support Build Check"
     types: [completed]
   workflow_dispatch:
     inputs:
