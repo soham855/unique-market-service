@@ -14,6 +14,7 @@ declare
   is_existing_admin boolean := coalesce(public.is_admin(), false);
   profile_phone text;
   verified_auth_phone text;
+  matching_technician_count integer := 0;
 begin
   if tg_op = 'INSERT' then
     if new.role = 'admin' and not is_service and not is_existing_admin then
@@ -28,15 +29,15 @@ begin
       from auth.users u
       where u.id = auth.uid();
 
+      select count(*) into matching_technician_count
+      from public.technicians t
+      where right(regexp_replace(coalesce(t.mobile, ''), '\D', '', 'g'), 10) = profile_phone
+        and lower(coalesce(t.status, 'active')) in ('active', 'online', 'available');
+
       if length(profile_phone) <> 10
          or verified_auth_phone is null
          or verified_auth_phone <> profile_phone
-         or not exists (
-           select 1
-           from public.technicians t
-           where right(regexp_replace(coalesce(t.mobile, ''), '\D', '', 'g'), 10) = profile_phone
-             and lower(coalesce(t.status, 'active')) in ('active', 'online', 'available')
-         ) then
+         or matching_technician_count <> 1 then
         raise exception 'Technician profile must match the authenticated phone and an active technician record'
           using errcode = '42501';
       end if;
