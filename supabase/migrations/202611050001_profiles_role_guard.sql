@@ -26,7 +26,7 @@ begin
         select 1
         from public.technicians t
         where right(regexp_replace(coalesce(t.mobile, ''), '\D', '', 'g'), 10) = profile_phone
-          and lower(coalesce(t.status, 'active')) = 'active'
+          and lower(coalesce(t.status, 'active')) in ('active', 'online', 'available')
       ) then
         raise exception 'Technician profile requires an active registered technician mobile'
           using errcode = '42501';
