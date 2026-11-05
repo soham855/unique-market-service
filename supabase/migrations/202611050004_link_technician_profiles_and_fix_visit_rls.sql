@@ -38,6 +38,10 @@ create policy customers_linked_profile_select
   to authenticated
   using (user_id = auth.uid() or profile_id = auth.uid() or public.is_admin());
 
+-- Replace the old UUID-equality checks with the explicit profile link.
+drop policy if exists technicians_self_or_admin_select on public.technicians;
+drop policy if exists technicians_self_or_admin_select_hardened on public.technicians;
+
 -- Technician rows are visible only to the profile explicitly linked by an admin.
 create policy technicians_linked_profile_select
   on public.technicians
