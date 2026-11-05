@@ -902,10 +902,13 @@ async function processNotificationEvents() {
 
     const seenEventGroups = new Set()
     for (const event of data || []) {
-      // Deduplicate per complaint + event + recipient, not per complaint/event alone.
-      // A complaint can legitimately have separate customer and office notifications.
+      // OTP events are report-specific and must never be deduplicated by the shared recipient.
+      // Other notifications are deduplicated per complaint + event + recipient.
+      const isSensitiveOtpEvent = ['cash_payment_otp', 'service_report_otp'].includes(event.event_type)
       const recipientKey = String(event.phone || event.customer_phone || event.recipient_user_id || '').replace(/\D/g, '')
-      const groupKey = String(event.complaint_id || '') + ':' + String(event.event_type || '') + ':' + recipientKey
+      const groupKey = isSensitiveOtpEvent
+        ? 'otp:' + String(event.id)
+        : String(event.complaint_id || '') + ':' + String(event.event_type || '') + ':' + recipientKey
       if (seenEventGroups.has(groupKey)) {
         console.log('WhatsApp duplicate pending event skipped:', JSON.stringify({ eventId: event.id, complaintId: event.complaint_id, eventType: event.event_type }))
         try {
@@ -925,7 +928,6 @@ async function processNotificationEvents() {
       const normalizedCustomerPhone = String(customerPhone || event.phone || '').replace(/\D/g, '')
       const isLegacyAutomationNumber = normalizedCustomerPhone === '8554887026'
       const customerJid = isLegacyAutomationNumber ? null : recipientJid(normalizedCustomerPhone)
-      const isSensitiveOtpEvent = ['cash_payment_otp', 'service_report_otp'].includes(event.event_type)
       if (isSensitiveOtpEvent) {
         // OTPs must go only to the customer's registered number, never office or group chats.
         if (customerJid) targets.push(customerJid)
