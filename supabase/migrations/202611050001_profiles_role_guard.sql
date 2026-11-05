@@ -10,7 +10,7 @@ set search_path = pg_catalog, public, auth
 as $$
 declare
   is_service boolean := coalesce(auth.role(), '') = 'service_role'
-    or current_user in ('postgres', 'supabase_admin');
+    or session_user in ('postgres', 'supabase_admin');
   is_existing_admin boolean := coalesce(public.is_admin(), false);
   profile_phone text;
 begin
