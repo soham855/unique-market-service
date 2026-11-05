@@ -24,7 +24,7 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
       - name: Type-check service report OTP Edge Function
-        run: deno check --no-lock supabase/functions/service-report-otp/index.ts
+        run: deno check --no-lock --node-modules-dir=auto supabase/functions/service-report-otp/index.ts
       - name: Check WhatsApp bot syntax
         run: node --check whatsapp-bot/server.mjs
       - name: Build web portal
