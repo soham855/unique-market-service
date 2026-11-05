@@ -1,6 +1,8 @@
 name: Unique Market Auto-Heal Monitor
 
 on:
+  push:
+    branches: ["website-completion-main-sync-2026-11-05"]
   workflow_run:
     workflows:
       - "Build Instant Services Android APK"
