@@ -825,6 +825,11 @@ async function sendNotificationEvent(jid, event) {
   const marker = String(event.message || '').match(/\n?\[\[PDF_URL=(https?:\/\/[^\]]+)\]\]\s*$/i)
   const pdfUrl = marker?.[1] || null
   if (status !== 'connected' || !sock) throw new Error('WhatsApp is not connected')
+  if (['cash_payment_otp', 'service_report_otp'].includes(event.event_type)) {
+    if (!event.message) throw new Error('Sensitive OTP event has no message body')
+    await sendText(jid, String(event.message))
+    return
+  }
   let complaint = null, customer = null, recipientProfile = null
   if (event.complaint_id) {
     const resolved = await getComplaintAndCustomer(event.complaint_id)
@@ -919,13 +924,16 @@ async function processNotificationEvents() {
       const targets = []
       const normalizedCustomerPhone = String(customerPhone || event.phone || '').replace(/\D/g, '')
       const isLegacyAutomationNumber = normalizedCustomerPhone === '8554887026'
-      if (event.event_type === 'status_changed') {
-        const customerJid = isLegacyAutomationNumber ? null : recipientJid(normalizedCustomerPhone)
+      const customerJid = isLegacyAutomationNumber ? null : recipientJid(normalizedCustomerPhone)
+      const isSensitiveOtpEvent = ['cash_payment_otp', 'service_report_otp'].includes(event.event_type)
+      if (isSensitiveOtpEvent) {
+        // OTPs must go only to the customer's registered number, never office or group chats.
+        if (customerJid) targets.push(customerJid)
+      } else if (event.event_type === 'status_changed') {
         if (customerJid) targets.push(customerJid)
       } else {
         const officeJid = recipientJid(PHONE_NUMBER)
         if (officeJid) targets.push(officeJid)
-        const customerJid = isLegacyAutomationNumber ? null : recipientJid(normalizedCustomerPhone)
         if (customerJid && !targets.includes(customerJid)) targets.push(customerJid)
         if (WA_GROUP_JID && !targets.includes(WA_GROUP_JID)) targets.push(WA_GROUP_JID)
       }
