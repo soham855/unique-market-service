@@ -17,3 +17,24 @@ alter table public.whatsapp_notification_events
       ]
     )
   );
+
+
+-- Customer-facing RLS must not permit clients to enqueue trusted OTP messages.
+-- The Edge Function writes these events with service_role (RLS bypass); admins
+-- retain the existing admin policy. This prevents customers from spoofing OTP
+-- messages or selecting arbitrary phone numbers through the public Data API.
+drop policy if exists whatsapp_events_customer_insert on public.whatsapp_notification_events;
+create policy whatsapp_events_customer_insert
+  on public.whatsapp_notification_events
+  for insert
+  to authenticated
+  with check (
+    event_type not in ('cash_payment_otp', 'service_report_otp')
+    and exists (
+      select 1
+      from public.complaints c
+      join public.customers cu on cu.id = c.customer_id
+      where c.id = whatsapp_notification_events.complaint_id
+        and (cu.profile_id = auth.uid() or cu.user_id = auth.uid())
+    )
+  );
