@@ -119,11 +119,20 @@ Deno.serve(async (req: Request) => {
     if (new Date(challenge.expires_at).getTime() < Date.now()) return json(400, { error: "OTP expired. Request a new OTP." });
     if (Number(challenge.attempts) >= 5) return json(429, { error: "Too many incorrect attempts. Request a new OTP." });
 
-    if ((await sha256(`${reportId}:${otp}:${serviceKey}`)) !== challenge.otp_hash) {
-      await fetch(`${url}/rest/v1/service_report_otp_challenges?service_report_id=eq.${reportId}&attempts=lt.5&used_at=is.null`, {
-        method: "PATCH", headers: { ...restHeaders, Prefer: "return=minimal" },
-        body: JSON.stringify({ attempts: Number(challenge.attempts) + 1 }),
+    if ((await sha256(\`\${reportId}:\${otp}:\${serviceKey}\`)) !== challenge.otp_hash) {
+      const attemptResponse = await fetch(\`\${url}/rest/v1/rpc/increment_service_report_otp_attempt\`, {
+        method: "POST",
+        headers: restHeaders,
+        body: JSON.stringify({ p_report_id: reportId }),
       });
+      if (!attemptResponse.ok) {
+        console.error("Atomic OTP attempt update failed", await attemptResponse.text());
+        return json(503, { error: "Could not verify OTP attempt. Please retry." });
+      }
+      const attempts = await attemptResponse.json();
+      if (attempts === null || Number(attempts) >= 5) {
+        return json(429, { error: "Too many incorrect attempts or OTP expired. Request a new OTP." });
+      }
       return json(400, { error: "Incorrect OTP" });
     }
 
