@@ -14,6 +14,11 @@ revoke all on public.service_report_otp_challenges from anon, authenticated;
 
 -- Invalidate legacy OTPs that were generated in the technician app and stored in plaintext.
 update public.service_reports set customer_otp = null where customer_otp is not null;
+update public.service_reports r
+set customer_otp_verified = false, customer_approved_at = null
+from public.complaints c
+where c.id = r.complaint_id and c.status <> 'Completed'
+  and (r.customer_otp_verified is distinct from false or r.customer_approved_at is not null);
 
 -- Client-side updates must never mark a service report as customer-approved.
 create or replace function public.guard_service_report_customer_approval()
