@@ -17,7 +17,8 @@ update public.service_reports set customer_otp = null where customer_otp is not 
 update public.service_reports r
 set customer_otp_verified = false, customer_approved_at = null
 from public.complaints c
-where c.id = r.complaint_id and c.status <> 'Completed'
+where c.id = r.complaint_id
+  and lower(coalesce(c.status, '')) not in ('completed', 'closed', 'resolved')
   and (r.customer_otp_verified is distinct from false or r.customer_approved_at is not null);
 
 -- Client-side updates must never mark a service report as customer-approved.
