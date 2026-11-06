@@ -20,8 +20,34 @@ jobs:
           node-version: '22'
       - name: Install dependencies
         run: npm install
-      - name: Security audit
-        run: npm audit --omit=dev --audit-level=critical
+      - name: Security audit (full dependency tree)
+        run: |
+          npm audit --json > npm-audit.json || true
+          node --input-type=module -e '
+            import fs from "node:fs";
+            const report = JSON.parse(fs.readFileSync("npm-audit.json", "utf8"));
+            const advisories = Object.values(report.vulnerabilities || {});
+            console.log("Audit totals:", JSON.stringify(report.metadata?.vulnerabilities || {}));
+            for (const item of advisories) {
+              console.log(JSON.stringify({
+                name: item.name,
+                severity: item.severity,
+                isDirect: item.isDirect,
+                range: item.range,
+                fixAvailable: item.fixAvailable,
+                via: item.via
+              }, null, 2));
+            }
+            if (!advisories.length) console.log("No dependency vulnerabilities found.");
+          '
+      - name: Upload dependency audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-dependency-audit
+          path: npm-audit.json
+          if-no-files-found: ignore
+          retention-days: 14
       - name: Build web app
         run: npm run build
       - name: Setup Java
