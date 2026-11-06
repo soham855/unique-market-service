@@ -6,7 +6,7 @@ on:
       - "Build Instant Services Android APK"
       - "Build Instant Services Android AAB"
       - "Flutter Android Build"
-      - "Network Agent Windows"
+      - "Network Agent Windows Build"
       - "Workspace Reminder Android"
       - "Technician Support Build Check"
     types: [completed]
@@ -30,7 +30,7 @@ jobs:
       - name: Download failed run logs
         env:
           GH_TOKEN: ${{ github.token }}
-          RUN_ID: ${{ github.event_name == 'workflow_dispatch' && inputs.run_id || github.event.workflow_run.id }}
+          RUN_ID: ${{ github.event.inputs.run_id || github.event.workflow_run.id }}
         run: |
           set -euo pipefail
           test -n "$RUN_ID"
@@ -47,7 +47,7 @@ jobs:
       - name: Create diagnostic issue
         env:
           GH_TOKEN: ${{ github.token }}
-          RUN_ID: ${{ github.event_name == 'workflow_dispatch' && inputs.run_id || github.event.workflow_run.id }}
+          RUN_ID: ${{ github.event.inputs.run_id || github.event.workflow_run.id }}
         run: |
           set -euo pipefail
           RUN_DATA="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/$RUN_ID")"
