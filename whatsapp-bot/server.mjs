@@ -919,7 +919,7 @@ async function processNotificationEvents() {
       const targets = []
       const normalizedCustomerPhone = String(customerPhone || event.phone || '').replace(/\D/g, '')
       const isLegacyAutomationNumber = normalizedCustomerPhone === '8554887026'
-      if (event.event_type === 'status_changed') {
+      if (event.event_type === 'cash_payment_otp' || event.event_type === 'status_changed') {
         const customerJid = isLegacyAutomationNumber ? null : recipientJid(normalizedCustomerPhone)
         if (customerJid) targets.push(customerJid)
       } else {
