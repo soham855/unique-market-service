@@ -1,4 +1,4 @@
-import React,{useEffect,useState} from 'react'
+import React,{Suspense,useEffect,useState} from 'react'
 import {initGlitchTip,setGlitchTipTag} from './lib/glitchtip'
 import {createRoot} from 'react-dom/client'
 import {App as CapacitorApp} from '@capacitor/app'
@@ -14,41 +14,41 @@ import {LanguageProvider} from './lib/i18n'
 import {supabase} from './lib/supabase'
 import {getSession,onAuthStateChange,signOut} from './lib/auth'
 import {getMyProfile} from './lib/profile'
-import Login from './components/Login'
-import NativeSplash from './components/NativeSplash'
-import RoleDashboard from './components/RoleDashboard'
-import ComplaintModule from './components/ComplaintModule'
-import CustomerComplaintModule from './components/CustomerComplaintModule'
-import CustomerServiceHistory from './components/CustomerServiceHistory'
-import TechnicianServiceHistory from './components/TechnicianServiceHistory'
-import TechnicianRequest from './components/TechnicianRequest'
-import CustomerProfile from './components/CustomerProfile'
-import ComplaintSearch from './components/ComplaintSearch'
-import AdminModule from './components/AdminModule'
-import BankAmcModule from './components/BankAmcModule'
-import TechnicianBankAmcModule from './components/TechnicianBankAmcModule'
-import TechnicianAdmin from './components/TechnicianAdmin'
-import AdminComplaintKanban from './components/AdminComplaintKanban'
-import AdminReports from './components/AdminReports'
-import AdminSettings from './components/AdminSettings'
-import TechnicianPayment from './components/TechnicianPayment'
-import TechnicianModule from './components/TechnicianModule'
-import CustomerPayment from './components/CustomerPayment'
-import PaymentLedger from './components/PaymentLedger'
-import NotificationBell from './components/NotificationBell'
-import AdminAccountManager from './components/CustomerRegister'
+const Login=React.lazy(()=>import('./components/Login'))
+const NativeSplash=React.lazy(()=>import('./components/NativeSplash'))
+const RoleDashboard=React.lazy(()=>import('./components/RoleDashboard'))
+const ComplaintModule=React.lazy(()=>import('./components/ComplaintModule'))
+const CustomerComplaintModule=React.lazy(()=>import('./components/CustomerComplaintModule'))
+const CustomerServiceHistory=React.lazy(()=>import('./components/CustomerServiceHistory'))
+const TechnicianServiceHistory=React.lazy(()=>import('./components/TechnicianServiceHistory'))
+const TechnicianRequest=React.lazy(()=>import('./components/TechnicianRequest'))
+const CustomerProfile=React.lazy(()=>import('./components/CustomerProfile'))
+const ComplaintSearch=React.lazy(()=>import('./components/ComplaintSearch'))
+const AdminModule=React.lazy(()=>import('./components/AdminModule'))
+const BankAmcModule=React.lazy(()=>import('./components/BankAmcModule'))
+const TechnicianBankAmcModule=React.lazy(()=>import('./components/TechnicianBankAmcModule'))
+const TechnicianAdmin=React.lazy(()=>import('./components/TechnicianAdmin'))
+const AdminComplaintKanban=React.lazy(()=>import('./components/AdminComplaintKanban'))
+const AdminReports=React.lazy(()=>import('./components/AdminReports'))
+const AdminSettings=React.lazy(()=>import('./components/AdminSettings'))
+const TechnicianPayment=React.lazy(()=>import('./components/TechnicianPayment'))
+const TechnicianModule=React.lazy(()=>import('./components/TechnicianModule'))
+const CustomerPayment=React.lazy(()=>import('./components/CustomerPayment'))
+const PaymentLedger=React.lazy(()=>import('./components/PaymentLedger'))
+const NotificationBell=React.lazy(()=>import('./components/NotificationBell'))
+const AdminAccountManager=React.lazy(()=>import('./components/CustomerRegister'))
 import LocalSeoPage,{pages as localSeoPages} from './components/LocalSeoPage'
-import CompanyLandingPage from './components/CompanyLandingPage'
-import WhyChooseUniqueMarket from './components/WhyChooseUniqueMarket'
-import NextGenSecuritySystems from './components/NextGenSecuritySystems'
-import ServicePortalAnimation from './components/ServicePortalAnimation'
-import CustomerAmcDetails from './components/CustomerAmcDetails'
-import CustomerAIAssistant from './components/CustomerAIAssistant'
-import ServiceReportModule from './components/ServiceReportModule'
-import CustomerReferral from './components/CustomerReferral'
-import NetworkAITool from './components/NetworkAITool'
-import TrackService from './components/TrackService'
-import TechnicianSupport from './components/TechnicianSupport'
+const CompanyLandingPage=React.lazy(()=>import('./components/CompanyLandingPage'))
+const WhyChooseUniqueMarket=React.lazy(()=>import('./components/WhyChooseUniqueMarket'))
+const NextGenSecuritySystems=React.lazy(()=>import('./components/NextGenSecuritySystems'))
+const ServicePortalAnimation=React.lazy(()=>import('./components/ServicePortalAnimation'))
+const CustomerAmcDetails=React.lazy(()=>import('./components/CustomerAmcDetails'))
+const CustomerAIAssistant=React.lazy(()=>import('./components/CustomerAIAssistant'))
+const ServiceReportModule=React.lazy(()=>import('./components/ServiceReportModule'))
+const CustomerReferral=React.lazy(()=>import('./components/CustomerReferral'))
+const NetworkAITool=React.lazy(()=>import('./components/NetworkAITool'))
+const TrackService=React.lazy(()=>import('./components/TrackService'))
+const TechnicianSupport=React.lazy(()=>import('./components/TechnicianSupport'))
 import './technician-support.css'
 import {initNativePushNotifications} from './lib/nativeNotifications'
 
@@ -108,5 +108,5 @@ function App(){
  else{content=<section className='role-dashboard'><button className='secondary' type='button' onClick={()=>setActiveModule(null)}>← Back to Dashboard</button><div className='modules'><article className='module-card'><span>●</span><h3>{selected}</h3><p>This module is not available yet. Please use a supported dashboard action.</p></article></div></section>}
  return <main className='app-shell'><header className='topbar'><div><p className='eyebrow'>UNIQUE MARKET</p><h1>Instant Services for Your Security</h1></div><div className='top-actions'><span className='status'>{profile.role.toUpperCase()}</span><NotificationBell userId={session.user.id}/><button className='secondary' type='button' onClick={signOut}>Sign out</button></div></header>{content}{supabase&&<footer className='footer'>Signed in as {session.user.email}</footer>}</main>
 }
-function Root(){return <LanguageProvider><App/></LanguageProvider>}
+function Root(){return <LanguageProvider><Suspense fallback={<main className='auth-shell'><div className='login-card'><p className='eyebrow'>UNIQUE MARKET</p><h1>Loading module…</h1></div></main>}><App/></Suspense></LanguageProvider>}
 createRoot(document.getElementById('root')).render(<React.StrictMode><Root/></React.StrictMode>)
