@@ -22,12 +22,26 @@ jobs:
         run: npm install
       - name: Security audit (full dependency tree)
         run: |
-          npm audit --json > npm-audit.json || true
-          node --input-type=module -e '
+          set +e
+          npm audit --json > npm-audit.json
+          audit_exit=$?
+          set -e
+          AUDIT_EXIT_CODE="$audit_exit" node --input-type=module -e '
             import fs from "node:fs";
-            const report = JSON.parse(fs.readFileSync("npm-audit.json", "utf8"));
+            let report;
+            try {
+              report = JSON.parse(fs.readFileSync("npm-audit.json", "utf8"));
+            } catch (error) {
+              console.error("Dependency audit did not return valid JSON:", error.message);
+              process.exit(1);
+            }
+            if (report.error || !report.metadata?.vulnerabilities) {
+              console.error("Dependency audit could not complete:", JSON.stringify(report.error || report));
+              process.exit(1);
+            }
+            const totals = report.metadata.vulnerabilities;
             const advisories = Object.values(report.vulnerabilities || {});
-            console.log("Audit totals:", JSON.stringify(report.metadata?.vulnerabilities || {}));
+            console.log("Audit totals:", JSON.stringify(totals));
             for (const item of advisories) {
               console.log(JSON.stringify({
                 name: item.name,
@@ -39,6 +53,12 @@ jobs:
               }, null, 2));
             }
             if (!advisories.length) console.log("No dependency vulnerabilities found.");
+            const blocking = Number(totals.high || 0) + Number(totals.critical || 0);
+            if (blocking > 0) {
+              console.error("Blocking dependency audit: high/critical vulnerabilities must be fixed.");
+              process.exit(1);
+            }
+            console.log("No high or critical dependency vulnerabilities.");
           '
       - name: Upload dependency audit report
         if: always()
