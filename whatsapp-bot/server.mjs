@@ -926,7 +926,7 @@ async function processNotificationEvents() {
     for (const event of data || []) {
       if (supersededStatusEventIds.has(event.id)) {
         try {
-          await supabaseRestRequest(\`/whatsapp_notification_events?id=eq.\${encodeURIComponent(event.id)}\`, {
+          await supabaseRestRequest('/whatsapp_notification_events?id=eq.' + encodeURIComponent(event.id), {
             method: 'PATCH',
             headers: { Prefer: 'return=minimal' },
             body: JSON.stringify({ status: 'failed', error_message: 'Superseded by a newer pending complaint status update' })
@@ -946,7 +946,7 @@ async function processNotificationEvents() {
       if (seenEventGroups.has(groupKey)) {
         console.log('WhatsApp duplicate pending event skipped:', JSON.stringify({ eventId: event.id, complaintId: event.complaint_id, eventType: event.event_type }))
         try {
-          await supabaseRestRequest(\`/whatsapp_notification_events?id=eq.\${encodeURIComponent(event.id)}\`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ status: 'failed', error_message: 'Duplicate event skipped; same complaint/event type already queued' }) })
+          await supabaseRestRequest('/whatsapp_notification_events?id=eq.' + encodeURIComponent(event.id), { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ status: 'failed', error_message: 'Duplicate event skipped; same complaint/event type already queued' }) })
         } catch (dupErr) { console.error('WhatsApp duplicate event cleanup failed:', String(dupErr?.message || dupErr)) }
         continue
       }
