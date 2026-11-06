@@ -1,0 +1,5 @@
+.env.whatsapp
+whatsapp-bot/auth_info/
+backups/
+*.backup
+*.backup-*
