@@ -28,6 +28,21 @@ language plpgsql
 set search_path = pg_catalog, public, auth
 as $$
 begin
+  -- Inserts must not be able to forge a completed customer approval either.
+  if tg_op = 'INSERT' then
+    if (
+         new.customer_otp is not null
+         or coalesce(new.customer_otp_verified, false) is true
+         or new.customer_approved_at is not null
+       )
+       and coalesce(auth.role(), '') <> 'service_role'
+       and current_user not in ('postgres', 'supabase_admin') then
+      raise exception 'Customer approval can only be recorded by the trusted server'
+        using errcode = '42501';
+    end if;
+    return new;
+  end if;
+
   if (
        new.customer_otp is distinct from old.customer_otp
        or new.customer_otp_verified is distinct from old.customer_otp_verified
@@ -46,7 +61,7 @@ revoke all on function public.guard_service_report_customer_approval()
   from public, anon, authenticated;
 drop trigger if exists service_reports_guard_customer_approval on public.service_reports;
 create trigger service_reports_guard_customer_approval
-before update of customer_otp, customer_otp_verified, customer_approved_at on public.service_reports
+before insert or update of customer_otp, customer_otp_verified, customer_approved_at on public.service_reports
 for each row execute function public.guard_service_report_customer_approval();
 
 -- Even direct API updates cannot complete a complaint without a verified report
