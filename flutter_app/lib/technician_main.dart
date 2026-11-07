@@ -746,6 +746,17 @@ class _TechnicianJobDetailsPageState extends State<TechnicianJobDetailsPage> {
     } finally { if (mounted) setState(() => busy = false); }
   }
 
+  Future<void> requestOtp() async {
+    if (report == null) return;
+    setState(() => busy = true);
+    try {
+      await service.requestCustomerOtp(report!['id'].toString());
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Customer OTP sent to registered WhatsApp number.')));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    } finally { if (mounted) setState(() => busy = false); }
+  }
+
   Future<void> verifyOtp() async {
     if (report == null) return;
     setState(() => busy = true);
@@ -832,7 +843,17 @@ class _TechnicianJobDetailsPageState extends State<TechnicianJobDetailsPage> {
               Expanded(child: TextField(controller: other, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Other ₹', border: OutlineInputBorder()))),
             ]),
           ])),
-          Card(child: ListTile(leading: Icon(otpOk ? Icons.verified : Icons.pin_outlined), title: Text(otpOk ? 'Customer OTP Verified' : 'Customer OTP Verification'), subtitle: Text(otpOk ? 'Customer approved service completion.' : 'Ask the customer for the OTP shown in their Customer App.'), trailing: otpOk ? const Icon(Icons.check_circle) : null)),
+          Card(child: ListTile(
+            leading: Icon(otpOk ? Icons.verified : Icons.pin_outlined),
+            title: Text(otpOk ? 'Customer OTP Verified' : 'Customer OTP Verification'),
+            subtitle: Text(otpOk ? 'Customer approved service completion.' : 'Send a one-time code to the customer registered WhatsApp number.'),
+            trailing: otpOk ? const Icon(Icons.check_circle) : null,
+          )),
+          if (!otpOk) Align(alignment: Alignment.centerLeft, child: OutlinedButton.icon(
+            onPressed: busy ? null : requestOtp,
+            icon: const Icon(Icons.send_outlined),
+            label: const Text('SEND CUSTOMER OTP ON WHATSAPP'),
+          )),
           if (!otpOk) Row(children: [
             Expanded(child: TextField(controller: otp, keyboardType: TextInputType.number, maxLength: 6, decoration: const InputDecoration(labelText: 'Customer OTP', border: OutlineInputBorder()))),
             const SizedBox(width: 8), FilledButton(onPressed: busy ? null : verifyOtp, child: const Text('VERIFY')),

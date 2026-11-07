@@ -825,6 +825,11 @@ async function sendNotificationEvent(jid, event) {
   const marker = String(event.message || '').match(/\n?\[\[PDF_URL=(https?:\/\/[^\]]+)\]\]\s*$/i)
   const pdfUrl = marker?.[1] || null
   if (status !== 'connected' || !sock) throw new Error('WhatsApp is not connected')
+  if (['cash_payment_otp', 'service_report_otp'].includes(event.event_type)) {
+    if (!event.message) throw new Error('Sensitive OTP event has no message body')
+    await sendText(jid, String(event.message))
+    return
+  }
   let complaint = null, customer = null, recipientProfile = null
   if (event.complaint_id) {
     const resolved = await getComplaintAndCustomer(event.complaint_id)
@@ -895,17 +900,55 @@ async function processNotificationEvents() {
 
     if (data?.length) console.log(`WhatsApp outbox: ${data.length} pending event(s)`)
 
+    // If several status updates accumulated while the bot was offline, send only
+    // the newest state for each complaint and recipient. Older states are stale.
+    const latestStatusEventByGroup = new Map()
+    for (const event of data || []) {
+      if (event.event_type !== 'status_changed' || !event.complaint_id) continue
+      const recipientKey = String(event.phone || event.customer_phone || event.recipient_user_id || '').replace(/\D/g, '')
+      if (!recipientKey) continue
+      const groupKey = String(event.complaint_id) + ':status_changed:' + recipientKey
+      const previous = latestStatusEventByGroup.get(groupKey)
+      if (!previous || new Date(event.created_at).getTime() > new Date(previous.created_at).getTime()) {
+        latestStatusEventByGroup.set(groupKey, event)
+      }
+    }
+    const supersededStatusEventIds = new Set()
+    for (const event of data || []) {
+      if (event.event_type !== 'status_changed' || !event.complaint_id) continue
+      const recipientKey = String(event.phone || event.customer_phone || event.recipient_user_id || '').replace(/\D/g, '')
+      if (!recipientKey) continue
+      const groupKey = String(event.complaint_id) + ':status_changed:' + recipientKey
+      if (latestStatusEventByGroup.get(groupKey)?.id !== event.id) supersededStatusEventIds.add(event.id)
+    }
+
     const seenEventGroups = new Set()
     for (const event of data || []) {
-      // Deduplicate per complaint + event + recipient, not per complaint/event alone.
-      // A complaint can legitimately have separate customer and office notifications.
+      if (supersededStatusEventIds.has(event.id)) {
+        try {
+          await supabaseRestRequest('/whatsapp_notification_events?id=eq.' + encodeURIComponent(event.id), {
+            method: 'PATCH',
+            headers: { Prefer: 'return=minimal' },
+            body: JSON.stringify({ status: 'failed', error_message: 'Superseded by a newer pending complaint status update' })
+          })
+        } catch (supersededErr) {
+          console.error('WhatsApp superseded status cleanup failed:', String(supersededErr?.message || supersededErr))
+        }
+        continue
+      }
+      // OTP events are report-specific and must never be deduplicated by the shared recipient.
+      // Other notifications are deduplicated per complaint + event + recipient.
+      const isSensitiveOtpEvent = ['cash_payment_otp', 'service_report_otp'].includes(event.event_type)
       const recipientKey = String(event.phone || event.customer_phone || event.recipient_user_id || '').replace(/\D/g, '')
-      const groupKey = String(event.complaint_id || '') + ':' + String(event.event_type || '') + ':' + recipientKey
+      const groupKey = isSensitiveOtpEvent
+        ? 'otp:' + String(event.id)
+        : String(event.complaint_id || '') + ':' + String(event.event_type || '') + ':' + recipientKey
       if (seenEventGroups.has(groupKey)) {
         console.log('WhatsApp duplicate pending event skipped:', JSON.stringify({ eventId: event.id, complaintId: event.complaint_id, eventType: event.event_type }))
         try {
-          await supabaseRestRequest(`/whatsapp_notification_events?id=eq.${encodeURIComponent(event.id)}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ status: 'failed', error_message: 'Duplicate event skipped; same complaint/event type already queued' }) })
-        } catch (dupErr) { console.error('WhatsApp duplicate event cleanup failed:', String(dupErr?.message || dupErr)) }        continue
+          await supabaseRestRequest('/whatsapp_notification_events?id=eq.' + encodeURIComponent(event.id), { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ status: 'failed', error_message: 'Duplicate event skipped; same complaint/event type already queued' }) })
+        } catch (dupErr) { console.error('WhatsApp duplicate event cleanup failed:', String(dupErr?.message || dupErr)) }
+        continue
       }
       seenEventGroups.add(groupKey)
       let customerPhone = event.customer_phone || ''
@@ -919,13 +962,15 @@ async function processNotificationEvents() {
       const targets = []
       const normalizedCustomerPhone = String(customerPhone || event.phone || '').replace(/\D/g, '')
       const isLegacyAutomationNumber = normalizedCustomerPhone === '8554887026'
-      if (event.event_type === 'status_changed') {
-        const customerJid = isLegacyAutomationNumber ? null : recipientJid(normalizedCustomerPhone)
+      const customerJid = isLegacyAutomationNumber ? null : recipientJid(normalizedCustomerPhone)
+      if (isSensitiveOtpEvent) {
+        // OTPs must go only to the customer's registered number, never office or group chats.
+        if (customerJid) targets.push(customerJid)
+      } else if (event.event_type === 'status_changed') {
         if (customerJid) targets.push(customerJid)
       } else {
         const officeJid = recipientJid(PHONE_NUMBER)
         if (officeJid) targets.push(officeJid)
-        const customerJid = isLegacyAutomationNumber ? null : recipientJid(normalizedCustomerPhone)
         if (customerJid && !targets.includes(customerJid)) targets.push(customerJid)
         if (WA_GROUP_JID && !targets.includes(WA_GROUP_JID)) targets.push(WA_GROUP_JID)
       }

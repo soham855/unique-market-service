@@ -13,16 +13,10 @@ class TechnicianService {
   }
 
   Future<Map<String, dynamic>?> technician() async {
-    final p = await profile();
-    if (p == null) return null;
-    final mobile = (p['phone'] ?? p['mobile'])?.toString();
-    if (mobile == null || mobile.isEmpty) return null;
-    final byMobile = await client.from('technicians').select().eq('mobile', mobile).maybeSingle();
-    if (byMobile != null) return byMobile;
-    final name = p['full_name']?.toString().trim();
-    if (name == null || name.isEmpty) return null;
-    final rows = await client.from('technicians').select().ilike('name', name).limit(1);
-    return rows.isEmpty ? null : Map<String,dynamic>.from(rows.first);
+    final user = client.auth.currentUser;
+    if (user == null) return null;
+    final row = await client.from('technicians').select().eq('profile_id', user.id).maybeSingle();
+    return row == null ? null : Map<String, dynamic>.from(row);
   }
 
   Future<List<Map<String, dynamic>>> jobs() async {
@@ -106,13 +100,11 @@ class TechnicianService {
       report = Map<String, dynamic>.from(existing.first);
       await client.from('service_reports').update({'service_visit_id': visit['id'], 'diagnosis': diagnosis, 'updated_at': DateTime.now().toUtc().toIso8601String()}).eq('id', report['id']);
     } else {
-      final otp = (100000 + DateTime.now().millisecondsSinceEpoch % 900000).toString();
       report = Map<String, dynamic>.from(await client.from('service_reports').insert({
         'complaint_id': complaintId,
         'service_visit_id': visit['id'],
         'technician_id': user.id,
         'diagnosis': diagnosis,
-        'customer_otp': otp,
         'customer_otp_verified': false,
       }).select().single());
     }
@@ -157,11 +149,25 @@ class TechnicianService {
     await client.from('service_reports').update({'after_photo_url': path}).eq('id', reportId);
   }
 
+  Future<void> requestCustomerOtp(String reportId) async {
+    final response = await client.functions.invoke('service-report-otp', body: {
+      'action': 'request',
+      'report_id': reportId,
+    });
+    if (response.status < 200 || response.status >= 300) {
+      throw Exception((response.data is Map ? response.data['error'] : null) ?? 'Could not send customer OTP.');
+    }
+  }
+
   Future<void> verifyCustomerOtp(String reportId, String otp) async {
-    final rows = await client.from('service_reports').select('customer_otp').eq('id', reportId).limit(1);
-    if (rows.isEmpty) throw Exception('Service report not found.');
-    if (rows.first['customer_otp']?.toString() != otp.trim()) throw Exception('Invalid customer OTP.');
-    await client.from('service_reports').update({'customer_otp_verified': true, 'customer_approved_at': DateTime.now().toUtc().toIso8601String()}).eq('id', reportId);
+    final response = await client.functions.invoke('service-report-otp', body: {
+      'action': 'verify',
+      'report_id': reportId,
+      'otp': otp.trim(),
+    });
+    if (response.status < 200 || response.status >= 300) {
+      throw Exception((response.data is Map ? response.data['error'] : null) ?? 'Customer OTP verification failed.');
+    }
   }
 
   Future<void> saveSignature(String reportId, String path) async {
