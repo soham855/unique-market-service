@@ -22,12 +22,18 @@ export default function TechnicianPayment({profile,onBack}){
 
  useEffect(()=>{
   (async()=>{
-   const [{data:cs},{data:ps}]=await Promise.all([
-    supabase.from('customers').select('id,name,mobile').order('name').limit(500),
-    supabase.from('payment_settings').select('upi_id,account_name,qr_image_url,is_enabled').limit(1).maybeSingle()
-   ])
-   setCustomers(cs||[])
-   setSettings(ps||null)
+   try{
+    const [cr,pr]=await Promise.all([
+     supabase.from('customers').select('id,name,mobile').order('name').limit(500),
+     supabase.from('payment_settings').select('upi_id,account_name,qr_image_url,is_enabled').limit(1).maybeSingle()
+    ])
+    if(cr.error){setCustomers([]);setMessage('Customer list load failed: '+cr.error.message)}
+    else setCustomers(cr.data||[])
+    if(pr.error){setSettings(null);setMessage('Payment settings load failed: '+pr.error.message)}
+    else setSettings(pr.data||null)
+   }catch(err){
+    setMessage('Payment screen load failed: '+(err?.message||'Unknown error'))
+   }
   })()
  },[])
 
@@ -124,42 +130,44 @@ export default function TechnicianPayment({profile,onBack}){
    return setMessage('Customer UTR / reference number is required for online payment.')
 
   setSaving(true)
-  const paymentId=mode==='Cash'?crypto.randomUUID():undefined
-  const payload={
-   ...(paymentId?{id:paymentId}:{}),
-   customer_id:customerId,
-   challan_id:targetType==='challan'?targetId:null,
-   complaint_id:targetType==='service_call'?targetId:null,
-   payment_date:new Date().toISOString().slice(0,10),
-   amount:Number(amount),
-   mode:mode==='Online'?'UPI':'Cash',
-   status:'pending',
-   ...(mode==='Cash'?{payment_status:'Pending OTP'}:{}),
-   source:'technician',
-   recorded_by:profile.id,
-   reference_no:mode==='Online'?referenceNo.trim():null,
-   notes:notes.trim()||(mode==='Online'?'Customer QR payment — verification pending':'Cash collected by technician — OTP verification pending')
-  }
+  try{
+   const paymentId=mode==='Cash'?crypto.randomUUID():undefined
+   const payload={
+    ...(paymentId?{id:paymentId}:{}),
+    customer_id:customerId,
+    challan_id:targetType==='challan'?targetId:null,
+    complaint_id:targetType==='service_call'?targetId:null,
+    payment_date:new Date().toISOString().slice(0,10),
+    amount:Number(amount),
+    mode:mode==='Online'?'UPI':'Cash',
+    status:'pending',
+    ...(mode==='Cash'?{payment_status:'Pending OTP'}:{}),
+    source:'technician',
+    recorded_by:profile.id,
+    reference_no:mode==='Online'?referenceNo.trim():null,
+    notes:notes.trim()||(mode==='Online'?'Customer QR payment — verification pending':'Cash collected by technician — OTP verification pending')
+   }
 
-  const {error}=await supabase.from('payments').insert(payload)
-  setSaving(false)
-  if(error){
-   setMessage(error.message)
-   return
-  }
+   const {error}=await supabase.from('payments').insert(payload)
+   if(error){setMessage('Payment save failed: '+error.message);return}
 
-  if(mode==='Cash'){
-   setCashPaymentId(paymentId)
-   setOtp('')
-   setOtpSent(false)
-   await requestCashOtp(paymentId)
-   return
-  }
+   if(mode==='Cash'){
+    setCashPaymentId(paymentId)
+    setOtp('')
+    setOtpSent(false)
+    await requestCashOtp(paymentId)
+    return
+   }
 
-  setMessage('UTR submitted. Payment is Verification Pending. Admin verification pending.')
-  setAmount('')
-  setReferenceNo('')
-  setNotes('')
+   setMessage('UTR submitted. Payment is Verification Pending. Admin verification pending.')
+   setAmount('')
+   setReferenceNo('')
+   setNotes('')
+  }catch(err){
+   setMessage('Payment submission failed: '+(err?.message||'Unknown error'))
+  }finally{
+   setSaving(false)
+  }
  }
 
  return <section className='role-dashboard'>
