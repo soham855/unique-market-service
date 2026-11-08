@@ -25,6 +25,8 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Type-check service report OTP Edge Function
         run: deno check --no-lock --node-modules-dir=auto supabase/functions/service-report-otp/index.ts
+      - name: Type-check cash payment OTP Edge Function
+        run: deno check --no-lock --node-modules-dir=auto supabase/functions/cash-payment-otp/index.ts
       - name: Check WhatsApp bot syntax
         run: node --check whatsapp-bot/server.mjs
       - name: Build web portal
