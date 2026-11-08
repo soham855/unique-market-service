@@ -147,9 +147,9 @@ class _AdminAmcRenewalsPageState extends State<AdminAmcRenewalsPage>{
               const SizedBox(width:8),
               Expanded(child:OutlinedButton(onPressed:()=>updateStatus(r['id'].toString(),'rejected'),child:const Text('REJECT'))),
             ]) else Text(status.toUpperCase(),style:const TextStyle(fontWeight:FontWeight.w800)),
-          ])))
+          ])));
         }),
-      ])))
+      ])));
 }
 class AdminHomePage extends StatefulWidget { const AdminHomePage({super.key}); @override State<AdminHomePage> createState()=>_AdminHomePageState(); }
 class _AdminHomePageState extends State<AdminHomePage> {
