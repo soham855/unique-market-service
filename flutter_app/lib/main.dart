@@ -808,7 +808,7 @@ class _InvoicePageState extends State<InvoicePage>{
         const SizedBox(height:16),
         if(payments.isNotEmpty)Card(child:Padding(padding:const EdgeInsets.all(14),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
           const Text('Payment History',style:TextStyle(fontSize:17,fontWeight:FontWeight.w800)),
-          ...payments.map((p)=>ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.receipt_long_outlined),title:Text('₹'+_num(p['amount']).toStringAsFixed(2)),subtitle:Text((p['mode']??'-').toString()+' • '+(p['payment_status']??p['status']??'Pending').toString()+(p['reference_no']!=null?' • '+p['reference_no'].toString():'')))
+          ...payments.map((p)=>ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.receipt_long_outlined),title:Text('₹'+_num(p['amount']).toStringAsFixed(2)),subtitle:Text((p['mode']??'-').toString()+' • '+(p['payment_status']??p['status']??'Pending').toString()+(p['reference_no']!=null?' • '+p['reference_no'].toString():''))))
         ]))),
         const SizedBox(height:16),
         FilledButton.icon(onPressed:printInvoice,icon:const Icon(Icons.picture_as_pdf_outlined),label:const Text('VIEW / PRINT PDF'))
