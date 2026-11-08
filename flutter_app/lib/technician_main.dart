@@ -831,7 +831,7 @@ class _TechnicianJobDetailsPageState extends State<TechnicianJobDetailsPage> {
               const SizedBox(width: 10),
               Expanded(child: TextField(controller: other, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Other ₹', border: OutlineInputBorder()))),
             ]),
-          ])),
+          ]))),
           Card(child: ListTile(leading: Icon(otpOk ? Icons.verified : Icons.pin_outlined), title: Text(otpOk ? 'Customer OTP Verified' : 'Customer OTP Verification'), subtitle: Text(otpOk ? 'Customer approved service completion.' : 'Ask the customer for the OTP shown in their Customer App.'), trailing: otpOk ? const Icon(Icons.check_circle) : null)),
           if (!otpOk) Row(children: [
             Expanded(child: TextField(controller: otp, keyboardType: TextInputType.number, maxLength: 6, decoration: const InputDecoration(labelText: 'Customer OTP', border: OutlineInputBorder()))),
