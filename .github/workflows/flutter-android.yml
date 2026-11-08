@@ -46,9 +46,9 @@ jobs:
       - name: Generate launcher icon PNG
         run: |
           sudo apt-get update
-          sudo apt-get install -y imagemagick
+          sudo apt-get install -y librsvg2-bin
           mkdir -p assets
-          magick -background none assets/app_icon.svg -resize 1024x1024 assets/app_icon.png
+          rsvg-convert -w 1024 -h 1024 assets/app_icon.svg -o assets/app_icon.png
           test -s assets/app_icon.png
 
       - name: Configure Android notification permission
