@@ -43,6 +43,13 @@ jobs:
             exit 1
           fi
 
+      - name: Remove generated Flutter sample test
+        run: |
+          # flutter create adds this scaffold test when no project test suite exists.
+          if [ -f test/widget_test.dart ] && grep -q 'MyApp' test/widget_test.dart && ! grep -Rqs 'class MyApp' lib; then
+            rm test/widget_test.dart
+          fi
+
       - name: Generate launcher icon PNG
         run: |
           sudo apt-get update
@@ -74,7 +81,12 @@ jobs:
           grep -q '"package_name": "com.uniquemarket.instantservices"' android/app/google-services.json
 
       - name: Get packages
-        run: flutter pub get
+        run: |
+          flutter pub get
+          PROPS=android/gradle/wrapper/gradle-wrapper.properties
+          if [ -f "$PROPS" ]; then
+            grep -q '^networkTimeout=' "$PROPS" && sed -i 's/^networkTimeout=.*/networkTimeout=120000/' "$PROPS" || echo 'networkTimeout=120000' >> "$PROPS"
+          fi
 
       - name: Generate Android launcher icons
         run: |
