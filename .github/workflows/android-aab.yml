@@ -45,11 +45,20 @@ jobs:
           if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
             echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/release.keystore
           fi
+      - name: Configure Gradle download timeout
+        run: |
+          PROPS=android/gradle/wrapper/gradle-wrapper.properties
+          grep -q '^networkTimeout=' "$PROPS" && sed -i 's/^networkTimeout=.*/networkTimeout=120000/' "$PROPS" || echo 'networkTimeout=120000' >> "$PROPS"
       - name: Build release AAB
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew bundleRelease
+          for attempt in 1 2 3; do
+            ./gradlew --no-daemon bundleRelease && exit 0
+            echo "Gradle attempt $attempt failed; retrying in 15 seconds..."
+            sleep 15
+          done
+          exit 1
       - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:
