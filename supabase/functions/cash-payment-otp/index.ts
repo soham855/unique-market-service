@@ -4,10 +4,34 @@ const headers = { "Content-Type": "application/json", "Cache-Control": "no-store
 const json = (status: number, body: Record<string, unknown>) =>
   new Response(JSON.stringify(body), { status, headers });
 
-async function sha256(value: string) {
-  const bytes = new TextEncoder().encode(value);
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
-  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
+const rpcHeaders = (serviceKey: string) => ({
+  apikey: serviceKey,
+  Authorization: `Bearer ${serviceKey}`,
+  "Content-Type": "application/json",
+});
+
+async function callRpc<T>(
+  url: string,
+  serviceKey: string,
+  name: string,
+  body: Record<string, unknown>,
+): Promise<{ ok: true; data: T } | { ok: false; status: number; error: string }> {
+  const response = await fetch(`${url}/rest/v1/rpc/${name}`, {
+    method: "POST",
+    headers: rpcHeaders(serviceKey),
+    body: JSON.stringify(body),
+  });
+  const text = await response.text();
+  if (!response.ok) {
+    console.error(`${name} RPC failed:`, response.status, text);
+    return { ok: false, status: response.status, error: text };
+  }
+  try {
+    return { ok: true, data: JSON.parse(text) as T };
+  } catch {
+    console.error(`${name} RPC returned invalid JSON`);
+    return { ok: false, status: 502, error: "Invalid RPC response" };
+  }
 }
 
 Deno.serve(async (req: Request) => {
@@ -16,107 +40,136 @@ Deno.serve(async (req: Request) => {
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!url || !serviceKey) return json(500, { error: "Server environment not configured" });
 
-  const auth = req.headers.get("Authorization") || "";
-  const userResp = await fetch(`${url}/auth/v1/user`, {
-    headers: { apikey: serviceKey, Authorization: auth },
+  const authorization = req.headers.get("Authorization") || "";
+  if (!authorization.startsWith("Bearer ")) return json(401, { error: "Sign in required" });
+  const userResponse = await fetch(`${url}/auth/v1/user`, {
+    headers: { apikey: serviceKey, Authorization: authorization },
   });
-  if (!userResp.ok) return json(401, { error: "Sign in required" });
-  const user = await userResp.json();
+  if (!userResponse.ok) return json(401, { error: "Sign in required" });
+  const user = await userResponse.json();
   const userId = user?.id as string | undefined;
   if (!userId) return json(401, { error: "Sign in required" });
 
-  const profileResp = await fetch(`${url}/rest/v1/profiles?id=eq.${userId}&select=role`, {
-    headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
-  });
-  const profileRows = profileResp.ok ? await profileResp.json() : [];
-  const role = profileRows?.[0]?.role;
-  if (!["admin", "technician"].includes(role)) return json(403, { error: "Admin or technician access required" });
+  const profileResponse = await fetch(
+    `${url}/rest/v1/profiles?id=eq.${userId}&select=role`,
+    { headers: rpcHeaders(serviceKey) },
+  );
+  if (!profileResponse.ok) return json(503, { error: "Could not verify technician access" });
+  const profiles = await profileResponse.json();
+  if (profiles?.[0]?.role !== "technician") {
+    return json(403, { error: "Technician access required" });
+  }
 
   let body: { action?: string; payment_id?: string; otp?: string };
-  try { body = await req.json(); } catch { return json(400, { error: "Invalid JSON" }); }
+  try {
+    body = await req.json();
+  } catch {
+    return json(400, { error: "Invalid JSON" });
+  }
   const paymentId = body.payment_id;
-  if (!paymentId || !/^[0-9a-f-]{36}$/i.test(paymentId)) return json(400, { error: "Valid payment_id required" });
-
-  const restHeaders = {
-    apikey: serviceKey, Authorization: `Bearer ${serviceKey}`,
-    "Content-Type": "application/json", Prefer: "return=representation",
-  };
-  const paymentResp = await fetch(`${url}/rest/v1/payments?id=eq.${paymentId}&select=id,customer_id,recorded_by,mode,status,source,amount`, { headers: restHeaders });
-  if (!paymentResp.ok) return json(500, { error: "Could not load payment" });
-  const payments = await paymentResp.json();
-  const payment = payments?.[0];
-  if (!payment || payment.mode !== "Cash" || payment.source !== "technician") return json(404, { error: "Cash technician payment not found" });
-  if (role !== "admin" && payment.recorded_by !== userId) return json(403, { error: "You cannot verify this payment" });
-  if (payment.status === "confirmed") return json(409, { error: "Payment already confirmed" });
-  if (payment.status !== "pending") return json(409, { error: "Payment is not pending OTP verification" });
+  if (!paymentId || !/^[0-9a-f-]{36}$/i.test(paymentId)) {
+    return json(400, { error: "Valid payment_id required" });
+  }
 
   if (body.action === "request") {
-    const customerResp = await fetch(`${url}/rest/v1/customers?id=eq.${payment.customer_id}&select=mobile,name`, { headers: restHeaders });
-    const customers = customerResp.ok ? await customerResp.json() : [];
-    const customer = customers?.[0];
-    const phone = String(customer?.mobile || "").replace(/\D/g, "");
-    if (phone.length < 10) return json(422, { error: "Customer registered mobile number is missing or invalid" });
-
-    const otpArray = new Uint32Array(1);
-    crypto.getRandomValues(otpArray);
-    const otp = String(otpArray[0] % 1000000).padStart(6, "0");
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
-    const challengeResp = await fetch(`${url}/rest/v1/cash_payment_otp_challenges?on_conflict=payment_id`, {
-      method: "POST",
-      headers: { ...restHeaders, Prefer: "resolution=merge-duplicates,return=minimal" },
-      body: JSON.stringify({ payment_id: paymentId, otp_hash: await sha256(paymentId + ":" + otp), expires_at: expiresAt, attempts: 0, used_at: null, requested_by: userId, created_at: new Date().toISOString() }),
+    const challenge = await callRpc<{
+      otp?: string;
+      phone?: string;
+      amount?: number | string;
+      expires_at?: string;
+    }>(url, serviceKey, "request_cash_payment_otp", {
+      p_payment_id: paymentId,
+      p_actor_id: userId,
     });
-    if (!challengeResp.ok) return json(500, { error: "Could not create OTP challenge" });
+    if (!challenge.ok) {
+      return json(409, {
+        error: "Could not create OTP. Confirm the cash payment is pending, belongs to you, and the customer mobile is valid.",
+      });
+    }
 
+    const otp = String(challenge.data?.otp || "");
+    const phone = String(challenge.data?.phone || "");
+    if (!/^\d{6}$/.test(otp) || !/^\d{10,12}$/.test(phone)) {
+      await callRpc(url, serviceKey, "cancel_cash_payment_otp", {
+        p_payment_id: paymentId,
+        p_actor_id: userId,
+      });
+      return json(503, { error: "OTP challenge response was incomplete. Payment remains pending." });
+    }
+
+    const amount = Number(challenge.data.amount || 0);
     const event = {
-      event_key: `cash-payment-otp:${paymentId}:${Date.now()}`,
+      event_key: `cash-payment-otp:${paymentId}:${crypto.randomUUID()}`,
       event_type: "cash_payment_otp",
       phone,
       customer_phone: phone,
-      message: `Unique Market payment verification: OTP ${otp}. Amount ₹${Number(payment.amount || 0).toLocaleString("en-IN")}. Valid for 5 minutes. Do not share this code with anyone except to verify this cash payment.`,
+      message: `Unique Market payment verification: OTP ${otp}. Amount ₹${amount.toLocaleString("en-IN")}. Valid for 5 minutes. Do not share this code with anyone except to verify this cash payment.`,
       status: "pending",
     };
-    const queueResp = await fetch(`${url}/rest/v1/whatsapp_notification_events`, {
-      method: "POST", headers: { ...restHeaders, Prefer: "return=minimal" }, body: JSON.stringify(event),
+    const queueResponse = await fetch(`${url}/rest/v1/whatsapp_notification_events`, {
+      method: "POST",
+      headers: { ...rpcHeaders(serviceKey), Prefer: "return=minimal" },
+      body: JSON.stringify(event),
     });
-    if (!queueResp.ok) {
-      await fetch(`${url}/rest/v1/cash_payment_otp_challenges?payment_id=eq.${paymentId}`, { method: "DELETE", headers: restHeaders });
-      console.error("OTP WhatsApp outbox insert failed", await queueResp.text());
+    if (!queueResponse.ok) {
+      console.error("OTP WhatsApp outbox insert failed:", queueResponse.status, await queueResponse.text());
+      await callRpc(url, serviceKey, "cancel_cash_payment_otp", {
+        p_payment_id: paymentId,
+        p_actor_id: userId,
+      });
       return json(503, { error: "Could not queue OTP WhatsApp message. Payment remains pending." });
     }
-    return json(200, { queued: true, expires_in_seconds: 300, message: "OTP queued to the customer's registered WhatsApp number. Wait for delivery before verifying." });
+    return json(200, {
+      queued: true,
+      expires_in_seconds: 300,
+      message: "OTP queued to the customer's registered WhatsApp number. Payment remains pending until verified.",
+    });
   }
 
   if (body.action === "verify") {
     const otp = String(body.otp || "").trim();
     if (!/^\d{6}$/.test(otp)) return json(400, { error: "Enter the 6-digit OTP" });
-    const challengeResp = await fetch(`${url}/rest/v1/cash_payment_otp_challenges?payment_id=eq.${paymentId}&select=otp_hash,expires_at,attempts,used_at`, { headers: restHeaders });
-    const challenges = challengeResp.ok ? await challengeResp.json() : [];
-    const challenge = challenges?.[0];
-    if (!challenge || challenge.used_at) return json(400, { error: "OTP not found or already used. Request a new OTP." });
-    if (new Date(challenge.expires_at).getTime() < Date.now()) return json(400, { error: "OTP expired. Request a new OTP." });
-    if (Number(challenge.attempts) >= 5) return json(429, { error: "Too many incorrect attempts. Request a new OTP." });
-    const matches = (await sha256(paymentId + ":" + otp)) === challenge.otp_hash;
-    if (!matches) {
-      await fetch(`${url}/rest/v1/cash_payment_otp_challenges?payment_id=eq.${paymentId}`, {
-        method: "PATCH", headers: { ...restHeaders, Prefer: "return=minimal" },
-        body: JSON.stringify({ attempts: Number(challenge.attempts) + 1 }),
-      });
-      return json(400, { error: "Incorrect OTP" });
+
+    const verification = await callRpc<{
+      ok?: boolean;
+      status?: string;
+      reason?: string;
+      attempts_remaining?: number;
+    }>(url, serviceKey, "verify_cash_payment_otp", {
+      p_payment_id: paymentId,
+      p_actor_id: userId,
+      p_otp: otp,
+    });
+    if (!verification.ok) {
+      return json(503, { error: "Could not verify the OTP securely. Payment remains pending." });
     }
-    const usedResp = await fetch(`${url}/rest/v1/cash_payment_otp_challenges?payment_id=eq.${paymentId}&used_at=is.null&attempts=lt.5`, {
-      method: "PATCH", headers: { ...restHeaders, Prefer: "return=representation" },
-      body: JSON.stringify({ used_at: new Date().toISOString() }),
+    if (verification.data?.ok !== true) {
+      const failures: Record<string, { status: number; message: string }> = {
+        invalid_input: { status: 400, message: "Enter the 6-digit OTP" },
+        payment_not_owned_or_pending: { status: 409, message: "Payment is not pending or is not assigned to your account." },
+        technician_required: { status: 403, message: "Technician access required." },
+        challenge_not_found: { status: 404, message: "OTP not found. Request a new OTP." },
+        already_used: { status: 409, message: "OTP was already used. Request a new OTP." },
+        attempts_exceeded: { status: 429, message: "Too many incorrect attempts. Request a new OTP." },
+        expired: { status: 410, message: "OTP expired. Request a new OTP." },
+        amount_mismatch: { status: 409, message: "Payment amount changed. Request a new OTP." },
+        incorrect: { status: 400, message: "Incorrect OTP." },
+        challenge_already_consumed: { status: 409, message: "OTP was already consumed. Request a new OTP." },
+      };
+      const failure = failures[String(verification.data?.reason || "")] ||
+        { status: 400, message: "OTP verification failed. Request a new OTP." };
+      return json(failure.status, {
+        error: failure.message,
+        attempts_remaining: verification.data?.attempts_remaining,
+      });
+    }
+
+    return json(200, {
+      verified: true,
+      status: "confirmed",
+      message: "OTP verified. Cash payment confirmed.",
     });
-    const usedRows = usedResp.ok ? await usedResp.json() : [];
-    if (!usedRows?.length) return json(409, { error: "OTP was already used or locked. Request a new OTP." });
-    const confirmResp = await fetch(`${url}/rest/v1/payments?id=eq.${paymentId}&status=eq.pending`, {
-      method: "PATCH", headers: { ...restHeaders, Prefer: "return=representation" },
-      body: JSON.stringify({ status: "confirmed", payment_status: "Confirmed" }),
-    });
-    const confirmed = confirmResp.ok ? await confirmResp.json() : [];
-    if (!confirmed?.length) return json(409, { error: "OTP verified, but payment status could not be updated. Contact Admin." });
-    return json(200, { verified: true, status: "confirmed", message: "OTP verified. Cash payment confirmed." });
   }
+
   return json(400, { error: "action must be request or verify" });
 });
