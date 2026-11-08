@@ -1,6 +1,6 @@
 -- Allow trusted OTP notification event types in the WhatsApp outbox.
--- Keep the existing notification types unchanged; the worker already handles
--- cash_payment_otp and service_report_otp as sensitive, customer-only messages.
+-- Preserve the live payment_receipt event type while adding service-report OTP.
+-- OTP and payment receipt events are trusted server-generated notifications.
 alter table public.whatsapp_notification_events
   drop constraint if exists whatsapp_notification_events_event_type_check;
 
@@ -30,7 +30,7 @@ create policy whatsapp_events_customer_insert
   for insert
   to authenticated
   with check (
-    event_type not in ('cash_payment_otp', 'service_report_otp')
+    event_type not in ('cash_payment_otp', 'payment_receipt', 'service_report_otp')
     and exists (
       select 1
       from public.complaints c
