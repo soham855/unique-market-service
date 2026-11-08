@@ -570,7 +570,7 @@ class _TechnicianSchedulePageState extends State<TechnicianSchedulePage>{
         final bd=DateTime.tryParse(b['scheduled_visit_at']?.toString()??'')??DateTime(2099);
         return ad.compareTo(bd);
       });
-      if(mounted)setState(()=>{jobs=all,loading=false});
+      if(mounted)setState(() { jobs=all; loading=false; });
     }catch(_){if(mounted)setState(()=>loading=false);}
   }
   DateTime? _date(Map<String,dynamic> j)=>DateTime.tryParse(j['scheduled_visit_at']?.toString()??j['scheduled_visit_date']?.toString()??'');
@@ -842,7 +842,7 @@ class _TechnicianJobDetailsPageState extends State<TechnicianJobDetailsPage> {
               const SizedBox(width: 10),
               Expanded(child: TextField(controller: other, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Other ₹', border: OutlineInputBorder()))),
             ]),
-          ])),
+          ]))),
           Card(child: ListTile(
             leading: Icon(otpOk ? Icons.verified : Icons.pin_outlined),
             title: Text(otpOk ? 'Customer OTP Verified' : 'Customer OTP Verification'),
@@ -915,7 +915,7 @@ class _SignatureDialogState extends State<SignatureDialog> {
     for (final p in points) {
       if (p == null) { previous = null; continue; }
       final scaled = Offset(p.dx * 900 / 420, p.dy * 500 / 230);
-      if (previous != null) canvas.drawLine(previous!, scaled, paint);
+      if (previous != null) canvas.drawLine(previous, scaled, paint);
       previous = scaled;
     }
     final image = await recorder.endRecording().toImage(900, 500);
@@ -932,7 +932,7 @@ class SignaturePainter extends CustomPainter {
     Offset? previous;
     for (final p in points) {
       if (p == null) { previous = null; continue; }
-      if (previous != null) canvas.drawLine(previous!, p, paint);
+      if (previous != null) canvas.drawLine(previous, p, paint);
       previous = p;
     }
   }

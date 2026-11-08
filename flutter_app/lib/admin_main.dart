@@ -117,7 +117,7 @@ class AdminAmcRenewalsPage extends StatefulWidget {
   @override State<AdminAmcRenewalsPage> createState()=>_AdminAmcRenewalsPageState();
 }
 class _AdminAmcRenewalsPageState extends State<AdminAmcRenewalsPage>{
-  final service=AdminService(); List<Map<String,dynamic>> items=[]; bool loading=true; Timer? timer;
+  final service=AdminService(Supabase.instance.client); List<Map<String,dynamic>> items=[]; bool loading=true; Timer? timer;
   @override void initState(){super.initState();load();timer=Timer.periodic(const Duration(seconds:10),(_)=>load());}
   @override void dispose(){timer?.cancel();super.dispose();}
   Future<void> load()async{try{items=await service.amcRenewalRequests();}catch(_){items=[];}if(mounted)setState(()=>loading=false);}
@@ -147,7 +147,7 @@ class _AdminAmcRenewalsPageState extends State<AdminAmcRenewalsPage>{
               const SizedBox(width:8),
               Expanded(child:OutlinedButton(onPressed:()=>updateStatus(r['id'].toString(),'rejected'),child:const Text('REJECT'))),
             ]) else Text(status.toUpperCase(),style:const TextStyle(fontWeight:FontWeight.w800)),
-          ]));
+          ])));
         }),
       ]));
 }
