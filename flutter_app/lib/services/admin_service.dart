@@ -36,9 +36,9 @@ class AdminService {
   }
 
   Future<List<Map<String,dynamic>>> complaints({String? status}) async {
-    var q = client.from('complaints').select().order('created_at', ascending: false);
-    if (status != null && status != 'All') q = q.eq('status', status);
-    final rows = await q;
+    final rows = status != null && status != 'All'
+        ? await client.from('complaints').select().eq('status', status).order('created_at', ascending: false)
+        : await client.from('complaints').select().order('created_at', ascending: false);
     return List<Map<String,dynamic>>.from(rows);
   }
 
@@ -135,9 +135,9 @@ class AdminService {
   }
 
   Future<List<Map<String,dynamic>>> payments({String? status}) async {
-    var q = client.from('payments').select('id,amount,payment_date,payment_status,status,mode,reference_no,complaint_id,customer_id,created_at').order('created_at', ascending: false);
-    if (status != null && status != 'All') q = q.eq('payment_status', status);
-    final rows = await q;
+    final rows = status != null && status != 'All'
+        ? await client.from('payments').select('id,amount,payment_date,payment_status,status,mode,reference_no,complaint_id,customer_id,created_at').eq('payment_status', status).order('created_at', ascending: false)
+        : await client.from('payments').select('id,amount,payment_date,payment_status,status,mode,reference_no,complaint_id,customer_id,created_at').order('created_at', ascending: false);
     final result = List<Map<String,dynamic>>.from(rows);
     for (final p in result) {
       final complaintId = p['complaint_id'];
