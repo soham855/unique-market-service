@@ -60,12 +60,12 @@ jobs:
             --title "$TITLE" \
             --body "## Unique Market Auto-Heal Diagnostic
 
-Failed workflow: $RUN_URL
+            Failed workflow: $RUN_URL
 
-The error log captured from the failed run:
+            The error log captured from the failed run:
 
-```
-$BODY
-```
+            ```
+            $BODY
+            ```
 
-This issue is diagnostic-only; it does not modify production services or customer data."
+            This issue is diagnostic-only; it does not modify production services or customer data."
