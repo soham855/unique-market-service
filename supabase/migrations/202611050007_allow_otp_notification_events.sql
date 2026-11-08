@@ -13,6 +13,7 @@ alter table public.whatsapp_notification_events
         'assigned'::text,
         'status_changed'::text,
         'cash_payment_otp'::text,
+        'payment_receipt'::text,
         'service_report_otp'::text
       ]
     )
