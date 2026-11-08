@@ -781,7 +781,7 @@ class _InvoicePageState extends State<InvoicePage>{
       pw.Text('Payment Status: '+status,style:pw.TextStyle(fontSize:16,fontWeight:pw.FontWeight.bold)),
       pw.SizedBox(height:18),
       pw.Text('Thank you for choosing Unique Market.')
-    ]));
+    ]))));
     await Printing.layoutPdf(onLayout:(_)=>doc.save());
   }
 
