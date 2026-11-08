@@ -77,7 +77,25 @@ jobs:
         run: flutter pub get
 
       - name: Generate Android launcher icons
-        run: dart run flutter_launcher_icons
+        run: |
+          RES=android/app/src/main/res
+          for spec in "mdpi:48" "hdpi:72" "xhdpi:96" "xxhdpi:144" "xxxhdpi:192"; do
+            density="${spec%%:*}"
+            size="${spec##*:}"
+            mkdir -p "$RES/mipmap-$density"
+            rsvg-convert -w "$size" -h "$size" assets/app_icon.svg -o "$RES/mipmap-$density/ic_launcher.png"
+            cp "$RES/mipmap-$density/ic_launcher.png" "$RES/mipmap-$density/ic_launcher_round.png"
+          done
+          mkdir -p "$RES/drawable"
+          rsvg-convert -w 432 -h 432 assets/app_icon.svg -o "$RES/drawable/ic_launcher_foreground.png"
+          mkdir -p "$RES/mipmap-anydpi-v26"
+          cat > "$RES/mipmap-anydpi-v26/ic_launcher.xml" <<'EOF'
+          <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+              <background android:drawable="@android:color/black" />
+              <foreground android:drawable="@drawable/ic_launcher_foreground" />
+          </adaptive-icon>
+          EOF
+          cp "$RES/mipmap-anydpi-v26/ic_launcher.xml" "$RES/mipmap-anydpi-v26/ic_launcher_round.xml"
 
       - name: Analyze
         run: flutter analyze
