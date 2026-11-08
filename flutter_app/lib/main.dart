@@ -13,15 +13,26 @@ import 'package:url_launcher/url_launcher.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await SharedPreferences.getInstance();
-  if (SupabaseConfig.isConfigured) {
-    await Supabase.initialize(url: SupabaseConfig.url, publishableKey: SupabaseConfig.publishableKey);
+  Object? startupError;
+  try {
+    await SharedPreferences.getInstance();
+    if (SupabaseConfig.isConfigured) {
+      await Supabase.initialize(
+        url: SupabaseConfig.url,
+        publishableKey: SupabaseConfig.publishableKey,
+      );
+    }
+  } catch (error, stackTrace) {
+    startupError = error;
+    debugPrint('APP_STARTUP_ERROR: $error');
+    debugPrintStack(stackTrace: stackTrace);
   }
-  runApp(const UniqueMarketApp());
+  runApp(UniqueMarketApp(startupError: startupError));
 }
 
 class UniqueMarketApp extends StatelessWidget {
-  const UniqueMarketApp({super.key});
+  final Object? startupError;
+  const UniqueMarketApp({super.key, this.startupError});
   @override
   Widget build(BuildContext context) => MaterialApp(
     debugShowCheckedModeBanner: false,
@@ -78,7 +89,49 @@ class UniqueMarketApp extends StatelessWidget {
         ),
       ),
     ),
-    home: SupabaseConfig.isConfigured ? const SessionGate() : const Scaffold(body: Center(child: Text('Supabase is not configured.'))),
+    home: startupError != null
+        ? StartupErrorPage(error: startupError!)
+        : SupabaseConfig.isConfigured
+            ? const SessionGate()
+            : const Scaffold(body: Center(child: Text('Supabase is not configured.'))),
+  );
+}
+
+class StartupErrorPage extends StatelessWidget {
+  final Object error;
+  const StartupErrorPage({super.key, required this.error});
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    body: SafeArea(
+      child: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline, color: Colors.red, size: 56),
+              const SizedBox(height: 16),
+              const Text(
+                'App startup failed',
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'The app could not finish initialization. Share this error with Unique Market support.',
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              SelectableText(
+                error.toString(),
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 13, color: Colors.redAccent),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
   );
 }
 
