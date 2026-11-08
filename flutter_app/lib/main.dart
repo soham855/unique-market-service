@@ -599,7 +599,7 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
               const Text('Your service is completed. You can view or print the invoice.'),
               const SizedBox(height: 10),
               FilledButton.icon(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => InvoicePage(complaint: t, payments: payments))), icon: const Icon(Icons.picture_as_pdf_outlined), label: const Text('VIEW / PRINT INVOICE')),
-            ]),
+            ])),
             if (status == 'Completed') const SizedBox(height: 12),
             _sectionCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               const Text('Payment', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
