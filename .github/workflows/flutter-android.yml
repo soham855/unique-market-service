@@ -7,6 +7,12 @@ on:
       - 'flutter_app/**'
       - '.github/workflows/flutter-android.yml'
       - 'supabase/migrations/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'flutter_app/**'
+      - '.github/workflows/flutter-android.yml'
+      - 'supabase/migrations/**'
   workflow_dispatch:
 
 jobs:
