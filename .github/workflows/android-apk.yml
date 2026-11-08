@@ -3,6 +3,8 @@ name: Build Instant Services Android APK
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -18,8 +20,54 @@ jobs:
           node-version: '22'
       - name: Install dependencies
         run: npm install
-      - name: Security audit
-        run: npm audit --omit=dev --audit-level=critical
+      - name: Security audit (full dependency tree)
+        run: |
+          set +e
+          npm audit --json > npm-audit.json
+          audit_exit=$?
+          set -e
+          AUDIT_EXIT_CODE="$audit_exit" node --input-type=module -e '
+            import fs from "node:fs";
+            let report;
+            try {
+              report = JSON.parse(fs.readFileSync("npm-audit.json", "utf8"));
+            } catch (error) {
+              console.error("Dependency audit did not return valid JSON:", error.message);
+              process.exit(1);
+            }
+            if (report.error || !report.metadata?.vulnerabilities) {
+              console.error("Dependency audit could not complete:", JSON.stringify(report.error || report));
+              process.exit(1);
+            }
+            const totals = report.metadata.vulnerabilities;
+            const advisories = Object.values(report.vulnerabilities || {});
+            console.log("Audit totals:", JSON.stringify(totals));
+            for (const item of advisories) {
+              console.log(JSON.stringify({
+                name: item.name,
+                severity: item.severity,
+                isDirect: item.isDirect,
+                range: item.range,
+                fixAvailable: item.fixAvailable,
+                via: item.via
+              }, null, 2));
+            }
+            if (!advisories.length) console.log("No dependency vulnerabilities found.");
+            const blocking = Number(totals.high || 0) + Number(totals.critical || 0);
+            if (blocking > 0) {
+              console.error("Blocking dependency audit: high/critical vulnerabilities must be fixed.");
+              process.exit(1);
+            }
+            console.log("No high or critical dependency vulnerabilities.");
+          '
+      - name: Upload dependency audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-dependency-audit
+          path: npm-audit.json
+          if-no-files-found: ignore
+          retention-days: 14
       - name: Build web app
         run: npm run build
       - name: Setup Java
@@ -50,11 +98,14 @@ jobs:
           fs.writeFileSync(p,x)
           NODE
           node scripts/ensure-android-location.mjs
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.14.3'
       - name: Build debug APK
         run: |
-          chmod +x android/gradlew
           cd android
-          ./gradlew assembleDebug
+          gradle assembleDebug --no-daemon --stacktrace
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:

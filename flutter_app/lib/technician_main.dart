@@ -570,7 +570,7 @@ class _TechnicianSchedulePageState extends State<TechnicianSchedulePage>{
         final bd=DateTime.tryParse(b['scheduled_visit_at']?.toString()??'')??DateTime(2099);
         return ad.compareTo(bd);
       });
-      if(mounted)setState(()=>{jobs=all,loading=false});
+      if(mounted)setState(() { jobs=all; loading=false; });
     }catch(_){if(mounted)setState(()=>loading=false);}
   }
   DateTime? _date(Map<String,dynamic> j)=>DateTime.tryParse(j['scheduled_visit_at']?.toString()??j['scheduled_visit_date']?.toString()??'');
@@ -746,6 +746,17 @@ class _TechnicianJobDetailsPageState extends State<TechnicianJobDetailsPage> {
     } finally { if (mounted) setState(() => busy = false); }
   }
 
+  Future<void> requestOtp() async {
+    if (report == null) return;
+    setState(() => busy = true);
+    try {
+      await service.requestCustomerOtp(report!['id'].toString());
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Customer OTP sent to registered WhatsApp number.')));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    } finally { if (mounted) setState(() => busy = false); }
+  }
+
   Future<void> verifyOtp() async {
     if (report == null) return;
     setState(() => busy = true);
@@ -831,8 +842,18 @@ class _TechnicianJobDetailsPageState extends State<TechnicianJobDetailsPage> {
               const SizedBox(width: 10),
               Expanded(child: TextField(controller: other, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Other ₹', border: OutlineInputBorder()))),
             ]),
-          ])),
-          Card(child: ListTile(leading: Icon(otpOk ? Icons.verified : Icons.pin_outlined), title: Text(otpOk ? 'Customer OTP Verified' : 'Customer OTP Verification'), subtitle: Text(otpOk ? 'Customer approved service completion.' : 'Ask the customer for the OTP shown in their Customer App.'), trailing: otpOk ? const Icon(Icons.check_circle) : null)),
+          ]))),
+          Card(child: ListTile(
+            leading: Icon(otpOk ? Icons.verified : Icons.pin_outlined),
+            title: Text(otpOk ? 'Customer OTP Verified' : 'Customer OTP Verification'),
+            subtitle: Text(otpOk ? 'Customer approved service completion.' : 'Send a one-time code to the customer registered WhatsApp number.'),
+            trailing: otpOk ? const Icon(Icons.check_circle) : null,
+          )),
+          if (!otpOk) Align(alignment: Alignment.centerLeft, child: OutlinedButton.icon(
+            onPressed: busy ? null : requestOtp,
+            icon: const Icon(Icons.send_outlined),
+            label: const Text('SEND CUSTOMER OTP ON WHATSAPP'),
+          )),
           if (!otpOk) Row(children: [
             Expanded(child: TextField(controller: otp, keyboardType: TextInputType.number, maxLength: 6, decoration: const InputDecoration(labelText: 'Customer OTP', border: OutlineInputBorder()))),
             const SizedBox(width: 8), FilledButton(onPressed: busy ? null : verifyOtp, child: const Text('VERIFY')),
@@ -894,7 +915,7 @@ class _SignatureDialogState extends State<SignatureDialog> {
     for (final p in points) {
       if (p == null) { previous = null; continue; }
       final scaled = Offset(p.dx * 900 / 420, p.dy * 500 / 230);
-      if (previous != null) canvas.drawLine(previous!, scaled, paint);
+      if (previous != null) canvas.drawLine(previous, scaled, paint);
       previous = scaled;
     }
     final image = await recorder.endRecording().toImage(900, 500);
@@ -911,7 +932,7 @@ class SignaturePainter extends CustomPainter {
     Offset? previous;
     for (final p in points) {
       if (p == null) { previous = null; continue; }
-      if (previous != null) canvas.drawLine(previous!, p, paint);
+      if (previous != null) canvas.drawLine(previous, p, paint);
       previous = p;
     }
   }

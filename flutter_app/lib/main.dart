@@ -599,7 +599,7 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
               const Text('Your service is completed. You can view or print the invoice.'),
               const SizedBox(height: 10),
               FilledButton.icon(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => InvoicePage(complaint: t, payments: payments))), icon: const Icon(Icons.picture_as_pdf_outlined), label: const Text('VIEW / PRINT INVOICE')),
-            ]),
+            ])),
             if (status == 'Completed') const SizedBox(height: 12),
             _sectionCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               const Text('Payment', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
@@ -653,7 +653,7 @@ class _ServiceReviewCardState extends State<ServiceReviewCard>{
   int rating=0; final feedback=TextEditingController(); bool loading=true,saving=false;
   @override void initState(){super.initState();load();}
   @override void dispose(){feedback.dispose();super.dispose();}
-  Future<void>load()async{try{final r=await widget.service.reviewForComplaint(widget.complaintId);if(r!=null&&mounted){setState(()=>{rating=(r['rating'] as num).toInt(),feedback.text=(r['feedback']??'').toString(),loading=false});}else if(mounted)setState(()=>loading=false);}catch(_){if(mounted)setState(()=>loading=false);}}
+  Future<void>load()async{try{final r=await widget.service.reviewForComplaint(widget.complaintId);if(r!=null&&mounted){setState(() { rating=(r['rating'] as num).toInt(); feedback.text=(r['feedback']??'').toString(); loading=false; });}else if(mounted)setState(()=>loading=false);}catch(_){if(mounted)setState(()=>loading=false);}}
   Future<void>save()async{if(rating<1)return;setState(()=>saving=true);try{await widget.service.saveReview(complaintId:widget.complaintId,rating:rating,feedback:feedback.text);if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Thank you for your feedback.')));}catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('Could not save feedback: $e')));}finally{if(mounted)setState(()=>saving=false);}}
   @override Widget build(BuildContext context)=>Card(child:Padding(padding:const EdgeInsets.all(18),child:loading?const Center(child:CircularProgressIndicator()):Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
     const Text('Service Review',style:TextStyle(fontSize:18,fontWeight:FontWeight.w800)),
@@ -674,8 +674,6 @@ class _CustomerPaymentsPageState extends State<CustomerPaymentsPage>{
   bool loading=true; Timer? timer;
   @override void initState(){super.initState();load();timer=Timer.periodic(const Duration(seconds:10),(_)=>load());}
   @override void dispose(){timer?.cancel();super.dispose();}
-  double _num(dynamic v)=>double.tryParse((v??0).toString())??0;
-  double _paid(List<Map<String,dynamic>> ps)=>ps.fold(0.0,(s,p){final st=(p['payment_status']??p['status']??'').toString().toLowerCase();return s+(['approved','paid','completed'].contains(st)?_num(p['amount']):0);});
   String _status(List<Map<String,dynamic>> ps){if(ps.isEmpty)return 'No payment';final states=ps.map((p)=>(p['payment_status']??p['status']??'pending').toString().toLowerCase()).toSet();if(states.contains('pending'))return 'Verification pending';if(states.every((s)=>['approved','paid','completed'].contains(s)))return 'Paid';if(states.contains('rejected'))return 'Rejected';return 'Pending';}
   Future<void> load()async{try{tickets=await service.tickets();final m=<String,List<Map<String,dynamic>>>{};for(final t in tickets){final id=t['id']?.toString();if(id!=null&&id.isNotEmpty)m[id]=await service.paymentsForComplaint(id);}paymentMap=m;}catch(_){}if(mounted)setState(()=>loading=false);}
   @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const Text('Payments'),actions:[IconButton(onPressed:load,icon:const Icon(Icons.refresh))]),body:loading?const Center(child:CircularProgressIndicator()):RefreshIndicator(onRefresh:load,child:ListView(padding:const EdgeInsets.all(16),children:[
@@ -781,7 +779,7 @@ class _InvoicePageState extends State<InvoicePage>{
       pw.Text('Payment Status: '+status,style:pw.TextStyle(fontSize:16,fontWeight:pw.FontWeight.bold)),
       pw.SizedBox(height:18),
       pw.Text('Thank you for choosing Unique Market.')
-    ])));
+    ]))));
     await Printing.layoutPdf(onLayout:(_)=>doc.save());
   }
 
@@ -808,7 +806,7 @@ class _InvoicePageState extends State<InvoicePage>{
         const SizedBox(height:16),
         if(payments.isNotEmpty)Card(child:Padding(padding:const EdgeInsets.all(14),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
           const Text('Payment History',style:TextStyle(fontSize:17,fontWeight:FontWeight.w800)),
-          ...payments.map((p)=>ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.receipt_long_outlined),title:Text('₹'+_num(p['amount']).toStringAsFixed(2)),subtitle:Text((p['mode']??'-').toString()+' • '+(p['payment_status']??p['status']??'Pending').toString()+(p['reference_no']!=null?' • '+p['reference_no'].toString():'')))
+          ...payments.map((p)=>ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.receipt_long_outlined),title:Text('₹'+_num(p['amount']).toStringAsFixed(2)),subtitle:Text((p['mode']??'-').toString()+' • '+(p['payment_status']??p['status']??'Pending').toString()+(p['reference_no']!=null?' • '+p['reference_no'].toString():''))))
         ]))),
         const SizedBox(height:16),
         FilledButton.icon(onPressed:printInvoice,icon:const Icon(Icons.picture_as_pdf_outlined),label:const Text('VIEW / PRINT PDF'))
