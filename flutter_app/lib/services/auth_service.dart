@@ -18,7 +18,7 @@ class AuthService {
 
     final phone = client.auth.currentUser?.phone;
     if (phone == null || phone.isEmpty) return null;
-    final digits = phone.replaceAll(RegExp(r'\\D'), '');
+    final digits = phone.replaceAll(RegExp(r'\D'), '');
     final local = digits.length > 10 ? digits.substring(digits.length - 10) : digits;
     final techRows = await client.from('technicians').select('id,name,mobile,status').eq('mobile', local).limit(1);
     if (techRows.isEmpty) return null;
