@@ -106,21 +106,34 @@ jobs:
       - name: Analyze
         run: flutter analyze
 
-      - name: Build debug APK
+      - name: Run Flutter tests
+        run: flutter test
+
+      - name: Build customer debug APK
         run: flutter build apk --debug --dart-define=SUPABASE_URL=https://tfscvycomllamoubtlcf.supabase.co --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_VeJIjcsILLniCHf2HjA20A_xlMydma0
+
+      - name: Upload customer debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: instant-services-customer-debug-apk
+          path: flutter_app/build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 30
+
+      - name: Build technician debug APK
+        run: flutter build apk --debug -t lib/technician_main.dart --dart-define=SUPABASE_URL=https://tfscvycomllamoubtlcf.supabase.co --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_VeJIjcsILLniCHf2HjA20A_xlMydma0
+
+      - name: Upload technician debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: instant-services-technician-debug-apk
+          path: flutter_app/build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 30
 
       - name: Build release APK
         run: flutter build apk --release --dart-define=SUPABASE_URL=https://tfscvycomllamoubtlcf.supabase.co --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_VeJIjcsILLniCHf2HjA20A_xlMydma0
 
       - name: Build release AAB
         run: flutter build appbundle --release --dart-define=SUPABASE_URL=https://tfscvycomllamoubtlcf.supabase.co --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_VeJIjcsILLniCHf2HjA20A_xlMydma0
-
-      - name: Upload debug APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: instant-services-debug-apk
-          path: flutter_app/build/app/outputs/flutter-apk/app-debug.apk
-          retention-days: 30
 
       - name: Upload release APK
         uses: actions/upload-artifact@v4
