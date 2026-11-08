@@ -149,7 +149,7 @@ class _AdminAmcRenewalsPageState extends State<AdminAmcRenewalsPage>{
             ]) else Text(status.toUpperCase(),style:const TextStyle(fontWeight:FontWeight.w800)),
           ])));
         }),
-      ]));
+      ])));
 }
 class AdminHomePage extends StatefulWidget { const AdminHomePage({super.key}); @override State<AdminHomePage> createState()=>_AdminHomePageState(); }
 class _AdminHomePageState extends State<AdminHomePage> {
@@ -224,7 +224,7 @@ class _PaymentsPageState extends State<PaymentsPage>{ String status='All'; List<
 
 class ReportsPage extends StatefulWidget{final AdminService service;const ReportsPage({super.key,required this.service});@override State<ReportsPage> createState()=>_ReportsPageState();}
 class _ReportsPageState extends State<ReportsPage>{bool loading=true;List<Map<String,dynamic>> complaints=[],payments=[],visits=[],technicians=[];
-@override void initState(){super.initState();load();}Future<void>load()async{try{final r=await Future.wait([widget.service.reportComplaints(),widget.service.reportPayments(),widget.service.reportVisits(),widget.service.reportTechnicians()]);if(mounted)setState((){complaints=r[0] as List<Map<String,dynamic>>;payments=r[1] as List<Map<String,dynamic>>;visits=r[2] as List<Map<String,dynamic>>;technicians=r[3] as List<Map<String,dynamic>>;loading=false;});}catch(e){if(mounted){setState(()=>loading=false);ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(e.toString())));}}}
+@override void initState(){super.initState();load();}Future<void>load()async{try{final r=await Future.wait([widget.service.reportComplaints(),widget.service.reportPayments(),widget.service.reportVisits(),widget.service.reportTechnicians()]);if(mounted)setState((){complaints=r[0];payments=r[1];visits=r[2];technicians=r[3];loading=false;});}catch(e){if(mounted){setState(()=>loading=false);ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(e.toString())));}}}
 double get collected=>payments.fold(0.0,(s,p){final st=(p['payment_status']??p['status']??'').toString().toLowerCase();final a=double.tryParse((p['amount']??0).toString())??0;return s+(['approved','paid','completed'].contains(st)?a:0);});
 double get pending=>payments.fold(0.0,(s,p){final st=(p['payment_status']??p['status']??'').toString().toLowerCase();final a=double.tryParse((p['amount']??0).toString())??0;return s+(st=='pending'?a:0);});
 int countStatus(String s)=>complaints.where((c)=>(c['status']??'').toString()==s).length;

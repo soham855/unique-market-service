@@ -674,7 +674,6 @@ class _CustomerPaymentsPageState extends State<CustomerPaymentsPage>{
   bool loading=true; Timer? timer;
   @override void initState(){super.initState();load();timer=Timer.periodic(const Duration(seconds:10),(_)=>load());}
   @override void dispose(){timer?.cancel();super.dispose();}
-  double _num(dynamic v)=>double.tryParse((v??0).toString())??0;
   String _status(List<Map<String,dynamic>> ps){if(ps.isEmpty)return 'No payment';final states=ps.map((p)=>(p['payment_status']??p['status']??'pending').toString().toLowerCase()).toSet();if(states.contains('pending'))return 'Verification pending';if(states.every((s)=>['approved','paid','completed'].contains(s)))return 'Paid';if(states.contains('rejected'))return 'Rejected';return 'Pending';}
   Future<void> load()async{try{tickets=await service.tickets();final m=<String,List<Map<String,dynamic>>>{};for(final t in tickets){final id=t['id']?.toString();if(id!=null&&id.isNotEmpty)m[id]=await service.paymentsForComplaint(id);}paymentMap=m;}catch(_){}if(mounted)setState(()=>loading=false);}
   @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const Text('Payments'),actions:[IconButton(onPressed:load,icon:const Icon(Icons.refresh))]),body:loading?const Center(child:CircularProgressIndicator()):RefreshIndicator(onRefresh:load,child:ListView(padding:const EdgeInsets.all(16),children:[
