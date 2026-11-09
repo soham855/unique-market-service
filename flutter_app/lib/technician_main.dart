@@ -184,6 +184,12 @@ class _TechnicianLoginPageState extends State<TechnicianLoginPage> {
         await Supabase.instance.client.auth.signOut();
         throw Exception('This account is not an active Technician account.');
       }
+      final technicianRecord = await TechnicianService(Supabase.instance.client).technician();
+      final technicianStatus = (technicianRecord?['status'] ?? 'active').toString().toLowerCase();
+      if (technicianRecord == null || !['active', 'online', 'available'].contains(technicianStatus)) {
+        await Supabase.instance.client.auth.signOut();
+        throw Exception('Technician login is not linked to an active technician record. Ask Admin to link it from Admin > Technicians & Login Links.');
+      }
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('technician_remember_me', rememberMe);
       if (rememberMe) {
