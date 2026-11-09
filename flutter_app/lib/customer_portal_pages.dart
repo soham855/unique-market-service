@@ -913,3 +913,314 @@ class _CustomerProfileEditPageState extends State<CustomerProfileEditPage> {
               ),
       );
 }
+
+
+class CustomerPortalPaymentsPage extends StatefulWidget {
+  const CustomerPortalPaymentsPage({super.key});
+
+  @override
+  State<CustomerPortalPaymentsPage> createState() => _CustomerPortalPaymentsPageState();
+}
+
+class _CustomerPortalPaymentsPageState extends State<CustomerPortalPaymentsPage> {
+  final _client = Supabase.instance.client;
+  List<Map<String, dynamic>> _payments = [];
+  List<Map<String, dynamic>> _challans = [];
+  Map<String, dynamic>? _settings;
+  String? _customerId;
+  String _selectedId = '';
+  final _utr = TextEditingController();
+  bool _loading = true;
+  bool _submitting = false;
+  String _message = '';
+  bool _messageIsError = false;
+
+  Map<String, dynamic>? get _selected {
+    for (final challan in _challans) {
+      if (challan['id'].toString() == _selectedId) return challan;
+    }
+    return null;
+  }
+
+  double _number(dynamic value) => double.tryParse((value ?? 0).toString()) ?? 0;
+
+  double get _balance {
+    final selected = _selected;
+    if (selected == null) return 0;
+    return (_number(selected['subtotal']) - _number(selected['paid_amount'])).clamp(0, double.infinity);
+  }
+
+  bool get _upiEnabled => _settings?['is_enabled'] != false;
+  String get _upiId => _upiEnabled ? (_settings?['upi_id'] ?? '').toString() : '';
+  String get _accountName => (_settings?['account_name'] ?? 'Unique Market').toString();
+
+  String get _qrUrl {
+    if (_upiId.isEmpty) return '';
+    final upi = 'upi://pay?pa=' + Uri.encodeComponent(_upiId) +
+        '&pn=' + Uri.encodeComponent(_accountName) +
+        '&am=' + _balance.toStringAsFixed(2) + '&cu=INR';
+    return 'https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=' + Uri.encodeComponent(upi);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    if (mounted) {
+      setState(() {
+        _loading = true;
+        _message = '';
+      });
+    }
+    try {
+      final customer = await CustomerService(_client).customer();
+      if (customer == null) throw Exception('Customer record is not linked to this login.');
+      _customerId = customer['id'].toString();
+
+      final results = await Future.wait([
+        _client.from('payments')
+            .select('id,payment_date,amount,mode,reference_no,status,payment_status,created_at,challan_id,challans(challan_no)')
+            .eq('customer_id', _customerId!)
+            .order('created_at', ascending: false)
+            .limit(100),
+        _client.from('challans')
+            .select('id,challan_no,challan_date,subtotal,paid_amount,payment_status,status')
+            .eq('customer_id', _customerId!)
+            .inFilter('status', ['issued', 'completed'])
+            .order('challan_date', ascending: false)
+            .limit(100),
+        _client.from('payment_settings')
+            .select('upi_id,account_name,qr_image_url,is_enabled')
+            .limit(1)
+            .maybeSingle(),
+      ]);
+
+      _payments = List<Map<String, dynamic>>.from(results[0] as List);
+      _challans = List<Map<String, dynamic>>.from(results[1] as List)
+          .where((row) => _number(row['subtotal']) > _number(row['paid_amount']))
+          .toList();
+      _settings = results[2] == null ? null : Map<String, dynamic>.from(results[2] as Map);
+      _message = '';
+    } catch (error) {
+      _message = 'Could not load payment details: ' + error.toString();
+      _messageIsError = true;
+    }
+    if (mounted) setState(() => _loading = false);
+  }
+
+  Future<void> _submit() async {
+    final selected = _selected;
+    if (_customerId == null || selected == null || _balance <= 0) {
+      setState(() {
+        _message = 'Select an unpaid Call ID / Challan No.';
+        _messageIsError = true;
+      });
+      return;
+    }
+    if (_upiId.isEmpty) {
+      setState(() {
+        _message = 'Online payment is not configured. Please contact Unique Market.';
+        _messageIsError = true;
+      });
+      return;
+    }
+    if (_utr.text.trim().isEmpty) {
+      setState(() {
+        _message = 'UTR / transaction reference is mandatory.';
+        _messageIsError = true;
+      });
+      return;
+    }
+    final alreadyPending = _payments.any((payment) =>
+        payment['challan_id']?.toString() == _selectedId &&
+        (payment['status'] ?? payment['payment_status'] ?? '').toString().toLowerCase().contains('pending'));
+    if (alreadyPending) {
+      setState(() {
+        _message = 'A payment for this challan is already awaiting verification.';
+        _messageIsError = true;
+      });
+      return;
+    }
+
+    setState(() {
+      _submitting = true;
+      _message = '';
+    });
+    try {
+      await _client.from('payments').insert({
+        'customer_id': _customerId,
+        'challan_id': _selectedId,
+        'payment_date': DateTime.now().toUtc().toIso8601String().substring(0, 10),
+        'amount': _balance,
+        'mode': 'UPI',
+        'reference_no': _utr.text.trim(),
+        'status': 'pending',
+        'source': 'customer',
+        'payment_status': 'Pending Verification',
+        'notes': 'Customer QR payment — verification pending',
+      });
+      _utr.clear();
+      setState(() {
+        _selectedId = '';
+        _message = 'Payment submitted successfully. Your UTR is pending verification by Unique Market.';
+        _messageIsError = false;
+      });
+      await _load();
+      if (mounted) {
+        setState(() {
+          _message = 'Payment submitted successfully. Your UTR is pending verification by Unique Market.';
+          _messageIsError = false;
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _message = 'Payment submission failed: ' + error.toString();
+          _messageIsError = true;
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _utr.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = _selected;
+    final customQr = (_settings?['qr_image_url'] ?? '').toString();
+    final qr = customQr.isNotEmpty ? customQr : _qrUrl;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Payments'),
+        actions: [IconButton(onPressed: _loading ? null : _load, icon: const Icon(Icons.refresh))],
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : RefreshIndicator(
+              onRefresh: _load,
+              child: ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  const Text('Pay Service Bill', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 6),
+                  const Text('Select an unpaid Call ID / Challan No., scan the company QR, pay the exact amount, then submit your UTR.'),
+                  if (_message.isNotEmpty) Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Text(_message, style: TextStyle(color: _messageIsError ? Colors.red : Colors.green)),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    initialValue: _selectedId.isEmpty ? null : _selectedId,
+                    decoration: const InputDecoration(labelText: 'Call ID / Challan No.'),
+                    items: _challans.map((challan) {
+                      final balance = (_number(challan['subtotal']) - _number(challan['paid_amount'])).clamp(0, double.infinity);
+                      return DropdownMenuItem(
+                        value: challan['id'].toString(),
+                        child: Text((challan['challan_no'] ?? 'Challan').toString() + ' • Balance ₹' + balance.toStringAsFixed(2)),
+                      );
+                    }).toList(),
+                    onChanged: _upiId.isEmpty ? null : (value) => setState(() {
+                      _selectedId = value ?? '';
+                      _utr.clear();
+                      _message = '';
+                    }),
+                  ),
+                  if (_challans.isEmpty) const Card(
+                    child: Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Text('No unpaid challan found. Your outstanding bills will appear here.'),
+                    ),
+                  ),
+                  if (selected != null) ...[
+                    const SizedBox(height: 14),
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(18),
+                        child: Column(
+                          children: [
+                            const Text('Scan & Pay to Unique Market', style: TextStyle(fontWeight: FontWeight.w800)),
+                            const SizedBox(height: 8),
+                            Text('Amount: ₹' + _balance.toStringAsFixed(2),
+                                style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w900)),
+                            if (_upiId.isNotEmpty) Text('UPI: ' + _upiId),
+                            const SizedBox(height: 12),
+                            if (qr.isNotEmpty)
+                              Image.network(
+                                qr,
+                                width: 220,
+                                height: 220,
+                                fit: BoxFit.contain,
+                                errorBuilder: (_, __, ___) => const SizedBox(
+                                  width: 220,
+                                  height: 220,
+                                  child: Center(child: Text('QR image could not be loaded. Use the UPI ID above.')),
+                                ),
+                              ),
+                            const SizedBox(height: 8),
+                            const Text('Pay the exact displayed amount, then enter the UTR below.'),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _utr,
+                      textCapitalization: TextCapitalization.characters,
+                      decoration: const InputDecoration(labelText: 'UTR / Transaction Reference No.'),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        onPressed: _submitting || _utr.text.trim().isEmpty ? null : _submit,
+                        child: Text(_submitting ? 'Submitting…' : 'Submit Payment & UTR'),
+                      ),
+                    ),
+                  ],
+                  if (_upiId.isEmpty) const Card(
+                    child: Padding(
+                      padding: EdgeInsets.all(14),
+                      child: Text('Company UPI / QR is not configured. Please contact Unique Market.'),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  const Text('Payment History', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900)),
+                  if (_payments.isEmpty) const Card(
+                    child: Padding(
+                      padding: EdgeInsets.all(18),
+                      child: Text('No payments recorded yet.'),
+                    ),
+                  ),
+                  ..._payments.map((payment) {
+                    final challan = payment['challans'];
+                    final challanNo = challan is Map ? (challan['challan_no'] ?? '—').toString() : '—';
+                    return Card(
+                      child: ListTile(
+                        leading: const Icon(Icons.receipt_long_outlined),
+                        title: Text(challanNo),
+                        subtitle: Text(
+                          '₹' + _number(payment['amount']).toStringAsFixed(2) +
+                              ' • ' + (payment['mode'] ?? '—').toString() +
+                              '\n' + (payment['payment_status'] ?? payment['status'] ?? 'Pending').toString() +
+                              ' • UTR: ' + (payment['reference_no'] ?? '—').toString(),
+                        ),
+                        isThreeLine: true,
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ),
+    );
+  }
+}
