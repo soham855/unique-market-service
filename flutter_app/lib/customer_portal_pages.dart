@@ -1002,6 +1002,7 @@ class _CustomerPortalPaymentsPageState extends State<CustomerPortalPaymentsPage>
       _challans = List<Map<String, dynamic>>.from(results[1] as List)
           .where((row) => _number(row['subtotal']) > _number(row['paid_amount']))
           .toList();
+      if (!_challans.any((row) => row['id'].toString() == _selectedId)) _selectedId = '';
       _settings = results[2] == null ? null : Map<String, dynamic>.from(results[2] as Map);
       _message = '';
     } catch (error) {
@@ -1034,9 +1035,12 @@ class _CustomerPortalPaymentsPageState extends State<CustomerPortalPaymentsPage>
       });
       return;
     }
-    final alreadyPending = _payments.any((payment) =>
-        payment['challan_id']?.toString() == _selectedId &&
-        (payment['status'] ?? payment['payment_status'] ?? '').toString().toLowerCase().contains('pending'));
+    final alreadyPending = _payments.any((payment) {
+      final status = (payment['status'] ?? '').toString().toLowerCase();
+      final paymentStatus = (payment['payment_status'] ?? '').toString().toLowerCase();
+      return payment['challan_id']?.toString() == _selectedId &&
+          (status.contains('pending') || paymentStatus.contains('pending'));
+    });
     if (alreadyPending) {
       setState(() {
         _message = 'A payment for this challan is already awaiting verification.';
