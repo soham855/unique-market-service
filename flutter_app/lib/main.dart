@@ -950,6 +950,7 @@ class _ProfilePageState extends State<ProfilePage>{
       ListTile(leading:const Icon(Icons.business_outlined),title:const Text('Company'),subtitle:Text(customer?['company_name']?.toString()??'-')),
       ListTile(leading:const Icon(Icons.location_on_outlined),title:const Text('Address'),subtitle:Text(customer?['address']?.toString()??'-'))
     ])),const SizedBox(height:12),
+    ListTile(leading:const Icon(Icons.edit_outlined),title:const Text('Edit Profile'),subtitle:const Text('Update your contact and site details'),onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const CustomerProfileEditPage()))),
     ListTile(leading:const Icon(Icons.settings_outlined),title:const Text('Settings'),onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const SettingsPage())))
   ]));
 }
