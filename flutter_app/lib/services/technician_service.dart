@@ -13,16 +13,10 @@ class TechnicianService {
   }
 
   Future<Map<String, dynamic>?> technician() async {
-    final p = await profile();
-    if (p == null) return null;
-    final mobile = (p['phone'] ?? p['mobile'])?.toString();
-    if (mobile == null || mobile.isEmpty) return null;
-    final byMobile = await client.from('technicians').select().eq('mobile', mobile).maybeSingle();
-    if (byMobile != null) return byMobile;
-    final name = p['full_name']?.toString().trim();
-    if (name == null || name.isEmpty) return null;
-    final rows = await client.from('technicians').select().ilike('name', name).limit(1);
-    return rows.isEmpty ? null : Map<String,dynamic>.from(rows.first);
+    final user = client.auth.currentUser;
+    if (user == null) return null;
+    final row = await client.from('technicians').select().eq('profile_id', user.id).maybeSingle();
+    return row == null ? null : Map<String, dynamic>.from(row);
   }
 
   Future<List<Map<String, dynamic>>> jobs() async {
@@ -57,32 +51,17 @@ class TechnicianService {
     if (status == 'Assigned') data['assigned_at'] = DateTime.now().toUtc().toIso8601String();
     if (status == 'In Service') data['started_at'] = DateTime.now().toUtc().toIso8601String();
     if (status == 'Completed') data['completed_at'] = DateTime.now().toUtc().toIso8601String();
-    final updated = await client.from('complaints').update(data).eq('id', complaintId).eq('technician_id', user.id).select('id,ticket_no,customer_id,status').maybeSingle();
-    if (updated != null && updated['customer_id'] != null) {
-      final customer = await client.from('customers').select('profile_id').eq('id', updated['customer_id']).maybeSingle();
-      final profileId = customer?['profile_id']?.toString();
-      if (profileId != null && profileId.isNotEmpty) {
-        await client.from('notifications').insert({
-          'user_id': profileId, 'complaint_id': complaintId,
-          'title': 'Service Update',
-          'message': 'Ticket ' + (updated['ticket_no'] ?? complaintId).toString() + ' status: ' + status + '.',
-          'type': 'complaint_update',
-        });
-      }
-    }
+    final updated = await client.from('complaints').update(data).eq('id', complaintId).eq('technician_id', user.id).select('id').maybeSingle();
+    if (updated == null) throw Exception('This service call is not assigned to your account.');
+    // The database complaint trigger creates customer, technician and admin notifications.
   }
 
   Future<void> acceptJob(String complaintId) async {
     final user = client.auth.currentUser;
     if (user == null) throw Exception('Technician session expired.');
-    final updated = await client.from('complaints').update({'technician_id': user.id, 'status': 'Assigned', 'assigned_at': DateTime.now().toUtc().toIso8601String()}).eq('id', complaintId).select('id,ticket_no,customer_id').maybeSingle();
-    if (updated != null && updated['customer_id'] != null) {
-      final customer = await client.from('customers').select('profile_id').eq('id', updated['customer_id']).maybeSingle();
-      final profileId = customer?['profile_id']?.toString();
-      if (profileId != null && profileId.isNotEmpty) {
-        await client.from('notifications').insert({'user_id': profileId,'complaint_id': complaintId,'title':'Job Accepted','message':'Ticket ' + (updated['ticket_no'] ?? complaintId).toString() + ' has been accepted by the technician.','type':'complaint_update'});
-      }
-    }
+    final updated = await client.from('complaints').update({'technician_id': user.id, 'status': 'Assigned', 'assigned_at': DateTime.now().toUtc().toIso8601String()}).eq('id', complaintId).select('id').maybeSingle();
+    if (updated == null) throw Exception('This service call is no longer available or has already been assigned.');
+    // The database complaint trigger creates the assignment notifications.
   }
 
   Future<Map<String, dynamic>> startVisit(String complaintId, {String? diagnosis}) async {
@@ -106,13 +85,11 @@ class TechnicianService {
       report = Map<String, dynamic>.from(existing.first);
       await client.from('service_reports').update({'service_visit_id': visit['id'], 'diagnosis': diagnosis, 'updated_at': DateTime.now().toUtc().toIso8601String()}).eq('id', report['id']);
     } else {
-      final otp = (100000 + DateTime.now().millisecondsSinceEpoch % 900000).toString();
       report = Map<String, dynamic>.from(await client.from('service_reports').insert({
         'complaint_id': complaintId,
         'service_visit_id': visit['id'],
         'technician_id': user.id,
         'diagnosis': diagnosis,
-        'customer_otp': otp,
         'customer_otp_verified': false,
       }).select().single());
     }
@@ -157,11 +134,25 @@ class TechnicianService {
     await client.from('service_reports').update({'after_photo_url': path}).eq('id', reportId);
   }
 
+  Future<void> requestCustomerOtp(String reportId) async {
+    final response = await client.functions.invoke('service-report-otp', body: {
+      'action': 'request',
+      'report_id': reportId,
+    });
+    if (response.status < 200 || response.status >= 300) {
+      throw Exception((response.data is Map ? response.data['error'] : null) ?? 'Could not send customer OTP.');
+    }
+  }
+
   Future<void> verifyCustomerOtp(String reportId, String otp) async {
-    final rows = await client.from('service_reports').select('customer_otp').eq('id', reportId).limit(1);
-    if (rows.isEmpty) throw Exception('Service report not found.');
-    if (rows.first['customer_otp']?.toString() != otp.trim()) throw Exception('Invalid customer OTP.');
-    await client.from('service_reports').update({'customer_otp_verified': true, 'customer_approved_at': DateTime.now().toUtc().toIso8601String()}).eq('id', reportId);
+    final response = await client.functions.invoke('service-report-otp', body: {
+      'action': 'verify',
+      'report_id': reportId,
+      'otp': otp.trim(),
+    });
+    if (response.status < 200 || response.status >= 300) {
+      throw Exception((response.data is Map ? response.data['error'] : null) ?? 'Customer OTP verification failed.');
+    }
   }
 
   Future<void> saveSignature(String reportId, String path) async {
@@ -192,14 +183,6 @@ class TechnicianService {
 
     await client.from('service_visits').update({'completed_at': DateTime.now().toUtc().toIso8601String(), 'work_done': workDone, 'parts_used': partsUsed}).eq('id', visitId).eq('technician_id', tech['id']);
     await updateStatus(complaintId, 'Completed');
-    final complaint = await client.from('complaints').select('customer_id,ticket_no').eq('id', complaintId).maybeSingle();
-    final customerId = complaint?['customer_id'];
-    if (customerId != null) {
-      final customer = await client.from('customers').select('profile_id').eq('id', customerId).maybeSingle();
-      final profileId = customer?['profile_id']?.toString();
-      if (profileId != null && profileId.isNotEmpty) {
-        await client.from('notifications').insert({'user_id': profileId, 'complaint_id': complaintId, 'title': 'Service Completed', 'message': 'Ticket ' + (complaint?['ticket_no'] ?? complaintId).toString() + ' has been completed. Please review the service and payment.', 'type': 'service_completed'});
-      }
-    }
+    // The database complaint trigger notifies the customer when completion is recorded.
   }
 }
