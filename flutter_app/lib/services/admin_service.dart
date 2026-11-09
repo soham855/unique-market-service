@@ -47,6 +47,21 @@ class AdminService {
     return List<Map<String,dynamic>>.from(rows);
   }
 
+  Future<List<Map<String,dynamic>>> technicianRecords() async {
+    final rows = await client
+        .from('technicians')
+        .select('id,name,mobile,status,profile_id')
+        .order('name');
+    return List<Map<String,dynamic>>.from(rows);
+  }
+
+  Future<void> linkTechnicianProfile(String technicianId, String profileId) async {
+    await client
+        .from('technicians')
+        .update({'profile_id': profileId})
+        .eq('id', technicianId);
+  }
+
   Future<void> assignComplaint(String complaintId, String technicianProfileId, DateTime? visitAt, {String? note}) async {
     final data = <String,dynamic>{
       'technician_id': technicianProfileId,
