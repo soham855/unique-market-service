@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -569,9 +567,11 @@ class _CustomerReferralPageState extends State<CustomerReferralPage> {
 
   String _newCode(String name) {
     final cleaned = name.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase();
-    final prefix = cleaned.isEmpty ? 'CUSTOMER' : cleaned.substring(0, math.min(5, cleaned.length));
+    final prefixLength = cleaned.length < 5 ? cleaned.length : 5;
+    final prefix = cleaned.isEmpty ? 'CUSTOMER' : cleaned.substring(0, prefixLength);
     final suffix = DateTime.now().microsecondsSinceEpoch.toRadixString(36).toUpperCase();
-    return 'UM' + prefix + suffix.substring(math.max(0, suffix.length - 5));
+    final suffixStart = suffix.length > 5 ? suffix.length - 5 : 0;
+    return 'UM' + prefix + suffix.substring(suffixStart);
   }
 
   Future<void> _load() async {
@@ -776,6 +776,145 @@ class _CustomerReferralPageState extends State<CustomerReferralPage> {
                         )),
                   ],
                 ),
+              ),
+      );
+}
+
+
+class CustomerProfileEditPage extends StatefulWidget {
+  const CustomerProfileEditPage({super.key});
+
+  @override
+  State<CustomerProfileEditPage> createState() => _CustomerProfileEditPageState();
+}
+
+class _CustomerProfileEditPageState extends State<CustomerProfileEditPage> {
+  final _client = Supabase.instance.client;
+  final _name = TextEditingController();
+  final _phone = TextEditingController();
+  final _company = TextEditingController();
+  final _address = TextEditingController();
+  final _email = TextEditingController();
+  bool _loading = true;
+  bool _saving = false;
+  String _message = '';
+  String _error = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final user = _client.auth.currentUser;
+      if (user == null) throw Exception('Please sign in again.');
+      final row = await _client.from('profiles')
+          .select('full_name,phone,company_name,site_address')
+          .eq('id', user.id)
+          .maybeSingle();
+      if (row != null) {
+        _name.text = (row['full_name'] ?? '').toString();
+        _phone.text = (row['phone'] ?? '').toString();
+        _company.text = (row['company_name'] ?? '').toString();
+        _address.text = (row['site_address'] ?? '').toString();
+      }
+      _email.text = user.email ?? '';
+    } catch (error) {
+      _error = error.toString();
+    }
+    if (mounted) setState(() => _loading = false);
+  }
+
+  Future<void> _save() async {
+    final user = _client.auth.currentUser;
+    if (user == null) {
+      setState(() => _error = 'Please sign in again.');
+      return;
+    }
+    if (_name.text.trim().isEmpty || _phone.text.trim().isEmpty) {
+      setState(() => _error = 'Name and mobile number are required.');
+      return;
+    }
+    setState(() {
+      _saving = true;
+      _message = '';
+      _error = '';
+    });
+    try {
+      await _client.from('profiles').update({
+        'full_name': _name.text.trim(),
+        'phone': _phone.text.trim(),
+        'company_name': _company.text.trim().isEmpty ? null : _company.text.trim(),
+        'site_address': _address.text.trim().isEmpty ? null : _address.text.trim(),
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      }).eq('id', user.id);
+
+      final newEmail = _email.text.trim();
+      if (newEmail.isNotEmpty && newEmail.toLowerCase() != (user.email ?? '').toLowerCase()) {
+        await _client.auth.updateUser(UserAttributes(email: newEmail));
+        _message = 'Profile saved. Confirm the email change using the verification email sent by Supabase.';
+      } else {
+        _message = 'Profile updated successfully.';
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_message)));
+      }
+    } catch (error) {
+      _error = 'Could not save profile: ' + error.toString();
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _phone.dispose();
+    _company.dispose();
+    _address.dispose();
+    _email.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        appBar: AppBar(title: const Text('Edit My Profile')),
+        body: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : ListView(
+                padding: const EdgeInsets.all(18),
+                children: [
+                  const Text('Personal & Service Information',
+                      style: TextStyle(fontSize: 21, fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 16),
+                  TextField(controller: _name, decoration: const InputDecoration(labelText: 'Full Name')),
+                  const SizedBox(height: 12),
+                  TextField(controller: _company, decoration: const InputDecoration(labelText: 'Company Name (Optional)')),
+                  const SizedBox(height: 12),
+                  TextField(controller: _phone, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Mobile Number')),
+                  const SizedBox(height: 12),
+                  TextField(controller: _email, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(labelText: 'Email ID')),
+                  const SizedBox(height: 12),
+                  TextField(controller: _address, maxLines: 3, decoration: const InputDecoration(labelText: 'Site Address')),
+                  if (_error.isNotEmpty) Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Text(_error, style: const TextStyle(color: Colors.red)),
+                  ),
+                  if (_message.isNotEmpty) Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Text(_message, style: const TextStyle(color: Colors.green)),
+                  ),
+                  const SizedBox(height: 18),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: _saving ? null : _save,
+                      child: Text(_saving ? 'Saving…' : 'Save Changes'),
+                    ),
+                  ),
+                ],
               ),
       );
 }
