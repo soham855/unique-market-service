@@ -173,15 +173,12 @@ jobs:
       - name: Configure separate Admin app package
         run: |
           python3 - <<'PY'
+          import json
           from pathlib import Path
           gradle_kts = Path("android/app/build.gradle.kts")
           gradle = Path("android/app/build.gradle")
           target = gradle_kts if gradle_kts.exists() else gradle
-          content = target.read_text()
-          content = content.replace("com.uniquemarket.instantservices", "com.uniquemarket.admin")
-          # Admin authenticates through Supabase OTP and does not initialize Firebase.
-          # Remove the app-level Google Services plugin line for this separate package.
-          content = "\n".join(line for line in content.splitlines() if "com.google.gms.google-services" not in line) + "\n"
+          content = target.read_text().replace("com.uniquemarket.instantservices", "com.uniquemarket.admin")
           target.write_text(content)
           for path in Path("android/app/src/main").rglob("*"):
               if path.is_file() and path.name in ("MainActivity.kt", "MainActivity.java"):
@@ -189,8 +186,17 @@ jobs:
           manifest = Path("android/app/src/main/AndroidManifest.xml")
           if manifest.exists():
               manifest.write_text(manifest.read_text().replace('android:label="instant_services"', 'android:label="Unique Market Admin"'))
+          # Admin uses Supabase auth, not Firebase. The Android build currently applies
+          # Google Services globally, so create a build-only matching client entry.
+          # This file is ephemeral on the runner and never committed or deployed.
+          firebase = Path("android/app/google-services.json")
+          config = json.loads(firebase.read_text())
+          for client in config.get("client", []):
+              client.setdefault("client_info", {}).setdefault("android_client_info", {})["package_name"] = "com.uniquemarket.admin"
+          firebase.write_text(json.dumps(config, indent=2) + "\n")
           PY
           grep -R 'com.uniquemarket.admin' android/app/build.gradle* android/app/src/main
+          grep -q '"package_name": "com.uniquemarket.admin"' android/app/google-services.json
 
       - name: Build separate Admin release APK
         run: flutter build apk --release --target lib/admin_main.dart --dart-define=SUPABASE_URL=https://tfscvycomllamoubtlcf.supabase.co --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_VeJIjcsILLniCHf2HjA20A_xlMydma0
