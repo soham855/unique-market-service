@@ -24,7 +24,7 @@ grant select, update on table public.service_reports to service_role;
 create or replace function public.guard_service_report_customer_approval()
 returns trigger
 language plpgsql
-set search_path = pg_catalog, public, auth
+set search_path = pg_catalog, public
 as $$
 begin
   -- Inserts must not be able to forge a completed customer approval either.
@@ -34,8 +34,7 @@ begin
          or coalesce(new.customer_otp_verified, false) is true
          or new.customer_approved_at is not null
        )
-       and coalesce(auth.role(), '') <> 'service_role'
-       and current_user not in ('postgres', 'supabase_admin') then
+       and current_user not in ('postgres', 'supabase_admin', 'service_role') then
       raise exception 'Customer approval can only be recorded by the trusted server'
         using errcode = '42501';
     end if;
@@ -47,8 +46,7 @@ begin
        or new.customer_otp_verified is distinct from old.customer_otp_verified
        or new.customer_approved_at is distinct from old.customer_approved_at
      )
-     and coalesce(auth.role(), '') <> 'service_role'
-     and current_user not in ('postgres', 'supabase_admin') then
+     and current_user not in ('postgres', 'supabase_admin', 'service_role') then
     raise exception 'Customer approval can only be recorded by the trusted server'
       using errcode = '42501';
   end if;
