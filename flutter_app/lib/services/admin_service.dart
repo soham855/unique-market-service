@@ -67,6 +67,34 @@ class AdminService {
     }
   }
 
+  Future<List<Map<String,dynamic>>> sosAlerts() async {
+    final rows = await client
+        .from('technician_sos_alerts')
+        .select('id,technician_id,complaint_id,customer_name,location_text,latitude,longitude,notes,status,created_at,acknowledged_at,resolved_at')
+        .order('created_at', ascending: false)
+        .limit(100);
+    return List<Map<String,dynamic>>.from(rows);
+  }
+
+  Future<void> updateSosAlertStatus(String id, String status) async {
+    final user = client.auth.currentUser;
+    if (user == null) throw Exception('Admin session expired.');
+    final now = DateTime.now().toUtc().toIso8601String();
+    final data = <String,dynamic>{'status': status, 'updated_at': now};
+    if (status == 'acknowledged') {
+      data['acknowledged_by'] = user.id;
+      data['acknowledged_at'] = now;
+    }
+    if (status == 'resolved') data['resolved_at'] = now;
+    final updated = await client
+        .from('technician_sos_alerts')
+        .update(data)
+        .eq('id', id)
+        .select('id')
+        .maybeSingle();
+    if (updated == null) throw Exception('SOS alert not found or admin permission is missing.');
+  }
+
   Future<void> assignComplaint(String complaintId, String technicianProfileId, DateTime? visitAt, {String? note}) async {
     final data = <String,dynamic>{
       'technician_id': technicianProfileId,
