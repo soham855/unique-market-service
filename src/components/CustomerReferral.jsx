@@ -22,11 +22,7 @@ export default function CustomerReferral({profile,onBack}){
   const payload={referral_code_id:code.id,referrer_customer_id:customer.id,referred_name:name.trim(),referred_mobile:mobile.trim(),referred_company:company.trim()||null,reward_type:rule?.reward_type||'cash',reward_value:rule?.reward_value||500,reward_text:rule?.reward_text||'₹500 reward'}
   const {data:referral,error}=await supabase.from('referrals').insert(payload).select('*').single()
   if(error){setMessage(error.message);return}
-  const {data:admins}=await supabase.from('profiles').select('id').eq('role','admin')
-  if(admins?.length){
-    const message=`${customer?.name||'Customer'} referred ${name.trim()} (${mobile.trim()})${company.trim()?' • '+company.trim():''}. Reward: ${payload.reward_text}.`
-    await supabase.from('notifications').insert(admins.map(a=>({user_id:a.id,title:'🎁 New Customer Referral',message,type:'customer_referral'})))
-  }
+  // Admin notifications are created by the database trigger for this referral.
   setName('');setMobile('');setCompany('');setMessage('Referral submitted successfully. Admin has been notified.');await load()
  }
  return <section className="complaints-panel referral-panel"><div className="panel-heading"><div><span className="badge">REFERRAL SYSTEM</span><h2>Refer a Customer & Earn Rewards</h2><p>Share your referral code and track every referral from submission to reward.</p></div><button className="secondary" onClick={onBack}>← Back</button></div>
