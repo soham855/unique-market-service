@@ -947,7 +947,7 @@ class _CustomerPortalPaymentsPageState extends State<CustomerPortalPaymentsPage>
   double get _balance {
     final selected = _selected;
     if (selected == null) return 0;
-    return (_number(selected['subtotal']) - _number(selected['paid_amount'])).clamp(0, double.infinity);
+    return (_number(selected['subtotal']) - _number(selected['paid_amount'])).clamp(0, double.infinity).toDouble();
   }
 
   bool get _upiEnabled => _settings?['is_enabled'] != false;
@@ -1176,6 +1176,7 @@ class _CustomerPortalPaymentsPageState extends State<CustomerPortalPaymentsPage>
                     TextField(
                       controller: _utr,
                       textCapitalization: TextCapitalization.characters,
+                      onChanged: (_) => setState(() {}),
                       decoration: const InputDecoration(labelText: 'UTR / Transaction Reference No.'),
                     ),
                     const SizedBox(height: 12),
