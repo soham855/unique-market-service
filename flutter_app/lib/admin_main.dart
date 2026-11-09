@@ -235,7 +235,52 @@ Future<void>exportPdf()async{final doc=pw.Document();final now=DateTime.now();do
 Widget _metric(String title,String value,IconData icon)=>Card(child:Padding(padding:const EdgeInsets.all(14),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Icon(icon,color:const Color(0xFF0B63F6)),const SizedBox(height:5),Text(value,style:const TextStyle(fontSize:21,fontWeight:FontWeight.w900)),Text(title,style:const TextStyle(color:Colors.black54))])));}
 
 class CustomersPage extends StatefulWidget { final AdminService service; const CustomersPage({super.key,required this.service}); @override State<CustomersPage> createState()=>_CustomersPageState(); }
-class _CustomersPageState extends State<CustomersPage>{List<Map<String,dynamic>> rows=[];bool loading=true;@override void initState(){super.initState();load();}Future<void>load()async{try{rows=await widget.service.customers();if(mounted)setState(()=>loading=false);}catch(_){if(mounted)setState(()=>loading=false);}}@override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const Text('Customers')),body:loading?const Center(child:CircularProgressIndicator()):ListView.builder(padding:const EdgeInsets.all(12),itemCount:rows.length,itemBuilder:(_,i){final c=rows[i];return Card(child:ListTile(leading:const CircleAvatar(child:Icon(Icons.person_outline)),title:Text((c['name']??'Customer').toString(),style:const TextStyle(fontWeight:FontWeight.w800)),subtitle:Text((c['customer_code']??'-').toString()+' • '+(c['mobile']??'-').toString()),trailing:const Icon(Icons.chevron_right)));}));
+class _CustomersPageState extends State<CustomersPage>{
+  List<Map<String,dynamic>> rows=[];
+  bool loading=true;
+  final Set<String> provisioning={};
+  @override void initState(){super.initState();load();}
+  Future<void>load()async{try{rows=await widget.service.customers();if(mounted)setState(()=>loading=false);}catch(e){if(mounted){setState(()=>loading=false);ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(e.toString())));}}}
+  Future<void>provision(Map<String,dynamic> customer)async{
+    final id=(customer['id']??'').toString();
+    if(id.isEmpty)return;
+    final approved=await showDialog<bool>(context:context,builder:(ctx)=>AlertDialog(
+      title:const Text('Create Customer Login?'),
+      content:Text('Create an unverified login for '+(customer['name']??'this customer').toString()+' using '+(customer['mobile']??'').toString()+'. The customer must verify ownership by SMS OTP before signing in.'),
+      actions:[TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('Cancel')),FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:const Text('Create Login'))],
+    ));
+    if(approved!=true)return;
+    setState(()=>provisioning.add(id));
+    try{
+      final result=await widget.service.provisionExistingCustomer(id);
+      await load();
+      if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('Login created for '+(result['phone']??customer['mobile']??'customer').toString()+'. Phone is not verified yet; customer must complete OTP.')));
+    }catch(e){
+      if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(e.toString())));
+    }finally{if(mounted)setState(()=>provisioning.remove(id));}
+  }
+  @override Widget build(BuildContext context)=>Scaffold(
+    appBar:AppBar(title:const Text('Customers'),actions:[IconButton(onPressed:load,icon:const Icon(Icons.refresh))]),
+    body:loading?const Center(child:CircularProgressIndicator()):RefreshIndicator(
+      onRefresh:load,
+      child:ListView.builder(padding:const EdgeInsets.all(12),itemCount:rows.length,itemBuilder:(_,i){
+        final c=rows[i];
+        final id=(c['id']??'').toString();
+        final linked=(c['user_id']!=null&&c['profile_id']!=null);
+        final busy=provisioning.contains(id);
+        return Card(child:ListTile(
+          leading:const CircleAvatar(child:Icon(Icons.person_outline)),
+          title:Text((c['name']??'Customer').toString(),style:const TextStyle(fontWeight:FontWeight.w800)),
+          subtitle:Text((c['customer_code']??'-').toString()+' • '+(c['mobile']??'-').toString()),
+          trailing:linked?const Chip(label:Text('Login Linked')):IconButton(
+            tooltip:'Create secure customer login',
+            onPressed:busy?null:()=>provision(c),
+            icon:busy?const SizedBox(width:20,height:20,child:CircularProgressIndicator(strokeWidth:2)):const Icon(Icons.person_add_alt_1),
+          ),
+        ));
+      }),
+    ),
+  );
 }
 
 class TechniciansPage extends StatefulWidget { final AdminService service; const TechniciansPage({super.key,required this.service}); @override State<TechniciansPage> createState()=>_TechniciansPageState(); }
