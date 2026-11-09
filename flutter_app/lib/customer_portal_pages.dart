@@ -277,7 +277,8 @@ class _CustomerAiServiceAssistantPageState extends State<CustomerAiServiceAssist
 }
 
 class CustomerServiceHistoryPage extends StatefulWidget {
-  const CustomerServiceHistoryPage({super.key});
+  final void Function(Map<String, dynamic> ticket) onOpenTicket;
+  const CustomerServiceHistoryPage({super.key, required this.onOpenTicket});
 
   @override
   State<CustomerServiceHistoryPage> createState() => _CustomerServiceHistoryPageState();
@@ -362,10 +363,7 @@ class _CustomerServiceHistoryPageState extends State<CustomerServiceHistoryPage>
                           ),
                           isThreeLine: true,
                           trailing: const Icon(Icons.chevron_right),
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => TicketDetailsPage(ticket: ticket)),
-                          ),
+                          onTap: () => widget.onOpenTicket(ticket),
                         ),
                       )),
                   const SizedBox(height: 16),
@@ -374,10 +372,7 @@ class _CustomerServiceHistoryPageState extends State<CustomerServiceHistoryPage>
                         child: ListTile(
                           title: Text((ticket['ticket_no'] ?? ticket['complaint_no'] ?? ticket['title'] ?? 'Service Request').toString()),
                           subtitle: Text((ticket['created_at'] ?? '').toString() + ' • ' + (ticket['status'] ?? 'New').toString()),
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => TicketDetailsPage(ticket: ticket)),
-                          ),
+                          onTap: () => widget.onOpenTicket(ticket),
                         ),
                       )),
                 ],
