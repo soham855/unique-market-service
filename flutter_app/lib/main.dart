@@ -170,6 +170,25 @@ class _LoginPageState extends State<LoginPage> {
   final identifier = TextEditingController();
   final otp = TextEditingController();
   bool sent = false, busy = false, remember = true;
+  int resendSeconds = 0;
+  Timer? _resendTimer;
+
+  void _startResendCooldown() {
+    _resendTimer?.cancel();
+    setState(() => resendSeconds = 60);
+    _resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) { timer.cancel(); return; }
+      if (resendSeconds <= 1) { timer.cancel(); setState(() => resendSeconds = 0); }
+      else { setState(() => resendSeconds--); }
+    });
+  }
+
+  String _friendlyAuthError(Object error) {
+    final message = error.toString();
+    if (message.contains('over_email_send_rate_limit') || message.contains('429')) return 'Too many OTP requests. Please wait before requesting another code.';
+    if (message.contains('Signups not allowed')) return 'This email is not linked to an existing customer login. Contact Unique Market.';
+    return 'Login failed: $message';
+  }
 
   bool get isEmail => identifier.text.trim().contains('@');
 
@@ -181,9 +200,11 @@ class _LoginPageState extends State<LoginPage> {
       );
       return;
     }
+    if (resendSeconds > 0) return;
     setState(() => busy = true);
     try {
       await AuthService(Supabase.instance.client).sendOtp(value);
+      _startResendCooldown();
       if (mounted) {
         setState(() { sent = true; busy = false; });
         ScaffoldMessenger.of(context).showSnackBar(
@@ -194,7 +215,7 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) return;
       setState(() => busy = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Login failed. Only existing customer accounts can sign in. Details: $e')),
+        SnackBar(content: Text(_friendlyAuthError(e))),
       );
     }
   }
@@ -231,6 +252,7 @@ class _LoginPageState extends State<LoginPage> {
   void dispose() {
     identifier.dispose();
     otp.dispose();
+    _resendTimer?.cancel();
     super.dispose();
   }
 
@@ -268,7 +290,11 @@ class _LoginPageState extends State<LoginPage> {
             onPressed: busy ? null : (sent ? verify : send),
             child: busy ? const CircularProgressIndicator(color: Colors.white) : Text(sent ? 'VERIFY & CONTINUE' : 'SEND LOGIN CODE'),
           )),
-          if (sent) TextButton(onPressed: () => setState(() { sent = false; otp.clear(); }), child: const Text('Change email or mobile number')),
+          if (sent) ...[
+            Text('Didn’t receive the code? ${resendSeconds > 0 ? 'Try again in ${resendSeconds}s' : 'You can resend now.'}', style: const TextStyle(color: Colors.black54)),
+            TextButton(onPressed: busy || resendSeconds > 0 ? null : send, child: const Text('RESEND CODE')),
+            TextButton(onPressed: () { _resendTimer?.cancel(); setState(() { sent = false; otp.clear(); resendSeconds = 0; }); }, child: const Text('Change email or mobile number')),
+          ],
           const SizedBox(height: 28),
           const Text('CCTV | IT Security | Service & AMC', style: TextStyle(fontWeight: FontWeight.w700)),
           const Text('Station Road, Hotel Rajdoot, Ichalkaranji\\n7350060071', style: TextStyle(color: Colors.black54)),
