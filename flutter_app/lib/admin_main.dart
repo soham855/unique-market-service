@@ -407,6 +407,7 @@ class SosAlertsPage extends StatefulWidget {
 
 class _SosAlertsPageState extends State<SosAlertsPage> {
   List<Map<String,dynamic>> alerts = [];
+  List<Map<String,dynamic>> profiles = [];
   bool loading = true;
   Timer? timer;
   final Set<String> updating = {};
@@ -426,8 +427,17 @@ class _SosAlertsPageState extends State<SosAlertsPage> {
 
   Future<void> load() async {
     try {
-      final rows = await widget.service.sosAlerts();
-      if (mounted) setState(() { alerts = rows; loading = false; });
+      final results = await Future.wait([
+        widget.service.sosAlerts(),
+        widget.service.technicians(),
+      ]);
+      final rows = results[0] as List<Map<String,dynamic>>;
+      final loginProfiles = results[1] as List<Map<String,dynamic>>;
+      if (mounted) setState(() {
+        alerts = rows;
+        profiles = loginProfiles;
+        loading = false;
+      });
     } catch (e) {
       if (mounted) {
         setState(() => loading = false);
@@ -489,6 +499,12 @@ class _SosAlertsPageState extends State<SosAlertsPage> {
                   final status = (alert['status'] ?? 'open').toString();
                   final lat = alert['latitude']?.toString();
                   final lon = alert['longitude']?.toString();
+                  final linkedProfiles = profiles.where(
+                    (profile) => profile['id'].toString() == alert['technician_id'].toString(),
+                  );
+                  final technicianName = linkedProfiles.isEmpty
+                      ? (alert['technician_id'] ?? 'Unknown').toString()
+                      : (linkedProfiles.first['full_name'] ?? 'Technician').toString();
                   return Card(
                     margin: const EdgeInsets.only(bottom: 12),
                     child: Padding(
@@ -505,7 +521,7 @@ class _SosAlertsPageState extends State<SosAlertsPage> {
                             )),
                             Chip(label: Text(status.toUpperCase())),
                           ]),
-                          Text('Technician ID: ${alert['technician_id'] ?? '-'}'),
+                          Text('Technician: $technicianName'),
                           if (alert['complaint_id'] != null) Text('Ticket ID: ${alert['complaint_id']}'),
                           Text('Location: ${alert['location_text'] ?? 'Not available'}'),
                           if (lat != null && lon != null) Text('GPS: $lat, $lon'),
