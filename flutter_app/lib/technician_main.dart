@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'config/supabase_config.dart';
@@ -729,11 +730,21 @@ class _TechnicianJobDetailsPageState extends State<TechnicianJobDetailsPage> {
   final labour = TextEditingController(text: '0');
   final other = TextEditingController(text: '0');
   bool busy = false;
+  bool tracking = false;
+  bool trackingStarting = false;
+  late String currentStatus;
+  StreamSubscription<Position>? locationSubscription;
+  String? trackingSessionId;
   double? distanceMeters;
   Map<String,dynamic>? report;
 
   @override
   void dispose() {
+    locationSubscription?.cancel();
+    final activeSessionId = trackingSessionId;
+    if (activeSessionId != null) {
+      unawaited(service.endTrackingSession(activeSessionId));
+    }
     diagnosis.dispose();
     work.dispose();
     parts.dispose();
@@ -746,7 +757,11 @@ class _TechnicianJobDetailsPageState extends State<TechnicianJobDetailsPage> {
   @override
   void initState() {
     super.initState();
+    currentStatus = (widget.job['status'] ?? 'New').toString();
     _loadReport();
+    if (currentStatus == 'On The Way') {
+      WidgetsBinding.instance.addPostFrameCallback((_) => startTracking());
+    }
   }
 
   Future<void> _loadReport() async {
@@ -754,6 +769,105 @@ class _TechnicianJobDetailsPageState extends State<TechnicianJobDetailsPage> {
       report = await service.activeReport(widget.job['id'].toString());
       if (mounted) setState(() {});
     } catch (_) {}
+  }
+
+  Future<void> startTracking() async {
+    if (tracking || trackingStarting || !mounted) return;
+    trackingStarting = true;
+    final complaintId = widget.job['id'].toString();
+    try {
+      trackingSessionId = await service.startTrackingSession(complaintId);
+      final firstPosition = await service.currentPosition();
+      await service.recordLocation(complaintId, firstPosition);
+      locationSubscription = Geolocator.getPositionStream(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          distanceFilter: 20,
+        ),
+      ).listen((position) {
+        service.recordLocation(complaintId, position).catchError((error) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Location update failed: $error')),
+            );
+          }
+        });
+      });
+      if (mounted) {
+        setState(() => tracking = true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Live location sharing started while this app is open.')),
+        );
+      }
+    } catch (e) {
+      final activeSessionId = trackingSessionId;
+      trackingSessionId = null;
+      if (activeSessionId != null) {
+        try { await service.endTrackingSession(activeSessionId); } catch (_) {}
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    } finally {
+      trackingStarting = false;
+    }
+  }
+
+  Future<void> stopTracking() async {
+    await locationSubscription?.cancel();
+    locationSubscription = null;
+    final activeSessionId = trackingSessionId;
+    trackingSessionId = null;
+    if (activeSessionId != null) {
+      await service.endTrackingSession(activeSessionId);
+    }
+    if (mounted) setState(() => tracking = false);
+  }
+
+  Future<void> sendSos() async {
+    final noteController = TextEditingController();
+    final notes = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Emergency SOS'),
+        content: TextField(
+          controller: noteController,
+          maxLines: 3,
+          decoration: const InputDecoration(
+            labelText: 'What happened? (optional)',
+            hintText: 'Describe the emergency',
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('CANCEL')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(dialogContext, noteController.text),
+            child: const Text('SEND SOS'),
+          ),
+        ],
+      ),
+    );
+    noteController.dispose();
+    if (notes == null) return;
+    setState(() => busy = true);
+    try {
+      await service.sendSosAlert(
+        complaintId: widget.job['id']?.toString(),
+        customerName: widget.job['customer_name']?.toString(),
+        locationText: (widget.job['address'] ?? widget.job['location_text'])?.toString(),
+        notes: notes,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Emergency SOS recorded with your latest available location.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
   }
 
   Future<void> openNavigation() async {
@@ -781,13 +895,26 @@ class _TechnicianJobDetailsPageState extends State<TechnicianJobDetailsPage> {
     setState(() => busy = true);
     try {
       final id = widget.job['id'].toString();
-      if (status == 'Assigned') await service.acceptJob(id);
-      else if (status == 'On The Way') await service.updateStatus(id, status);
-      else if (status == 'Reached') await service.updateStatus(id, status);
-      else if (status == 'In Service') {
+      if (status == 'Assigned') {
+        await service.acceptJob(id);
+      } else if (status == 'On The Way') {
+        await service.updateStatus(id, status);
+        await startTracking();
+      } else if (status == 'Reached') {
+        await service.updateStatus(id, status);
+        await stopTracking();
+      } else if (status == 'In Service') {
         report = await service.startVisit(id, diagnosis: diagnosis.text.trim().isEmpty ? null : diagnosis.text.trim());
       }
-      if (mounted) { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Status updated: ' + status))); if (status != 'In Service') Navigator.pop(context); else setState(() {}); }
+      if (mounted) {
+        setState(() => currentStatus = status);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Status updated: ' + status)));
+        if (status == 'On The Way' || status == 'In Service') {
+          setState(() {});
+        } else {
+          Navigator.pop(context);
+        }
+      }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
     } finally { if (mounted) setState(() => busy = false); }
@@ -874,7 +1001,7 @@ class _TechnicianJobDetailsPageState extends State<TechnicianJobDetailsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final j = widget.job; final status = j['status']?.toString() ?? 'New';
+    final j = widget.job; final status = currentStatus;
     final before = (report?['before_photo_url']?.toString() ?? '').isNotEmpty;
     final after = (report?['after_photo_url']?.toString() ?? '').isNotEmpty;
     final signed = (report?['customer_signature']?.toString() ?? '').isNotEmpty;
@@ -888,10 +1015,31 @@ class _TechnicianJobDetailsPageState extends State<TechnicianJobDetailsPage> {
           _row('Customer', j['customer_name']), _row('Mobile', j['customer_phone']), _row('Service', j['service_type']), _row('Problem', j['category']), _row('Address', j['address'] ?? j['location_text']), _row('Visit', j['scheduled_visit_at'] ?? j['scheduled_visit_date']),
         ]))),
         const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: busy ? null : sendSos,
+            style: OutlinedButton.styleFrom(foregroundColor: Colors.red, side: const BorderSide(color: Colors.red)),
+            icon: const Icon(Icons.sos),
+            label: const Text('EMERGENCY SOS'),
+          ),
+        ),
+        if (tracking) const Card(
+          child: ListTile(
+            leading: Icon(Icons.gps_fixed, color: Colors.green),
+            title: Text('Live Location Sharing Active'),
+            subtitle: Text('Location updates are shared while the technician app remains open.'),
+          ),
+        ),
         if (distanceMeters != null) Card(child: ListTile(leading: const Icon(Icons.gps_fixed), title: const Text('GPS Verified'), subtitle: Text(distanceMeters!.toStringAsFixed(0) + ' m from customer location'))),
         if (status == 'New') _button('ACCEPT JOB', Icons.check, 'Assigned')
         else if (status == 'Assigned' || status == 'Scheduled') _button("I'M ON THE WAY", Icons.navigation_outlined, 'On The Way')
         else if (status == 'On The Way') ...[
+          if (!tracking) OutlinedButton.icon(
+            onPressed: busy || trackingStarting ? null : startTracking,
+            icon: const Icon(Icons.gps_fixed),
+            label: const Text('START LIVE LOCATION SHARING'),
+          ),
           OutlinedButton.icon(onPressed: busy ? null : openNavigation, icon: const Icon(Icons.map_outlined), label: const Text('NAVIGATE TO CUSTOMER')),
           const SizedBox(height: 10), _button('VERIFY LOCATION & REACH', Icons.location_on_outlined, 'Reached')
         ] else if (status == 'Reached') ...[
