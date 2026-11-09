@@ -166,13 +166,23 @@ class _AdminHomePageState extends State<AdminHomePage> {
       const SizedBox(height:18),_grid(),
       const SizedBox(height:14),
       Card(child:ListTile(leading:const CircleAvatar(child:Icon(Icons.autorenew)),title:const Text('AMC Renewal Requests',style:TextStyle(fontWeight:FontWeight.w800)),subtitle:const Text('View and manage customer AMC renewals'),trailing:const Icon(Icons.chevron_right),onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const AdminAmcRenewalsPage())).then((_){load();}))),
+      const SizedBox(height:18),
+      SizedBox(
+        width: double.infinity,
+        child: OutlinedButton.icon(
+          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SosAlertsPage(service: service))),
+          style: OutlinedButton.styleFrom(foregroundColor: Colors.red, side: const BorderSide(color: Colors.red)),
+          icon: const Icon(Icons.sos),
+          label: const Text('OPEN TECHNICIAN SOS ALERTS'),
+        ),
+      ),
       const SizedBox(height:22),const Text('Live Complaints',style:TextStyle(fontSize:20,fontWeight:FontWeight.w800)),const SizedBox(height:10),
       ...complaints.take(10).map((c)=>AdminComplaintTile(complaint:c,technicians:technicians,onChanged:load)),
       if(complaints.isEmpty)const Card(child:Padding(padding:EdgeInsets.all(22),child:Text('No complaints found.'))),
       const SizedBox(height:20),const Center(child:Text('UNIQUE MARKET • 7350060071',style:TextStyle(color:Colors.black45)))
     ])),
-    bottomNavigationBar:NavigationBar(selectedIndex:tab,onDestinationSelected:(i){setState(()=>tab=i);if(i==1)Navigator.push(context,MaterialPageRoute(builder:(_)=>ComplaintsPage(service:service))).then((_){load();});else if(i==2)Navigator.push(context,MaterialPageRoute(builder:(_)=>CustomersPage(service:service)));else if(i==3)Navigator.push(context,MaterialPageRoute(builder:(_)=>TechniciansPage(service:service)));else if(i==4)Navigator.push(context,MaterialPageRoute(builder:(_)=>PaymentsPage(service:service)));else if(i==5)Navigator.push(context,MaterialPageRoute(builder:(_)=>ReportsPage(service:service)));else if(i==6)Navigator.push(context,MaterialPageRoute(builder:(_)=>SosAlertsPage(service:service)));},destinations:const[
-      NavigationDestination(icon:Icon(Icons.dashboard_outlined),label:'Dashboard'),NavigationDestination(icon:Icon(Icons.confirmation_num_outlined),label:'Complaints'),NavigationDestination(icon:Icon(Icons.people_outline),label:'Customers'),NavigationDestination(icon:Icon(Icons.engineering_outlined),label:'Technicians'),NavigationDestination(icon:Icon(Icons.payments_outlined),label:'Payments'),NavigationDestination(icon:Icon(Icons.analytics_outlined),label:'Reports'),NavigationDestination(icon:Icon(Icons.sos_outlined),label:'SOS')
+    bottomNavigationBar:NavigationBar(selectedIndex:tab,onDestinationSelected:(i){setState(()=>tab=i);if(i==1)Navigator.push(context,MaterialPageRoute(builder:(_)=>ComplaintsPage(service:service))).then((_){load();});else if(i==2)Navigator.push(context,MaterialPageRoute(builder:(_)=>CustomersPage(service:service)));else if(i==3)Navigator.push(context,MaterialPageRoute(builder:(_)=>TechniciansPage(service:service)));else if(i==4)Navigator.push(context,MaterialPageRoute(builder:(_)=>PaymentsPage(service:service)));else if(i==5)Navigator.push(context,MaterialPageRoute(builder:(_)=>ReportsPage(service:service)));},destinations:const[
+      NavigationDestination(icon:Icon(Icons.dashboard_outlined),label:'Dashboard'),NavigationDestination(icon:Icon(Icons.confirmation_num_outlined),label:'Complaints'),NavigationDestination(icon:Icon(Icons.people_outline),label:'Customers'),NavigationDestination(icon:Icon(Icons.engineering_outlined),label:'Technicians'),NavigationDestination(icon:Icon(Icons.payments_outlined),label:'Payments'),NavigationDestination(icon:Icon(Icons.analytics_outlined),label:'Reports')
     ])
   );
   Widget _grid()=>GridView.count(crossAxisCount:2,shrinkWrap:true,physics:const NeverScrollableScrollPhysics(),crossAxisSpacing:10,mainAxisSpacing:10,childAspectRatio:1.45,children:[
