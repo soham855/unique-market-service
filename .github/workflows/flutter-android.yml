@@ -181,7 +181,7 @@ jobs:
           content = content.replace("com.uniquemarket.instantservices", "com.uniquemarket.admin")
           # Admin authenticates through Supabase OTP and does not initialize Firebase.
           # Remove the app-level Google Services plugin line for this separate package.
-          content = "\\n".join(line for line in content.splitlines() if "com.google.gms.google-services" not in line) + "\\n"
+          content = "\n".join(line for line in content.splitlines() if "com.google.gms.google-services" not in line) + "\n"
           target.write_text(content)
           for path in Path("android/app/src/main").rglob("*"):
               if path.is_file() and path.name in ("MainActivity.kt", "MainActivity.java"):
