@@ -238,5 +238,152 @@ class CustomersPage extends StatefulWidget { final AdminService service; const C
 class _CustomersPageState extends State<CustomersPage>{List<Map<String,dynamic>> rows=[];bool loading=true;@override void initState(){super.initState();load();}Future<void>load()async{try{rows=await widget.service.customers();if(mounted)setState(()=>loading=false);}catch(_){if(mounted)setState(()=>loading=false);}}@override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const Text('Customers')),body:loading?const Center(child:CircularProgressIndicator()):ListView.builder(padding:const EdgeInsets.all(12),itemCount:rows.length,itemBuilder:(_,i){final c=rows[i];return Card(child:ListTile(leading:const CircleAvatar(child:Icon(Icons.person_outline)),title:Text((c['name']??'Customer').toString(),style:const TextStyle(fontWeight:FontWeight.w800)),subtitle:Text((c['customer_code']??'-').toString()+' • '+(c['mobile']??'-').toString()),trailing:const Icon(Icons.chevron_right)));}));
 }
 
-class TechniciansPage extends StatefulWidget { final AdminService service; const TechniciansPage({super.key,required this.service}); @override State<TechniciansPage> createState()=>_TechniciansPageState(); }
-class _TechniciansPageState extends State<TechniciansPage>{List<Map<String,dynamic>> rows=[];bool loading=true;@override void initState(){super.initState();load();}Future<void>load()async{try{rows=await widget.service.technicians();if(mounted)setState(()=>loading=false);}catch(_){if(mounted)setState(()=>loading=false);}}@override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const Text('Technicians')),body:loading?const Center(child:CircularProgressIndicator()):ListView.builder(padding:const EdgeInsets.all(12),itemCount:rows.length,itemBuilder:(_,i){final t=rows[i];return Card(child:ListTile(leading:const CircleAvatar(child:Icon(Icons.engineering_outlined)),title:Text((t['name']??'Technician').toString(),style:const TextStyle(fontWeight:FontWeight.w800)),subtitle:Text((t['mobile']??'-').toString()),trailing:Chip(label:Text('Active'))));}));}
+class TechniciansPage extends StatefulWidget {
+  final AdminService service;
+  const TechniciansPage({super.key, required this.service});
+  @override
+  State<TechniciansPage> createState() => _TechniciansPageState();
+}
+
+class _TechniciansPageState extends State<TechniciansPage> {
+  List<Map<String, dynamic>> profiles = [];
+  List<Map<String, dynamic>> records = [];
+  Map<String, String?> selections = {};
+  bool loading = true;
+  final Set<String> saving = {};
+
+  @override
+  void initState() {
+    super.initState();
+    load();
+  }
+
+  Future<void> load() async {
+    try {
+      final results = await Future.wait([
+        widget.service.technicians(),
+        widget.service.technicianRecords(),
+      ]);
+      final nextProfiles = results[0] as List<Map<String, dynamic>>;
+      final nextRecords = results[1] as List<Map<String, dynamic>>;
+      if (!mounted) return;
+      setState(() {
+        profiles = nextProfiles;
+        records = nextRecords;
+        selections = {
+          for (final record in nextRecords)
+            record['id'].toString(): record['profile_id']?.toString(),
+        };
+        loading = false;
+      });
+    } catch (e) {
+      if (mounted) {
+        setState(() => loading = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    }
+  }
+
+  Future<void> saveLink(String recordId) async {
+    final profileId = selections[recordId];
+    if (profileId == null || profileId.isEmpty) return;
+    setState(() => saving.add(recordId));
+    try {
+      await widget.service.linkTechnicianProfile(recordId, profileId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Technician login profile linked successfully.')),
+        );
+        await load();
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    } finally {
+      if (mounted) setState(() => saving.remove(recordId));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(
+      title: const Text('Technicians & Login Links'),
+      actions: [IconButton(onPressed: loading ? null : load, icon: const Icon(Icons.refresh))],
+    ),
+    body: loading
+        ? const Center(child: CircularProgressIndicator())
+        : RefreshIndicator(
+            onRefresh: load,
+            child: ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                const Text('Technician Login Profiles', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
+                const SizedBox(height: 8),
+                if (profiles.isEmpty)
+                  const Card(child: Padding(padding: EdgeInsets.all(16), child: Text('No technician login profiles found.'))),
+                ...profiles.map((profile) => Card(
+                  child: ListTile(
+                    leading: const CircleAvatar(child: Icon(Icons.account_circle_outlined)),
+                    title: Text((profile['full_name'] ?? 'Technician').toString()),
+                    subtitle: Text((profile['phone'] ?? 'Email / phone profile').toString()),
+                    trailing: const Chip(label: Text('Login')),
+                  ),
+                )),
+                const SizedBox(height: 20),
+                const Text('Operational Technician Records', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
+                const SizedBox(height: 8),
+                if (records.isEmpty)
+                  const Card(child: Padding(padding: EdgeInsets.all(16), child: Text('No operational technician records found.'))),
+                ...records.map((record) {
+                  final id = record['id'].toString();
+                  final currentId = selections[id];
+                  final occupied = records
+                      .where((other) => other['id'].toString() != id && other['profile_id'] != null)
+                      .map((other) => other['profile_id'].toString())
+                      .toSet();
+                  final options = profiles.where((profile) {
+                    final profileId = profile['id'].toString();
+                    return profileId == currentId || !occupied.contains(profileId);
+                  }).toList();
+                  final validValue = options.any((profile) => profile['id'].toString() == currentId)
+                      ? currentId
+                      : null;
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text((record['name'] ?? 'Technician').toString(), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                          Text('Mobile: ${record['mobile'] ?? '-'} • Status: ${record['status'] ?? '-'}', style: const TextStyle(color: Colors.black54)),
+                          const SizedBox(height: 12),
+                          DropdownButtonFormField<String>(
+                            value: validValue,
+                            decoration: const InputDecoration(labelText: 'Link Login Profile'),
+                            items: options.map((profile) => DropdownMenuItem(
+                              value: profile['id'].toString(),
+                              child: Text((profile['full_name'] ?? profile['phone'] ?? profile['id']).toString()),
+                            )).toList(),
+                            onChanged: (value) => setState(() => selections[id] = value),
+                          ),
+                          const SizedBox(height: 10),
+                          SizedBox(
+                            width: double.infinity,
+                            child: FilledButton.icon(
+                              onPressed: saving.contains(id) || validValue == null ? null : () => saveLink(id),
+                              icon: saving.contains(id)
+                                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                                  : const Icon(Icons.link),
+                              label: Text(saving.contains(id) ? 'Saving...' : 'SAVE LOGIN LINK'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+  );
+}
