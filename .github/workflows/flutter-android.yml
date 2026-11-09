@@ -51,10 +51,18 @@ jobs:
 
       - name: Align Android launcher package with application ID
         run: |
-          # flutter create generates MainActivity under the project-name package
-          # (com.uniquemarket.instant_services). Firebase and Gradle use
-          # com.uniquemarket.instantservices, so align the native entry point.
-          find android/app/src/main -type f \\( -name 'MainActivity.kt' -o -name 'MainActivity.java' \\) -print -exec sed -i 's/com\\.uniquemarket\\.instant_services/com.uniquemarket.instantservices/g' {} \\;
+          python3 - <<'PY'
+          from pathlib import Path
+          for path in Path("android/app/src/main").rglob("*"):
+              if path.is_file() and path.name in ("MainActivity.kt", "MainActivity.java"):
+                  content = path.read_text()
+                  content = content.replace(
+                      "com.uniquemarket.instant_services",
+                      "com.uniquemarket.instantservices",
+                  )
+                  path.write_text(content)
+                  print(f"Updated {path}")
+          PY
           grep -R 'package com.uniquemarket.instantservices' android/app/src/main
 
       - name: Remove generated Flutter sample test
