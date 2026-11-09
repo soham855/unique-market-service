@@ -34,6 +34,82 @@ class TechnicianService {
     return Geolocator.getCurrentPosition(locationSettings: const LocationSettings(accuracy: LocationAccuracy.high));
   }
 
+  Future<String> startTrackingSession(String complaintId) async {
+    final user = client.auth.currentUser;
+    if (user == null) throw Exception('Technician session expired.');
+    final existing = await client
+        .from('technician_tracking_sessions')
+        .select('id')
+        .eq('technician_id', user.id)
+        .eq('complaint_id', complaintId)
+        .eq('status', 'active')
+        .order('started_at', ascending: false)
+        .limit(1);
+    if (existing.isNotEmpty) return existing.first['id'].toString();
+    final row = await client.from('technician_tracking_sessions').insert({
+      'technician_id': user.id,
+      'complaint_id': complaintId,
+      'started_at': DateTime.now().toUtc().toIso8601String(),
+      'status': 'active',
+    }).select('id').single();
+    return row['id'].toString();
+  }
+
+  Future<void> recordLocation(String complaintId, Position position) async {
+    final user = client.auth.currentUser;
+    if (user == null) throw Exception('Technician session expired.');
+    await client.from('technician_locations').insert({
+      'technician_id': user.id,
+      'complaint_id': complaintId,
+      'latitude': position.latitude,
+      'longitude': position.longitude,
+      'accuracy': position.accuracy,
+      'speed': position.speed,
+      'heading': position.heading,
+      'recorded_at': DateTime.now().toUtc().toIso8601String(),
+    });
+  }
+
+  Future<void> endTrackingSession(String sessionId) async {
+    final user = client.auth.currentUser;
+    if (user == null) return;
+    await client
+        .from('technician_tracking_sessions')
+        .update({
+          'ended_at': DateTime.now().toUtc().toIso8601String(),
+          'status': 'ended',
+        })
+        .eq('id', sessionId)
+        .eq('technician_id', user.id)
+        .eq('status', 'active');
+  }
+
+  Future<void> sendSosAlert({
+    String? complaintId,
+    String? customerName,
+    String? locationText,
+    required String notes,
+  }) async {
+    final user = client.auth.currentUser;
+    if (user == null) throw Exception('Technician session expired.');
+    Position? position;
+    try {
+      position = await currentPosition();
+    } catch (_) {
+      // Emergency SOS must still be recorded when GPS is unavailable.
+    }
+    await client.from('technician_sos_alerts').insert({
+      'technician_id': user.id,
+      'complaint_id': complaintId,
+      'customer_name': customerName,
+      'location_text': locationText,
+      'latitude': position?.latitude,
+      'longitude': position?.longitude,
+      'notes': notes.trim().isEmpty ? 'Technician emergency SOS' : notes.trim(),
+      'status': 'open',
+    });
+  }
+
   Future<double?> verifyCustomerLocation(Map<String, dynamic> job, {double maxMeters = 150}) async {
     final lat = double.tryParse(job['latitude']?.toString() ?? '');
     final lon = double.tryParse(job['longitude']?.toString() ?? '');
