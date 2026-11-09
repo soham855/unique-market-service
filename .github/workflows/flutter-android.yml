@@ -156,15 +156,19 @@ jobs:
           deno check --no-lock --node-modules-dir=auto supabase/functions/service-report-otp/index.ts
 
       - name: Build debug APK
+        if: github.event_name != 'pull_request'
         run: flutter build apk --debug --dart-define=SUPABASE_URL=https://tfscvycomllamoubtlcf.supabase.co --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_VeJIjcsILLniCHf2HjA20A_xlMydma0
 
       - name: Build release APK
+        if: github.event_name != 'pull_request'
         run: flutter build apk --release --dart-define=SUPABASE_URL=https://tfscvycomllamoubtlcf.supabase.co --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_VeJIjcsILLniCHf2HjA20A_xlMydma0
 
       - name: Build release AAB
+        if: github.event_name != 'pull_request'
         run: flutter build appbundle --release --dart-define=SUPABASE_URL=https://tfscvycomllamoubtlcf.supabase.co --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_VeJIjcsILLniCHf2HjA20A_xlMydma0
 
       - name: Preserve customer APK outputs
+        if: github.event_name != 'pull_request'
         run: |
           cp build/app/outputs/flutter-apk/app-debug.apk build/app/outputs/flutter-apk/customer-debug.apk
           cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/customer-release.apk
@@ -228,6 +232,7 @@ jobs:
           retention-days: 30
 
       - name: Upload debug APK
+        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: instant-services-debug-apk
@@ -235,6 +240,7 @@ jobs:
           retention-days: 30
 
       - name: Upload release APK
+        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: instant-services-release-apk
@@ -242,6 +248,7 @@ jobs:
           retention-days: 30
 
       - name: Upload release AAB
+        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: instant-services-release-aab
