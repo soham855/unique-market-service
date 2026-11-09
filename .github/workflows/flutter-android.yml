@@ -1,6 +1,12 @@
 name: Flutter Android Build
 
 on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'flutter_app/**'
+      - '.github/workflows/flutter-android.yml'
+      - 'supabase/migrations/**'
   push:
     branches: [main]
     paths:
