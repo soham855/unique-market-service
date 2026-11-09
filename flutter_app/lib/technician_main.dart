@@ -218,7 +218,7 @@ class _TechnicianLoginPageState extends State<TechnicianLoginPage> {
         const Text('Technician Service Portal'), const SizedBox(height: 36),
         Text(sent ? 'Verify OTP' : 'Technician Login', style: const TextStyle(fontSize: 25, fontWeight: FontWeight.w800)),
         const SizedBox(height: 18),
-        if (!sent) TextField(controller: identifier, keyboardType: TextInputType.emailAddress, textInputAction: TextInputAction.done, autocorrect: false, decoration: const InputDecoration(labelText: 'Registered Mobile Number or Email', prefixIcon: Icon(Icons.account_circle_outlined)))
+        if (!sent) TextField(controller: identifier, keyboardType: TextInputType.text, textInputAction: TextInputAction.done, autocorrect: false, decoration: const InputDecoration(labelText: 'Registered Mobile Number or Email', prefixIcon: Icon(Icons.account_circle_outlined)))
         else TextField(controller: otp, keyboardType: TextInputType.number, maxLength: 6, decoration: const InputDecoration(labelText: 'OTP', prefixIcon: Icon(Icons.lock_outline))),
         const SizedBox(height: 12),
         if (sent) CheckboxListTile(
@@ -718,6 +718,17 @@ class _TechnicianJobDetailsPageState extends State<TechnicianJobDetailsPage> {
   Map<String,dynamic>? report;
 
   @override
+  void dispose() {
+    diagnosis.dispose();
+    work.dispose();
+    parts.dispose();
+    otp.dispose();
+    labour.dispose();
+    other.dispose();
+    super.dispose();
+  }
+
+  @override
   void initState() {
     super.initState();
     _loadReport();
@@ -782,6 +793,23 @@ class _TechnicianJobDetailsPageState extends State<TechnicianJobDetailsPage> {
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
     } finally { if (mounted) setState(() => busy = false); }
+  }
+
+  Future<void> requestOtp() async {
+    if (report == null) return;
+    setState(() => busy = true);
+    try {
+      await service.requestCustomerOtp(report!['id'].toString());
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Customer OTP sent to the registered WhatsApp number.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
   }
 
   Future<void> verifyOtp() async {
@@ -870,7 +898,15 @@ class _TechnicianJobDetailsPageState extends State<TechnicianJobDetailsPage> {
               Expanded(child: TextField(controller: other, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Other ₹', border: OutlineInputBorder()))),
             ]),
           ]))),
-          Card(child: ListTile(leading: Icon(otpOk ? Icons.verified : Icons.pin_outlined), title: Text(otpOk ? 'Customer OTP Verified' : 'Customer OTP Verification'), subtitle: Text(otpOk ? 'Customer approved service completion.' : 'Ask the customer for the OTP shown in their Customer App.'), trailing: otpOk ? const Icon(Icons.check_circle) : null)),
+          Card(child: ListTile(leading: Icon(otpOk ? Icons.verified : Icons.pin_outlined), title: Text(otpOk ? 'Customer OTP Verified' : 'Customer OTP Verification'), subtitle: Text(otpOk ? 'Customer approved service completion.' : 'Send a secure OTP to the customer before asking for the code.'), trailing: otpOk ? const Icon(Icons.check_circle) : null)),
+          if (!otpOk) SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: busy ? null : requestOtp,
+              icon: const Icon(Icons.sms_outlined),
+              label: const Text('SEND CUSTOMER OTP'),
+            ),
+          ),
           if (!otpOk) Row(children: [
             Expanded(child: TextField(controller: otp, keyboardType: TextInputType.number, maxLength: 6, decoration: const InputDecoration(labelText: 'Customer OTP', border: OutlineInputBorder()))),
             const SizedBox(width: 8), FilledButton(onPressed: busy ? null : verifyOtp, child: const Text('VERIFY')),
