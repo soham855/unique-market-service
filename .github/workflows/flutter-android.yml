@@ -8,7 +8,7 @@ on:
       - '.github/workflows/flutter-android.yml'
       - 'supabase/migrations/**'
   push:
-    branches: [main]
+    branches: [main, 'fix/customer-otp-account-linking']
     paths:
       - 'flutter_app/**'
       - '.github/workflows/flutter-android.yml'
