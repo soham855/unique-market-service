@@ -938,20 +938,35 @@ class _InvoicePageState extends State<InvoicePage>{
     )
   );
 }
-class ProfilePage extends StatefulWidget { const ProfilePage({super.key}); @override State<ProfilePage> createState()=>_ProfilePageState(); }
+class ProfilePage extends StatefulWidget {
+  const ProfilePage({super.key});
+  @override State<ProfilePage> createState()=>_ProfilePageState();
+}
 class _ProfilePageState extends State<ProfilePage>{
-  final service=CustomerService(Supabase.instance.client); Map<String,dynamic>? customer;
-  @override void initState(){super.initState();load();} Future<void> load()async{final c=await service.customer();if(mounted)setState(()=>customer=c);}
-  @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const Text('Profile')),body:ListView(padding:const EdgeInsets.all(18),children:[
+  final service=CustomerService(Supabase.instance.client);
+  Map<String,dynamic>? customer;
+  Map<String,dynamic>? profile;
+  @override void initState(){super.initState();load();}
+  Future<void> load()async{
+    try{
+      final rows=await Future.wait([service.customer(),service.profile()]);
+      customer=rows[0];
+      profile=rows[1];
+    }catch(_){}
+    if(mounted)setState((){});
+  }
+  String _value(dynamic primary,dynamic fallback)=>((primary??fallback??'').toString().trim().isEmpty?'-':(primary??fallback).toString());
+  @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const Text('Profile'),actions:[IconButton(onPressed:load,icon:const Icon(Icons.refresh))]),body:ListView(padding:const EdgeInsets.all(18),children:[
     const CircleAvatar(radius:42,child:Icon(Icons.person_outline,size:42)),const SizedBox(height:14),
-    Center(child:Text(customer?['name']?.toString()??'Customer',style:const TextStyle(fontSize:23,fontWeight:FontWeight.w900))),
+    Center(child:Text(_value(profile?['full_name'],customer?['name']),style:const TextStyle(fontSize:23,fontWeight:FontWeight.w900))),
     Center(child:Text(customer?['customer_code']?.toString()??'',style:const TextStyle(color:Colors.black54))),const SizedBox(height:24),
     Card(child:Column(children:[
-      ListTile(leading:const Icon(Icons.phone_outlined),title:const Text('Mobile'),subtitle:Text(customer?['mobile']?.toString()??'-')),
-      ListTile(leading:const Icon(Icons.business_outlined),title:const Text('Company'),subtitle:Text(customer?['company_name']?.toString()??'-')),
-      ListTile(leading:const Icon(Icons.location_on_outlined),title:const Text('Address'),subtitle:Text(customer?['address']?.toString()??'-'))
+      ListTile(leading:const Icon(Icons.phone_outlined),title:const Text('Mobile'),subtitle:Text(_value(profile?['phone'],customer?['mobile']))),
+      ListTile(leading:const Icon(Icons.email_outlined),title:const Text('Email'),subtitle:Text(_value(Supabase.instance.client.auth.currentUser?.email,customer?['email']))),
+      ListTile(leading:const Icon(Icons.business_outlined),title:const Text('Company'),subtitle:Text(_value(profile?['company_name'],customer?['company_name']))),
+      ListTile(leading:const Icon(Icons.location_on_outlined),title:const Text('Site Address'),subtitle:Text(_value(profile?['site_address'],customer?['address']))),
     ])),const SizedBox(height:12),
-    ListTile(leading:const Icon(Icons.edit_outlined),title:const Text('Edit Profile'),subtitle:const Text('Update your contact and site details'),onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const CustomerProfileEditPage()))),
+    ListTile(leading:const Icon(Icons.edit_outlined),title:const Text('Edit Profile'),subtitle:const Text('Update your contact and site details'),onTap:()async{await Navigator.push(context,MaterialPageRoute(builder:(_)=>const CustomerProfileEditPage()));await load();}),
     ListTile(leading:const Icon(Icons.settings_outlined),title:const Text('Settings'),onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const SettingsPage())))
   ]));
 }
