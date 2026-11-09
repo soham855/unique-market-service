@@ -860,7 +860,7 @@ class _TechnicianJobDetailsPageState extends State<TechnicianJobDetailsPage> {
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Emergency SOS recorded with your latest available location.')),
+          const SnackBar(content: Text('SOS alert recorded. Admin SOS dashboard refreshes automatically.')),
         );
       }
     } catch (e) {
