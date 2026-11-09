@@ -1229,3 +1229,79 @@ class _CustomerPortalPaymentsPageState extends State<CustomerPortalPaymentsPage>
     );
   }
 }
+
+
+class CustomerMyComplaintsPage extends StatefulWidget {
+  final void Function(Map<String, dynamic> ticket) onOpenTicket;
+  const CustomerMyComplaintsPage({super.key, required this.onOpenTicket});
+
+  @override
+  State<CustomerMyComplaintsPage> createState() => _CustomerMyComplaintsPageState();
+}
+
+class _CustomerMyComplaintsPageState extends State<CustomerMyComplaintsPage> {
+  final _service = CustomerService(Supabase.instance.client);
+  List<Map<String, dynamic>> _tickets = [];
+  bool _loading = true;
+  String _error = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      _tickets = await _service.tickets();
+      _error = '';
+    } catch (error) {
+      _error = 'Could not load complaints: ' + error.toString();
+    }
+    if (mounted) setState(() => _loading = false);
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        appBar: AppBar(
+          title: const Text('My Complaints'),
+          actions: [IconButton(onPressed: _load, icon: const Icon(Icons.refresh))],
+        ),
+        body: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : RefreshIndicator(
+                onRefresh: _load,
+                child: ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    const Text('Track your complaints, assigned technician and service status.',
+                        style: TextStyle(color: Colors.black54)),
+                    if (_error.isNotEmpty) Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Text(_error, style: const TextStyle(color: Colors.red)),
+                    ),
+                    if (_tickets.isEmpty) const Card(
+                      child: Padding(
+                        padding: EdgeInsets.all(24),
+                        child: Center(child: Text('No complaints found.')),
+                      ),
+                    ),
+                    ..._tickets.map((ticket) => Card(
+                          margin: const EdgeInsets.only(top: 10),
+                          child: ListTile(
+                            leading: const CircleAvatar(child: Icon(Icons.confirmation_num_outlined)),
+                            title: Text((ticket['ticket_no'] ?? ticket['complaint_no'] ?? ticket['title'] ?? 'Service Complaint').toString()),
+                            subtitle: Text(
+                              (ticket['description'] ?? 'No additional details provided.').toString() +
+                                  '\nStatus: ' + (ticket['status'] ?? 'New').toString(),
+                            ),
+                            isThreeLine: true,
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: () => widget.onOpenTicket(ticket),
+                          ),
+                        )),
+                  ],
+                ),
+              ),
+      );
+}
