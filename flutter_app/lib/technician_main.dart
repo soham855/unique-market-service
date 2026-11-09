@@ -151,7 +151,7 @@ class _TechnicianLoginPageState extends State<TechnicianLoginPage> {
   Future<void> verify() async {
     setState(() => busy = true);
     try {
-      final r = await AuthService(Supabase.instance.client).verifyOtp(phone: phone(), token: otp.text);
+      final r = await AuthService(Supabase.instance.client).verifyOtp(identifier: phone(), token: otp.text);
       if (r.user == null) throw Exception('OTP verification failed.');
       final role = await AuthService(Supabase.instance.client).resolveRole(r.user!.id);
       if (role != 'technician') {
