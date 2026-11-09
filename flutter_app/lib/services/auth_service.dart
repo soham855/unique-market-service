@@ -53,6 +53,17 @@ class AuthService {
     final row = await client.from('profiles').select('role').eq('id', userId).maybeSingle();
     if (row != null) return row['role']?.toString().toLowerCase();
 
+    // A verified OTP session may claim an existing customer record with the
+    // exact same registered mobile number. The Edge Function performs the
+    // match and link with service-role privileges; the app never writes roles.
+    final link = await client.functions.invoke('link-existing-customer');
+    if (link.status >= 200 && link.status < 300) {
+      final data = link.data;
+      if (data is Map && data['role'] != null) {
+        return data['role'].toString().toLowerCase();
+      }
+    }
+
     final phone = client.auth.currentUser?.phone;
     if (phone == null || phone.isEmpty) return null;
     final digits = phone.replaceAll(RegExp(r'\\D'), '');
