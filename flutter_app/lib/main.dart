@@ -175,7 +175,7 @@ class _LoginPageState extends State<LoginPage> {
 
   Future<void> send() async {
     final value = identifier.text.trim();
-    if (value.isEmpty || (value.contains('@') && !RegExp(r'^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$').hasMatch(value))) {
+    if (value.isEmpty || (value.contains('@') && !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(value))) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Enter a valid registered email or mobile number.')),
       );
