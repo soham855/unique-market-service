@@ -93,7 +93,7 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
   String phone() { var p=mobile.text.trim(); if(p.startsWith('0'))p='+91'+p.substring(1); if(!p.startsWith('+'))p='+91'+p; return p; }
   Future<void> send() async { setState(()=>busy=true); try { await AuthService(Supabase.instance.client).sendOtp(phone()); if(mounted)setState(()=>sent=true); } catch(e) { if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(e.toString()))); } finally { if(mounted)setState(()=>busy=false); } }
   Future<void> verify() async { setState(()=>busy=true); try {
-    final r=await AuthService(Supabase.instance.client).verifyOtp(phone:phone(),token:otp.text);
+    final r=await AuthService(Supabase.instance.client).verifyOtp(identifier:phone(),token:otp.text);
     if(r.user==null)throw Exception('OTP verification failed.');
     final role=await AuthService(Supabase.instance.client).resolveRole(r.user!.id);
     if(role!='admin'){await Supabase.instance.client.auth.signOut();throw Exception('This account is not an Admin account.');}
