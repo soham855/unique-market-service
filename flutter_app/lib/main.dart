@@ -361,7 +361,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
           _homeCard(Icons.history, 'Service History', () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerServiceHistoryPage(onOpenTicket: (ticket) => Navigator.push(context, MaterialPageRoute(builder: (_) => TicketDetailsPage(ticket: ticket))))))),
           _homeCard(Icons.star_outline, 'Feedback', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomerFeedbackPage()))),
           _homeCard(Icons.verified_user_outlined, 'AMC Details', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AmcContractsPage()))),
-          _homeCard(Icons.payments_outlined, 'Payments', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomerPaymentsPage()))),
+          _homeCard(Icons.payments_outlined, 'Payments', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomerPortalPaymentsPage()))),
           _homeCard(Icons.card_giftcard_outlined, 'Referral System', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomerReferralPage()))),
           _homeCard(Icons.person_outline, 'My Profile', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfilePage()))),
           _homeCard(Icons.support_agent_outlined, 'Help & Support', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpSupportPage()))),
@@ -381,7 +381,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
       NavigationDestination(icon: Icon(Icons.confirmation_num_outlined), label: 'My Complaints'),
       NavigationDestination(icon: Icon(Icons.payments_outlined), label: 'Payments'),
       NavigationDestination(icon: Icon(Icons.person_outline), label: 'Profile'),
-    ], onDestinationSelected: (i) { if (i == 1) Navigator.push(context, MaterialPageRoute(builder: (_) => TicketListPage(tickets: tickets))); else if (i == 2) Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomerPaymentsPage())); else if (i == 3) Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfilePage())); }),
+    ], onDestinationSelected: (i) { if (i == 1) Navigator.push(context, MaterialPageRoute(builder: (_) => TicketListPage(tickets: tickets))); else if (i == 2) Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomerPortalPaymentsPage())); else if (i == 3) Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfilePage())); }),
   );
 
   Widget _homeCard(IconData icon, String title, VoidCallback onTap) => Card(child: InkWell(
