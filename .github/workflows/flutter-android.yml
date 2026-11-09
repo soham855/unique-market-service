@@ -169,3 +169,34 @@ jobs:
           name: instant-services-release-aab
           path: flutter_app/build/app/outputs/bundle/release/app-release.aab
           retention-days: 30
+
+      - name: Configure separate Admin app package
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          gradle_kts = Path("android/app/build.gradle.kts")
+          gradle = Path("android/app/build.gradle")
+          target = gradle_kts if gradle_kts.exists() else gradle
+          content = target.read_text()
+          content = content.replace("com.uniquemarket.instantservices", "com.uniquemarket.admin")
+          content = content.replace('    id("com.google.gms.google-services")\\n', '')
+          content = content.replace("    id 'com.google.gms.google-services'\\n", '')
+          target.write_text(content)
+          for path in Path("android/app/src/main").rglob("*"):
+              if path.is_file() and path.name in ("MainActivity.kt", "MainActivity.java"):
+                  path.write_text(path.read_text().replace("com.uniquemarket.instantservices", "com.uniquemarket.admin"))
+          manifest = Path("android/app/src/main/AndroidManifest.xml")
+          if manifest.exists():
+              manifest.write_text(manifest.read_text().replace('android:label="instant_services"', 'android:label="Unique Market Admin"'))
+          PY
+          grep -R 'com.uniquemarket.admin' android/app/build.gradle* android/app/src/main
+
+      - name: Build separate Admin release APK
+        run: flutter build apk --release --target lib/admin_main.dart --dart-define=SUPABASE_URL=https://tfscvycomllamoubtlcf.supabase.co --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_VeJIjcsILLniCHf2HjA20A_xlMydma0
+
+      - name: Upload Admin release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: unique-market-admin-release-apk
+          path: flutter_app/build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 30
