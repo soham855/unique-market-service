@@ -150,6 +150,7 @@ jobs:
           deno-version: v2.x
 
       - name: Type-check technician service OTP Edge Function
+        working-directory: ..
         run: deno check --no-lock --node-modules-dir=auto supabase/functions/service-report-otp/index.ts
 
       - name: Build debug APK
