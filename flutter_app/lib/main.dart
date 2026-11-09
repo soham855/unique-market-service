@@ -358,7 +358,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
           _homeCard(Icons.smart_toy_outlined, 'AI Service Assistant', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomerAiServiceAssistantPage()))),
           _homeCard(Icons.add_circle_outline, 'Raise Complaint', () async { await Navigator.push(context, MaterialPageRoute(builder: (_) => const RaiseComplaintPage())); await load(); }),
           _homeCard(Icons.confirmation_num_outlined, 'My Complaints', () async { await Navigator.push(context, MaterialPageRoute(builder: (_) => TicketListPage(tickets: tickets))); await load(); }),
-          _homeCard(Icons.history, 'Service History', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomerServiceHistoryPage()))),
+          _homeCard(Icons.history, 'Service History', () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerServiceHistoryPage(onOpenTicket: (ticket) => Navigator.push(context, MaterialPageRoute(builder: (_) => TicketDetailsPage(ticket: ticket))))))),
           _homeCard(Icons.star_outline, 'Feedback', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomerFeedbackPage()))),
           _homeCard(Icons.verified_user_outlined, 'AMC Details', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AmcContractsPage()))),
           _homeCard(Icons.payments_outlined, 'Payments', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomerPaymentsPage()))),
