@@ -192,8 +192,12 @@ jobs:
           else
             sed -i 's/applicationId "com.uniquemarket.instantservices"/applicationId "com.uniquemarket.technician"/' android/app/build.gradle
             if [ -n "${TECHNICIAN_GOOGLE_SERVICES_JSON:-}" ]; then
-              printf '%s' "$TECHNICIAN_GOOGLE_SERVICES_JSON" | base64 --decode > android/app/google-services.json
-              grep -q '"package_name": "com.uniquemarket.technician"' android/app/google-services.json
+              if printf '%s' "$TECHNICIAN_GOOGLE_SERVICES_JSON" | base64 --decode > /tmp/technician-google-services.json 2>/dev/null && grep -q '"package_name": "com.uniquemarket.technician"' /tmp/technician-google-services.json; then
+                cp /tmp/technician-google-services.json android/app/google-services.json
+              else
+                printf '%s' "$TECHNICIAN_GOOGLE_SERVICES_JSON" > android/app/google-services.json
+                grep -q '"package_name": "com.uniquemarket.technician"' android/app/google-services.json
+              fi
               grep -q "id 'com.google.gms.google-services'" android/app/build.gradle || sed -i "/id 'dev.flutter.flutter-gradle-plugin'/a\\    id 'com.google.gms.google-services'" android/app/build.gradle
             else
               sed -i "/id 'com.google.gms.google-services'/d" android/app/build.gradle
