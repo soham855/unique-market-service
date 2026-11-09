@@ -802,7 +802,7 @@ class _TechnicianJobDetailsPageState extends State<TechnicianJobDetailsPage> {
       await service.requestCustomerOtp(report!['id'].toString());
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Customer OTP sent to the registered WhatsApp number.')),
+          const SnackBar(content: Text('Customer OTP queued for WhatsApp delivery to the registered number.')),
         );
       }
     } catch (e) {
