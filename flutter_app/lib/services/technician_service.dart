@@ -63,9 +63,9 @@ class TechnicianService {
       'complaint_id': complaintId,
       'latitude': position.latitude,
       'longitude': position.longitude,
-      'accuracy': position.accuracy,
-      'speed': position.speed,
-      'heading': position.heading,
+      'accuracy': position.accuracy >= 0 ? position.accuracy : null,
+      'speed': position.speed >= 0 ? position.speed : null,
+      'heading': position.heading >= 0 && position.heading < 360 ? position.heading : 0,
       'recorded_at': DateTime.now().toUtc().toIso8601String(),
     });
   }
