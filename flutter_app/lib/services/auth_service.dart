@@ -7,10 +7,13 @@ class AuthService {
   bool isEmail(String identifier) => identifier.trim().contains('@');
 
   String normalizePhone(String value) {
-    var phone = value.trim().replaceAll(RegExp(r'[\s()-]'), '');
-    if (phone.startsWith('0')) phone = '+91${phone.substring(1)}';
-    if (!phone.startsWith('+')) phone = '+91$phone';
-    return phone;
+    var phone = value.trim().replaceAll(RegExp(r'[^0-9+]'), '');
+    if (phone.startsWith('+')) return phone;
+    final digits = phone.replaceAll(RegExp(r'\D'), '');
+    if (digits.length == 10) return '+91$digits';
+    if (digits.length == 11 && digits.startsWith('0')) return '+91${digits.substring(1)}';
+    if (digits.length == 12 && digits.startsWith('91')) return '+$digits';
+    return '+$digits';
   }
 
   Future<void> sendOtp(String identifier) async {
