@@ -178,9 +178,13 @@ jobs:
           gradle = Path("android/app/build.gradle")
           target = gradle_kts if gradle_kts.exists() else gradle
           content = target.read_text()
+          import re
           content = content.replace("com.uniquemarket.instantservices", "com.uniquemarket.admin")
-          content = content.replace('    id("com.google.gms.google-services")\\n', '')
-          content = content.replace("    id 'com.google.gms.google-services'\\n", '')
+          # The Admin app uses Supabase OTP and does not initialize Firebase.
+          # Remove only the app-level Google Services plugin; keep the plugin
+          # declaration in settings.gradle for the Customer app build above.
+          content = re.sub(r'(?m)^[ \\t]*id\\(["\\']com\\.google\\.gms\\.google-services["\\']\\)[ \\t]*\\r?\\n?', '', content)
+          content = re.sub(r'(?m)^[ \\t]*id\\s+["\\']com\\.google\\.gms\\.google-services["\\'][ \\t]*\\r?\\n?', '', content)
           target.write_text(content)
           for path in Path("android/app/src/main").rglob("*"):
               if path.is_file() and path.name in ("MainActivity.kt", "MainActivity.java"):
