@@ -150,8 +150,10 @@ jobs:
           deno-version: v2.x
 
       - name: Type-check technician service OTP Edge Function
-        working-directory: ..
-        run: deno check --no-lock --node-modules-dir=auto supabase/functions/service-report-otp/index.ts
+        run: |
+          cd ..
+          test -f supabase/functions/service-report-otp/index.ts
+          deno check --no-lock --node-modules-dir=auto supabase/functions/service-report-otp/index.ts
 
       - name: Build debug APK
         run: flutter build apk --debug --dart-define=SUPABASE_URL=https://tfscvycomllamoubtlcf.supabase.co --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_VeJIjcsILLniCHf2HjA20A_xlMydma0
