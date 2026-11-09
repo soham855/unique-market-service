@@ -4,10 +4,47 @@ class AuthService {
   final SupabaseClient client;
   AuthService(this.client);
 
-  Future<void> sendOtp(String phone) => client.auth.signInWithOtp(phone: phone.trim());
+  bool isEmail(String identifier) => identifier.trim().contains('@');
 
-  Future<AuthResponse> verifyOtp({required String phone, required String token}) {
-    return client.auth.verifyOTP(phone: phone.trim(), token: token.trim(), type: OtpType.sms);
+  String normalizePhone(String value) {
+    var phone = value.trim().replaceAll(RegExp(r'[\\s()-]'), '');
+    if (phone.startsWith('0')) phone = '+91${phone.substring(1)}';
+    if (!phone.startsWith('+')) phone = '+91$phone';
+    return phone;
+  }
+
+  Future<void> sendOtp(String identifier) async {
+    final value = identifier.trim();
+    if (isEmail(value)) {
+      await client.auth.signInWithOtp(
+        email: value.toLowerCase(),
+        shouldCreateUser: false,
+      );
+    } else {
+      await client.auth.signInWithOtp(
+        phone: normalizePhone(value),
+        shouldCreateUser: false,
+      );
+    }
+  }
+
+  Future<AuthResponse> verifyOtp({
+    required String identifier,
+    required String token,
+  }) {
+    final value = identifier.trim();
+    if (isEmail(value)) {
+      return client.auth.verifyOTP(
+        email: value.toLowerCase(),
+        token: token.trim(),
+        type: OtpType.email,
+      );
+    }
+    return client.auth.verifyOTP(
+      phone: normalizePhone(value),
+      token: token.trim(),
+      type: OtpType.sms,
+    );
   }
 
   Future<void> signOut() => client.auth.signOut();
