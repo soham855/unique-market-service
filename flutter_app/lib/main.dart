@@ -838,7 +838,7 @@ class _PaymentPageState extends State<PaymentPage> {
     const SizedBox(height:18),if(serviceTotal<=0)const Card(child:Padding(padding:EdgeInsets.all(14),child:Text('Final service charges are not available yet. You can still submit a payment amount.'))),const SizedBox(height:8),
     TextField(controller:amount,keyboardType:const TextInputType.numberWithOptions(decimal:true),decoration:const InputDecoration(labelText:'Amount',prefixText:'₹ ')),const SizedBox(height:16),
     const Text('Payment Mode',style:TextStyle(fontWeight:FontWeight.w700)),const SizedBox(height:8),
-    Wrap(spacing:8,children:['UPI','Cash'].map((m)=>ChoiceChip(label:Text(m),selected:mode==m,onSelected:(_)=>setState(()=>mode=m))).toList()),
+    const Card(child:Padding(padding:EdgeInsets.all(14),child:Text('Customer payments are accepted through UPI. Cash payments are recorded only after technician/admin verification.'))),
     if(mode=='UPI')...[
       const SizedBox(height:16),const Card(child:Padding(padding:EdgeInsets.all(16),child:Text('Pay using your UPI app, then enter the UTR / reference number below.'))),const SizedBox(height:12),
       TextField(controller:utr,decoration:const InputDecoration(labelText:'UTR / Reference Number'))],
