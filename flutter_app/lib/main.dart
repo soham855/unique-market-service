@@ -6,6 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import 'config/supabase_config.dart';
 import 'services/auth_service.dart';
 import 'services/customer_service.dart';
+import 'customer_portal_pages.dart';
 import 'services/push_notification_service.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -346,15 +347,26 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
       Text('Namaskar, ' + (customer?['name']?.toString() ?? 'Customer'), style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900)),
       Text(customer?['customer_code']?.toString() ?? 'Customer Portal', style: const TextStyle(color: Colors.black54)),
       const SizedBox(height: 22),
-      Row(children: [
-        Expanded(child: _homeCard(Icons.add_circle_outline, 'Raise Complaint', () async { await Navigator.push(context, MaterialPageRoute(builder: (_) => const RaiseComplaintPage())); load(); })),
-        const SizedBox(width: 12),
-        Expanded(child: _homeCard(Icons.confirmation_num_outlined, 'My Tickets', () => Navigator.push(context, MaterialPageRoute(builder: (_) => TicketListPage(tickets: tickets))))),
-      ]),
-      const SizedBox(height: 12),
-      _homeCard(Icons.verified_user_outlined, 'AMC Contracts', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AmcContractsPage()))),
-      const SizedBox(height: 12),
-      _homeCard(Icons.support_agent_outlined, 'Help & Support', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpSupportPage()))),
+      GridView.count(
+        crossAxisCount: 2,
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: 1.75,
+        children: [
+          _homeCard(Icons.smart_toy_outlined, 'AI Service Assistant', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomerAiServiceAssistantPage()))),
+          _homeCard(Icons.add_circle_outline, 'Raise Complaint', () async { await Navigator.push(context, MaterialPageRoute(builder: (_) => const RaiseComplaintPage())); await load(); }),
+          _homeCard(Icons.confirmation_num_outlined, 'My Complaints', () async { await Navigator.push(context, MaterialPageRoute(builder: (_) => TicketListPage(tickets: tickets))); await load(); }),
+          _homeCard(Icons.history, 'Service History', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomerServiceHistoryPage()))),
+          _homeCard(Icons.star_outline, 'Feedback', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomerFeedbackPage()))),
+          _homeCard(Icons.verified_user_outlined, 'AMC Details', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AmcContractsPage()))),
+          _homeCard(Icons.payments_outlined, 'Payments', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomerPaymentsPage()))),
+          _homeCard(Icons.card_giftcard_outlined, 'Referral System', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomerReferralPage()))),
+          _homeCard(Icons.person_outline, 'My Profile', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfilePage()))),
+          _homeCard(Icons.support_agent_outlined, 'Help & Support', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpSupportPage()))),
+        ],
+      ),
       const SizedBox(height: 24),
       const Text('Recent Service', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
       const SizedBox(height: 10),
@@ -366,7 +378,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     ])),
     bottomNavigationBar: NavigationBar(destinations: const [
       NavigationDestination(icon: Icon(Icons.home_outlined), label: 'Home'),
-      NavigationDestination(icon: Icon(Icons.confirmation_num_outlined), label: 'Tickets'),
+      NavigationDestination(icon: Icon(Icons.confirmation_num_outlined), label: 'My Complaints'),
       NavigationDestination(icon: Icon(Icons.payments_outlined), label: 'Payments'),
       NavigationDestination(icon: Icon(Icons.person_outline), label: 'Profile'),
     ], onDestinationSelected: (i) { if (i == 1) Navigator.push(context, MaterialPageRoute(builder: (_) => TicketListPage(tickets: tickets))); else if (i == 2) Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomerPaymentsPage())); else if (i == 3) Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfilePage())); }),
@@ -422,7 +434,7 @@ class _AmcContractsPageState extends State<AmcContractsPage>{
   @override void dispose(){timer?.cancel();super.dispose();}
   Future<void> load()async{try{items=await service.amcContracts();}catch(_){items=[];}if(mounted)setState(()=>loading=false);}
   @override Widget build(BuildContext context)=>Scaffold(
-    appBar:AppBar(title:const Text('AMC Contracts'),actions:[IconButton(onPressed:load,icon:const Icon(Icons.refresh))]),
+    appBar:AppBar(title:const Text('AMC Details'),actions:[IconButton(onPressed:load,icon:const Icon(Icons.refresh))]),
     body:loading?const Center(child:CircularProgressIndicator()):RefreshIndicator(onRefresh:load,child:ListView(padding:const EdgeInsets.all(16),children:[
       if(items.isEmpty) const Card(child:Padding(padding:EdgeInsets.all(24),child:Center(child:Text('No AMC contracts found.')))),
       ...items.map((a){final status=(a['status']??'').toString();final start=(a['start_date']??'').toString();final end=(a['end_date']??'').toString();return Card(margin:const EdgeInsets.only(bottom:12),child:Padding(padding:const EdgeInsets.all(16),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
