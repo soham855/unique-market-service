@@ -266,7 +266,7 @@ class _CustomersPageState extends State<CustomersPage>{
       child:ListView.builder(padding:const EdgeInsets.all(12),itemCount:rows.length,itemBuilder:(_,i){
         final c=rows[i];
         final id=(c['id']??'').toString();
-        final linked=(c['user_id']!=null&&c['profile_id']!=null);
+        final linked=(c['user_id']!=null||c['profile_id']!=null);
         final busy=provisioning.contains(id);
         return Card(child:ListTile(
           leading:const CircleAvatar(child:Icon(Icons.person_outline)),
