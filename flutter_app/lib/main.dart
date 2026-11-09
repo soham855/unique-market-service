@@ -429,13 +429,14 @@ class AmcContractsPage extends StatefulWidget {
   @override State<AmcContractsPage> createState()=>_AmcContractsPageState();
 }
 class _AmcContractsPageState extends State<AmcContractsPage>{
-  final service=CustomerService(Supabase.instance.client); List<Map<String,dynamic>> items=[]; bool loading=true; Timer? timer;
+  final service=CustomerService(Supabase.instance.client); List<Map<String,dynamic>> items=[]; bool loading=true; Timer? timer; String loadError='';
   @override void initState(){super.initState();load();timer=Timer.periodic(const Duration(seconds:10),(_)=>load());}
   @override void dispose(){timer?.cancel();super.dispose();}
-  Future<void> load()async{try{items=await service.amcContracts();}catch(_){items=[];}if(mounted)setState(()=>loading=false);}
+  Future<void> load()async{try{items=await service.amcContracts();loadError='';}catch(e){items=[];loadError=e.toString();}if(mounted)setState(()=>loading=false);}
   @override Widget build(BuildContext context)=>Scaffold(
     appBar:AppBar(title:const Text('AMC Details'),actions:[IconButton(onPressed:load,icon:const Icon(Icons.refresh))]),
     body:loading?const Center(child:CircularProgressIndicator()):RefreshIndicator(onRefresh:load,child:ListView(padding:const EdgeInsets.all(16),children:[
+      if(loadError.isNotEmpty) Card(child:Padding(padding:const EdgeInsets.all(16),child:Text('AMC details could not be loaded. Please refresh or contact Unique Market.\n'+loadError,style:const TextStyle(color:Colors.red)))),
       if(items.isEmpty) const Card(child:Padding(padding:EdgeInsets.all(24),child:Center(child:Text('No AMC contracts found.')))),
       ...items.map((a){final status=(a['status']??'').toString();final start=(a['start_date']??'').toString();final end=(a['end_date']??'').toString();return Card(margin:const EdgeInsets.only(bottom:12),child:Padding(padding:const EdgeInsets.all(16),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         Row(children:[const Icon(Icons.shield_outlined),const SizedBox(width:10),Expanded(child:Text(status.isEmpty?'AMC Contract':status,style:const TextStyle(fontSize:17,fontWeight:FontWeight.w800)))]),
