@@ -123,6 +123,15 @@ class _TechnicianSessionGateState extends State<TechnicianSessionGate> {
         if (mounted) setState(() { loading = false; allowed = false; });
         return;
       }
+      final technicianRecord = await TechnicianService(Supabase.instance.client).technician();
+      final technicianStatus = (technicianRecord?['status'] ?? 'active').toString().toLowerCase();
+      if (technicianRecord == null || !['active', 'online', 'available'].contains(technicianStatus)) {
+        await Supabase.instance.client.auth.signOut();
+        await prefs.remove('technician_remember_until_ms');
+        await prefs.remove('technician_remember_me');
+        if (mounted) setState(() { loading = false; allowed = false; });
+        return;
+      }
     } catch (_) {
       if (mounted) setState(() { loading = false; allowed = false; });
       return;
