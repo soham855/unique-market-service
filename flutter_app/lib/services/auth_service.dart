@@ -7,7 +7,7 @@ class AuthService {
   bool isEmail(String identifier) => identifier.trim().contains('@');
 
   String normalizePhone(String value) {
-    var phone = value.trim().replaceAll(RegExp(r'[\\s()-]'), '');
+    var phone = value.trim().replaceAll(RegExp(r'[\s()-]'), '');
     if (phone.startsWith('0')) phone = '+91${phone.substring(1)}';
     if (!phone.startsWith('+')) phone = '+91$phone';
     return phone;
@@ -15,16 +15,16 @@ class AuthService {
 
   Future<void> sendOtp(String identifier) async {
     final value = identifier.trim();
+    if (value.isEmpty) throw Exception('Enter your registered mobile number or email.');
     if (isEmail(value)) {
-      await client.auth.signInWithOtp(
-        email: value.toLowerCase(),
-        shouldCreateUser: false,
-      );
+      await client.auth.signInWithOtp(email: value.toLowerCase(), shouldCreateUser: false);
     } else {
-      await client.auth.signInWithOtp(
-        phone: normalizePhone(value),
-        shouldCreateUser: false,
-      );
+      final phone = normalizePhone(value);
+      final digits = phone.replaceAll(RegExp(r'\D'), '');
+      if (digits.length < 10 || digits.length > 15) {
+        throw Exception('Enter a valid mobile number with country code.');
+      }
+      await client.auth.signInWithOtp(phone: phone, shouldCreateUser: false);
     }
   }
 
@@ -33,16 +33,20 @@ class AuthService {
     required String token,
   }) {
     final value = identifier.trim();
+    final code = token.trim();
+    if (code.length != 6 || !RegExp(r'^\d{6}$').hasMatch(code)) {
+      throw Exception('Enter the 6-digit OTP.');
+    }
     if (isEmail(value)) {
       return client.auth.verifyOTP(
         email: value.toLowerCase(),
-        token: token.trim(),
+        token: code,
         type: OtpType.email,
       );
     }
     return client.auth.verifyOTP(
       phone: normalizePhone(value),
-      token: token.trim(),
+      token: code,
       type: OtpType.sms,
     );
   }
@@ -50,17 +54,34 @@ class AuthService {
   Future<void> signOut() => client.auth.signOut();
 
   Future<String?> resolveRole(String userId) async {
-    final row = await client.from('profiles').select('role').eq('id', userId).maybeSingle();
+    final row = await client
+        .from('profiles')
+        .select('role')
+        .eq('id', userId)
+        .maybeSingle();
     if (row != null) return row['role']?.toString().toLowerCase();
 
+    // First-time phone sign-in: link only an exact registered technician mobile.
     final phone = client.auth.currentUser?.phone;
     if (phone == null || phone.isEmpty) return null;
-    final digits = phone.replaceAll(RegExp(r'\\D'), '');
+    final digits = phone.replaceAll(RegExp(r'\D'), '');
     final local = digits.length > 10 ? digits.substring(digits.length - 10) : digits;
-    final techRows = await client.from('technicians').select('id,name,mobile,status').eq('mobile', local).limit(1);
-    if (techRows.isEmpty) return null;
-    final tech = Map<String,dynamic>.from(techRows.first);
-    await client.from('profiles').insert({'id': userId, 'full_name': tech['name'], 'phone': phone, 'role': 'technician'});
+    final techRows = await client
+        .from('technicians')
+        .select('id,name,mobile,status')
+        .eq('mobile', local)
+        .limit(2);
+    if (techRows.length != 1) return null;
+    final tech = Map<String, dynamic>.from(techRows.first);
+    final status = (tech['status'] ?? 'active').toString().toLowerCase();
+    if (!['active', 'online', 'available'].contains(status)) return null;
+
+    await client.from('profiles').insert({
+      'id': userId,
+      'full_name': tech['name'],
+      'phone': phone,
+      'role': 'technician',
+    });
     return 'technician';
   }
 }
