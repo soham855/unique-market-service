@@ -56,10 +56,15 @@ class AdminService {
   }
 
   Future<void> linkTechnicianProfile(String technicianId, String profileId) async {
-    await client
+    final updated = await client
         .from('technicians')
         .update({'profile_id': profileId})
-        .eq('id', technicianId);
+        .eq('id', technicianId)
+        .select('id')
+        .maybeSingle();
+    if (updated == null) {
+      throw Exception('Technician record not found or admin permission is missing.');
+    }
   }
 
   Future<void> assignComplaint(String complaintId, String technicianProfileId, DateTime? visitAt, {String? note}) async {
