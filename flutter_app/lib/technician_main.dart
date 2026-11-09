@@ -114,6 +114,19 @@ class _TechnicianSessionGateState extends State<TechnicianSessionGate> {
       if (mounted) setState(() { loading = false; allowed = false; });
       return;
     }
+    try {
+      final role = await AuthService(Supabase.instance.client).resolveRole(session.user.id);
+      if (role != 'technician') {
+        await Supabase.instance.client.auth.signOut();
+        await prefs.remove('technician_remember_until_ms');
+        await prefs.remove('technician_remember_me');
+        if (mounted) setState(() { loading = false; allowed = false; });
+        return;
+      }
+    } catch (_) {
+      if (mounted) setState(() { loading = false; allowed = false; });
+      return;
+    }
     if (mounted) setState(() { loading = false; allowed = true; });
   }
 
@@ -129,45 +142,70 @@ class TechnicianLoginPage extends StatefulWidget {
   @override State<TechnicianLoginPage> createState() => _TechnicianLoginPageState();
 }
 class _TechnicianLoginPageState extends State<TechnicianLoginPage> {
-  final mobile = TextEditingController();
+  final identifier = TextEditingController();
   final otp = TextEditingController();
   bool sent = false, busy = false;
   bool rememberMe = true;
-  String phone() {
-    var p = mobile.text.trim();
-    if (p.startsWith('0')) p = '+91' + p.substring(1);
-    if (!p.startsWith('+')) p = '+91' + p;
-    return p;
+
+  @override
+  void dispose() {
+    identifier.dispose();
+    otp.dispose();
+    super.dispose();
   }
+
   Future<void> send() async {
+    if (identifier.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter your registered mobile number or email.')),
+      );
+      return;
+    }
     setState(() => busy = true);
     try {
-      await AuthService(Supabase.instance.client).sendOtp(phone());
+      await AuthService(Supabase.instance.client).sendOtp(identifier.text);
       if (mounted) setState(() { sent = true; busy = false; });
     } catch (e) {
-      if (mounted) { setState(() => busy = false); ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()))); }
+      if (mounted) {
+        setState(() => busy = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
     }
   }
+
   Future<void> verify() async {
     setState(() => busy = true);
     try {
-      final r = await AuthService(Supabase.instance.client).verifyOtp(identifier: phone(), token: otp.text);
+      final r = await AuthService(Supabase.instance.client)
+          .verifyOtp(identifier: identifier.text, token: otp.text);
       if (r.user == null) throw Exception('OTP verification failed.');
       final role = await AuthService(Supabase.instance.client).resolveRole(r.user!.id);
       if (role != 'technician') {
         await Supabase.instance.client.auth.signOut();
-        throw Exception('This account is not a Technician account.');
+        throw Exception('This account is not an active Technician account.');
       }
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('technician_remember_me', rememberMe);
       if (rememberMe) {
-        await prefs.setInt('technician_remember_until_ms', DateTime.now().add(const Duration(days: 15)).millisecondsSinceEpoch);
+        await prefs.setInt(
+          'technician_remember_until_ms',
+          DateTime.now().add(const Duration(days: 15)).millisecondsSinceEpoch,
+        );
       } else {
         await prefs.remove('technician_remember_until_ms');
       }
-      if (mounted) Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const TechnicianHomePage()), (_) => false);
+      if (mounted) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const TechnicianHomePage()),
+          (_) => false,
+        );
+      }
     } catch (e) {
-      if (mounted) { setState(() => busy = false); ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()))); }
+      if (mounted) {
+        setState(() => busy = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
     }
   }
   @override
@@ -180,7 +218,7 @@ class _TechnicianLoginPageState extends State<TechnicianLoginPage> {
         const Text('Technician Service Portal'), const SizedBox(height: 36),
         Text(sent ? 'Verify OTP' : 'Technician Login', style: const TextStyle(fontSize: 25, fontWeight: FontWeight.w800)),
         const SizedBox(height: 18),
-        if (!sent) TextField(controller: mobile, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Registered Mobile Number', prefixIcon: Icon(Icons.phone_outlined)))
+        if (!sent) TextField(controller: identifier, keyboardType: TextInputType.emailAddress, textInputAction: TextInputAction.done, autocorrect: false, decoration: const InputDecoration(labelText: 'Registered Mobile Number or Email', prefixIcon: Icon(Icons.account_circle_outlined)))
         else TextField(controller: otp, keyboardType: TextInputType.number, maxLength: 6, decoration: const InputDecoration(labelText: 'OTP', prefixIcon: Icon(Icons.lock_outline))),
         const SizedBox(height: 12),
         if (sent) CheckboxListTile(
@@ -191,7 +229,7 @@ class _TechnicianLoginPageState extends State<TechnicianLoginPage> {
           controlAffinity: ListTileControlAffinity.leading,
         ),
         SizedBox(width: double.infinity, height: 54, child: FilledButton(onPressed: busy ? null : (sent ? verify : send), child: busy ? const CircularProgressIndicator(color: Colors.white) : Text(sent ? 'VERIFY & CONTINUE' : 'SEND OTP'))),
-        if (sent) TextButton(onPressed: () => setState(() => sent = false), child: const Text('Change mobile number')),
+        if (sent) TextButton(onPressed: busy ? null : () => setState(() { sent = false; otp.clear(); }), child: const Text('Change mobile number or email')),
         const SizedBox(height: 28), const Text('CCTV | IT Security | Service & AMC', style: TextStyle(fontWeight: FontWeight.w700)),
         const Text('Station Road, Hotel Rajdoot, Ichalkaranji\n7350060071', style: TextStyle(color: Colors.black54)),
       ])),
