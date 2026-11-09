@@ -167,32 +167,45 @@ class LoginPage extends StatefulWidget {
   @override State<LoginPage> createState() => _LoginPageState();
 }
 class _LoginPageState extends State<LoginPage> {
-  final phone = TextEditingController();
+  final identifier = TextEditingController();
   final otp = TextEditingController();
   bool sent = false, busy = false, remember = true;
 
-  String normalizedPhone() {
-    var p = phone.text.trim();
-    if (p.startsWith('0')) p = '+91' + p.substring(1);
-    if (!p.startsWith('+')) p = '+91' + p;
-    return p;
-  }
+  bool get isEmail => identifier.text.trim().contains('@');
 
   Future<void> send() async {
+    final value = identifier.text.trim();
+    if (value.isEmpty || (value.contains('@') && !RegExp(r'^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$').hasMatch(value))) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a valid registered email or mobile number.')),
+      );
+      return;
+    }
     setState(() => busy = true);
     try {
-      await AuthService(Supabase.instance.client).sendOtp(normalizedPhone());
-      setState(() { sent = true; busy = false; });
+      await AuthService(Supabase.instance.client).sendOtp(value);
+      if (mounted) {
+        setState(() { sent = true; busy = false; });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(isEmail ? 'Login code sent to your registered email.' : 'OTP sent to your registered mobile number.')),
+        );
+      }
     } catch (e) {
+      if (!mounted) return;
       setState(() => busy = false);
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Login failed. Only existing customer accounts can sign in. Details: $e')),
+      );
     }
   }
 
   Future<void> verify() async {
     setState(() => busy = true);
     try {
-      final r = await AuthService(Supabase.instance.client).verifyOtp(phone: normalizedPhone(), token: otp.text);
+      final r = await AuthService(Supabase.instance.client).verifyOtp(
+        identifier: identifier.text.trim(),
+        token: otp.text,
+      );
       if (r.user == null) throw Exception('OTP verification failed');
       final role = await AuthService(Supabase.instance.client).resolveRole(r.user!.id);
       if (role != 'customer') {
@@ -208,9 +221,17 @@ class _LoginPageState extends State<LoginPage> {
       }
       if (mounted) Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const CustomerHomePage()), (_) => false);
     } catch (e) {
+      if (!mounted) return;
       setState(() => busy = false);
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
     }
+  }
+
+  @override
+  void dispose() {
+    identifier.dispose();
+    otp.dispose();
+    super.dispose();
   }
 
   @override
@@ -226,22 +247,31 @@ class _LoginPageState extends State<LoginPage> {
           const SizedBox(height: 6),
           const Text('Instant Services for Your Security'),
           const SizedBox(height: 36),
-          Text(sent ? 'Verify OTP' : 'Customer Login', style: const TextStyle(fontSize: 25, fontWeight: FontWeight.w800)),
+          Text(sent ? 'Verify Login Code' : 'Customer Login', style: const TextStyle(fontSize: 25, fontWeight: FontWeight.w800)),
           const SizedBox(height: 18),
           if (!sent) ...[
-            TextField(controller: phone, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Mobile Number', prefixIcon: Icon(Icons.phone_outlined))),
+            TextField(
+              controller: identifier,
+              keyboardType: TextInputType.emailAddress,
+              autofillHints: const [AutofillHints.email, AutofillHints.telephoneNumber],
+              decoration: const InputDecoration(
+                labelText: 'Registered Email or Mobile Number',
+                helperText: 'New customer registration is not available in this app.',
+                prefixIcon: Icon(Icons.person_outline),
+              ),
+            ),
             CheckboxListTile(value: remember, onChanged: (v) => setState(() => remember = v ?? true), contentPadding: EdgeInsets.zero, title: const Text('Remember Me'), subtitle: const Text('Stay signed in for 15 days')),
           ] else
-            TextField(controller: otp, keyboardType: TextInputType.number, maxLength: 6, decoration: const InputDecoration(labelText: 'OTP', prefixIcon: Icon(Icons.lock_outline))),
+            TextField(controller: otp, keyboardType: TextInputType.number, maxLength: 8, decoration: InputDecoration(labelText: isEmail ? 'Email Login Code' : 'SMS OTP', prefixIcon: const Icon(Icons.lock_outline))),
           const SizedBox(height: 12),
           SizedBox(width: double.infinity, height: 54, child: FilledButton(
             onPressed: busy ? null : (sent ? verify : send),
-            child: busy ? const CircularProgressIndicator(color: Colors.white) : Text(sent ? 'VERIFY & CONTINUE' : 'SEND OTP'),
+            child: busy ? const CircularProgressIndicator(color: Colors.white) : Text(sent ? 'VERIFY & CONTINUE' : 'SEND LOGIN CODE'),
           )),
-          if (sent) TextButton(onPressed: () => setState(() => sent = false), child: const Text('Change mobile number')),
+          if (sent) TextButton(onPressed: () => setState(() { sent = false; otp.clear(); }), child: const Text('Change email or mobile number')),
           const SizedBox(height: 28),
           const Text('CCTV | IT Security | Service & AMC', style: TextStyle(fontWeight: FontWeight.w700)),
-          const Text('Station Road, Hotel Rajdoot, Ichalkaranji\n7350060071', style: TextStyle(color: Colors.black54)),
+          const Text('Station Road, Hotel Rajdoot, Ichalkaranji\\n7350060071', style: TextStyle(color: Colors.black54)),
         ],
       )),
     ))),
