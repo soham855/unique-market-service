@@ -633,23 +633,8 @@ class _CustomerReferralPageState extends State<CustomerReferralPage> {
         'reward_value': rewardValue,
         'reward_text': rule?['reward_text'] ?? 'Reward after successful conversion',
       };
+      // Admin notifications are created by the database trigger after the referral is saved.
       await _client.from('referrals').insert(payload);
-      try {
-        final admins = await _client.from('profiles').select('id').eq('role', 'admin');
-        if (admins.isNotEmpty) {
-          await _client.from('notifications').insert(
-            List<Map<String, dynamic>>.from(admins).map((admin) => {
-              'user_id': admin['id'],
-              'title': 'New Customer Referral',
-              'message': (_customer!['name'] ?? 'Customer').toString() +
-                  ' referred ' + name + ' (' + mobile + ').',
-              'type': 'customer_referral',
-            }).toList(),
-          );
-        }
-      } catch (_) {
-        // Referral creation is the primary action; notification failures must not duplicate it.
-      }
       _name.clear();
       _mobile.clear();
       _company.clear();
