@@ -141,6 +141,9 @@ jobs:
       - name: Analyze
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
 
+      - name: Run Flutter tests
+        run: flutter test
+
       - name: Setup Deno
         uses: denoland/setup-deno@v2
         with:
