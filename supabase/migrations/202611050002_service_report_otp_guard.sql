@@ -12,6 +12,11 @@ create table if not exists public.service_report_otp_challenges (
 alter table public.service_report_otp_challenges enable row level security;
 revoke all on public.service_report_otp_challenges from anon, authenticated;
 
+-- The Edge Function accesses these tables through the Supabase Data API with service_role.
+-- New public tables no longer receive CRUD grants by default; keep this server-only.
+grant select, insert, update, delete on table public.service_report_otp_challenges to service_role;
+grant select, update on table public.service_reports to service_role;
+
 -- Invalidate legacy OTPs that were generated in the technician app and stored in plaintext.
 update public.service_reports set customer_otp = null where customer_otp is not null;
 update public.service_reports r
