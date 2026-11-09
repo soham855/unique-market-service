@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'config/supabase_config.dart';
@@ -114,6 +115,28 @@ class _TechnicianSessionGateState extends State<TechnicianSessionGate> {
       if (mounted) setState(() { loading = false; allowed = false; });
       return;
     }
+    try {
+      final role = await AuthService(Supabase.instance.client).resolveRole(session.user.id);
+      if (role != 'technician') {
+        await Supabase.instance.client.auth.signOut();
+        await prefs.remove('technician_remember_until_ms');
+        await prefs.remove('technician_remember_me');
+        if (mounted) setState(() { loading = false; allowed = false; });
+        return;
+      }
+      final technicianRecord = await TechnicianService(Supabase.instance.client).technician();
+      final technicianStatus = (technicianRecord?['status'] ?? 'active').toString().toLowerCase();
+      if (technicianRecord == null || !['active', 'online', 'available'].contains(technicianStatus)) {
+        await Supabase.instance.client.auth.signOut();
+        await prefs.remove('technician_remember_until_ms');
+        await prefs.remove('technician_remember_me');
+        if (mounted) setState(() { loading = false; allowed = false; });
+        return;
+      }
+    } catch (_) {
+      if (mounted) setState(() { loading = false; allowed = false; });
+      return;
+    }
     if (mounted) setState(() { loading = false; allowed = true; });
   }
 
@@ -129,45 +152,76 @@ class TechnicianLoginPage extends StatefulWidget {
   @override State<TechnicianLoginPage> createState() => _TechnicianLoginPageState();
 }
 class _TechnicianLoginPageState extends State<TechnicianLoginPage> {
-  final mobile = TextEditingController();
+  final identifier = TextEditingController();
   final otp = TextEditingController();
   bool sent = false, busy = false;
   bool rememberMe = true;
-  String phone() {
-    var p = mobile.text.trim();
-    if (p.startsWith('0')) p = '+91' + p.substring(1);
-    if (!p.startsWith('+')) p = '+91' + p;
-    return p;
+
+  @override
+  void dispose() {
+    identifier.dispose();
+    otp.dispose();
+    super.dispose();
   }
+
   Future<void> send() async {
+    if (identifier.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter your registered mobile number or email.')),
+      );
+      return;
+    }
     setState(() => busy = true);
     try {
-      await AuthService(Supabase.instance.client).sendOtp(phone());
+      await AuthService(Supabase.instance.client).sendOtp(identifier.text);
       if (mounted) setState(() { sent = true; busy = false; });
     } catch (e) {
-      if (mounted) { setState(() => busy = false); ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()))); }
+      if (mounted) {
+        setState(() => busy = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
     }
   }
+
   Future<void> verify() async {
     setState(() => busy = true);
     try {
-      final r = await AuthService(Supabase.instance.client).verifyOtp(identifier: phone(), token: otp.text);
+      final r = await AuthService(Supabase.instance.client)
+          .verifyOtp(identifier: identifier.text, token: otp.text);
       if (r.user == null) throw Exception('OTP verification failed.');
       final role = await AuthService(Supabase.instance.client).resolveRole(r.user!.id);
       if (role != 'technician') {
         await Supabase.instance.client.auth.signOut();
-        throw Exception('This account is not a Technician account.');
+        throw Exception('This account is not an active Technician account.');
+      }
+      final technicianRecord = await TechnicianService(Supabase.instance.client).technician();
+      final technicianStatus = (technicianRecord?['status'] ?? 'active').toString().toLowerCase();
+      if (technicianRecord == null || !['active', 'online', 'available'].contains(technicianStatus)) {
+        await Supabase.instance.client.auth.signOut();
+        throw Exception('Technician login is not linked to an active technician record. Ask Admin to link it from Admin > Technicians & Login Links.');
       }
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('technician_remember_me', rememberMe);
       if (rememberMe) {
-        await prefs.setInt('technician_remember_until_ms', DateTime.now().add(const Duration(days: 15)).millisecondsSinceEpoch);
+        await prefs.setInt(
+          'technician_remember_until_ms',
+          DateTime.now().add(const Duration(days: 15)).millisecondsSinceEpoch,
+        );
       } else {
         await prefs.remove('technician_remember_until_ms');
       }
-      if (mounted) Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const TechnicianHomePage()), (_) => false);
+      if (mounted) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const TechnicianHomePage()),
+          (_) => false,
+        );
+      }
     } catch (e) {
-      if (mounted) { setState(() => busy = false); ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()))); }
+      if (mounted) {
+        setState(() => busy = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
     }
   }
   @override
@@ -180,7 +234,7 @@ class _TechnicianLoginPageState extends State<TechnicianLoginPage> {
         const Text('Technician Service Portal'), const SizedBox(height: 36),
         Text(sent ? 'Verify OTP' : 'Technician Login', style: const TextStyle(fontSize: 25, fontWeight: FontWeight.w800)),
         const SizedBox(height: 18),
-        if (!sent) TextField(controller: mobile, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Registered Mobile Number', prefixIcon: Icon(Icons.phone_outlined)))
+        if (!sent) TextField(controller: identifier, keyboardType: TextInputType.text, textInputAction: TextInputAction.done, autocorrect: false, decoration: const InputDecoration(labelText: 'Registered Mobile Number or Email', prefixIcon: Icon(Icons.account_circle_outlined)))
         else TextField(controller: otp, keyboardType: TextInputType.number, maxLength: 6, decoration: const InputDecoration(labelText: 'OTP', prefixIcon: Icon(Icons.lock_outline))),
         const SizedBox(height: 12),
         if (sent) CheckboxListTile(
@@ -191,7 +245,7 @@ class _TechnicianLoginPageState extends State<TechnicianLoginPage> {
           controlAffinity: ListTileControlAffinity.leading,
         ),
         SizedBox(width: double.infinity, height: 54, child: FilledButton(onPressed: busy ? null : (sent ? verify : send), child: busy ? const CircularProgressIndicator(color: Colors.white) : Text(sent ? 'VERIFY & CONTINUE' : 'SEND OTP'))),
-        if (sent) TextButton(onPressed: () => setState(() => sent = false), child: const Text('Change mobile number')),
+        if (sent) TextButton(onPressed: busy ? null : () => setState(() { sent = false; otp.clear(); }), child: const Text('Change mobile number or email')),
         const SizedBox(height: 28), const Text('CCTV | IT Security | Service & AMC', style: TextStyle(fontWeight: FontWeight.w700)),
         const Text('Station Road, Hotel Rajdoot, Ichalkaranji\n7350060071', style: TextStyle(color: Colors.black54)),
       ])),
@@ -676,13 +730,38 @@ class _TechnicianJobDetailsPageState extends State<TechnicianJobDetailsPage> {
   final labour = TextEditingController(text: '0');
   final other = TextEditingController(text: '0');
   bool busy = false;
+  bool tracking = false;
+  bool trackingStarting = false;
+  late String currentStatus;
+  StreamSubscription<Position>? locationSubscription;
+  String? trackingSessionId;
   double? distanceMeters;
   Map<String,dynamic>? report;
 
   @override
+  void dispose() {
+    locationSubscription?.cancel();
+    final activeSessionId = trackingSessionId;
+    if (activeSessionId != null) {
+      unawaited(service.endTrackingSession(activeSessionId));
+    }
+    diagnosis.dispose();
+    work.dispose();
+    parts.dispose();
+    otp.dispose();
+    labour.dispose();
+    other.dispose();
+    super.dispose();
+  }
+
+  @override
   void initState() {
     super.initState();
+    currentStatus = (widget.job['status'] ?? 'New').toString();
     _loadReport();
+    if (currentStatus == 'On The Way') {
+      WidgetsBinding.instance.addPostFrameCallback((_) => startTracking());
+    }
   }
 
   Future<void> _loadReport() async {
@@ -690,6 +769,105 @@ class _TechnicianJobDetailsPageState extends State<TechnicianJobDetailsPage> {
       report = await service.activeReport(widget.job['id'].toString());
       if (mounted) setState(() {});
     } catch (_) {}
+  }
+
+  Future<void> startTracking() async {
+    if (tracking || trackingStarting || !mounted) return;
+    trackingStarting = true;
+    final complaintId = widget.job['id'].toString();
+    try {
+      trackingSessionId = await service.startTrackingSession(complaintId);
+      final firstPosition = await service.currentPosition();
+      await service.recordLocation(complaintId, firstPosition);
+      locationSubscription = Geolocator.getPositionStream(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          distanceFilter: 20,
+        ),
+      ).listen((position) {
+        service.recordLocation(complaintId, position).catchError((error) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Location update failed: $error')),
+            );
+          }
+        });
+      });
+      if (mounted) {
+        setState(() => tracking = true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Live location sharing started while this app is open.')),
+        );
+      }
+    } catch (e) {
+      final activeSessionId = trackingSessionId;
+      trackingSessionId = null;
+      if (activeSessionId != null) {
+        try { await service.endTrackingSession(activeSessionId); } catch (_) {}
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    } finally {
+      trackingStarting = false;
+    }
+  }
+
+  Future<void> stopTracking() async {
+    await locationSubscription?.cancel();
+    locationSubscription = null;
+    final activeSessionId = trackingSessionId;
+    trackingSessionId = null;
+    if (activeSessionId != null) {
+      await service.endTrackingSession(activeSessionId);
+    }
+    if (mounted) setState(() => tracking = false);
+  }
+
+  Future<void> sendSos() async {
+    final noteController = TextEditingController();
+    final notes = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Emergency SOS'),
+        content: TextField(
+          controller: noteController,
+          maxLines: 3,
+          decoration: const InputDecoration(
+            labelText: 'What happened? (optional)',
+            hintText: 'Describe the emergency',
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('CANCEL')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(dialogContext, noteController.text),
+            child: const Text('SEND SOS'),
+          ),
+        ],
+      ),
+    );
+    noteController.dispose();
+    if (notes == null) return;
+    setState(() => busy = true);
+    try {
+      await service.sendSosAlert(
+        complaintId: widget.job['id']?.toString(),
+        customerName: widget.job['customer_name']?.toString(),
+        locationText: (widget.job['address'] ?? widget.job['location_text'])?.toString(),
+        notes: notes,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('SOS alert recorded. Admin SOS dashboard refreshes automatically.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
   }
 
   Future<void> openNavigation() async {
@@ -717,13 +895,26 @@ class _TechnicianJobDetailsPageState extends State<TechnicianJobDetailsPage> {
     setState(() => busy = true);
     try {
       final id = widget.job['id'].toString();
-      if (status == 'Assigned') await service.acceptJob(id);
-      else if (status == 'On The Way') await service.updateStatus(id, status);
-      else if (status == 'Reached') await service.updateStatus(id, status);
-      else if (status == 'In Service') {
+      if (status == 'Assigned') {
+        await service.acceptJob(id);
+      } else if (status == 'On The Way') {
+        await service.updateStatus(id, status);
+        await startTracking();
+      } else if (status == 'Reached') {
+        await service.updateStatus(id, status);
+        await stopTracking();
+      } else if (status == 'In Service') {
         report = await service.startVisit(id, diagnosis: diagnosis.text.trim().isEmpty ? null : diagnosis.text.trim());
       }
-      if (mounted) { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Status updated: ' + status))); if (status != 'In Service') Navigator.pop(context); else setState(() {}); }
+      if (mounted) {
+        setState(() => currentStatus = status);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Status updated: ' + status)));
+        if (status == 'On The Way' || status == 'In Service') {
+          setState(() {});
+        } else {
+          Navigator.pop(context);
+        }
+      }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
     } finally { if (mounted) setState(() => busy = false); }
@@ -744,6 +935,23 @@ class _TechnicianJobDetailsPageState extends State<TechnicianJobDetailsPage> {
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
     } finally { if (mounted) setState(() => busy = false); }
+  }
+
+  Future<void> requestOtp() async {
+    if (report == null) return;
+    setState(() => busy = true);
+    try {
+      await service.requestCustomerOtp(report!['id'].toString());
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Customer OTP queued for WhatsApp delivery to the registered number.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
   }
 
   Future<void> verifyOtp() async {
@@ -793,7 +1001,7 @@ class _TechnicianJobDetailsPageState extends State<TechnicianJobDetailsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final j = widget.job; final status = j['status']?.toString() ?? 'New';
+    final j = widget.job; final status = currentStatus;
     final before = (report?['before_photo_url']?.toString() ?? '').isNotEmpty;
     final after = (report?['after_photo_url']?.toString() ?? '').isNotEmpty;
     final signed = (report?['customer_signature']?.toString() ?? '').isNotEmpty;
@@ -807,10 +1015,31 @@ class _TechnicianJobDetailsPageState extends State<TechnicianJobDetailsPage> {
           _row('Customer', j['customer_name']), _row('Mobile', j['customer_phone']), _row('Service', j['service_type']), _row('Problem', j['category']), _row('Address', j['address'] ?? j['location_text']), _row('Visit', j['scheduled_visit_at'] ?? j['scheduled_visit_date']),
         ]))),
         const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: busy ? null : sendSos,
+            style: OutlinedButton.styleFrom(foregroundColor: Colors.red, side: const BorderSide(color: Colors.red)),
+            icon: const Icon(Icons.sos),
+            label: const Text('EMERGENCY SOS'),
+          ),
+        ),
+        if (tracking) const Card(
+          child: ListTile(
+            leading: Icon(Icons.gps_fixed, color: Colors.green),
+            title: Text('Live Location Sharing Active'),
+            subtitle: Text('Location updates are shared while the technician app remains open.'),
+          ),
+        ),
         if (distanceMeters != null) Card(child: ListTile(leading: const Icon(Icons.gps_fixed), title: const Text('GPS Verified'), subtitle: Text(distanceMeters!.toStringAsFixed(0) + ' m from customer location'))),
         if (status == 'New') _button('ACCEPT JOB', Icons.check, 'Assigned')
         else if (status == 'Assigned' || status == 'Scheduled') _button("I'M ON THE WAY", Icons.navigation_outlined, 'On The Way')
         else if (status == 'On The Way') ...[
+          if (!tracking) OutlinedButton.icon(
+            onPressed: busy || trackingStarting ? null : startTracking,
+            icon: const Icon(Icons.gps_fixed),
+            label: const Text('START LIVE LOCATION SHARING'),
+          ),
           OutlinedButton.icon(onPressed: busy ? null : openNavigation, icon: const Icon(Icons.map_outlined), label: const Text('NAVIGATE TO CUSTOMER')),
           const SizedBox(height: 10), _button('VERIFY LOCATION & REACH', Icons.location_on_outlined, 'Reached')
         ] else if (status == 'Reached') ...[
@@ -832,7 +1061,15 @@ class _TechnicianJobDetailsPageState extends State<TechnicianJobDetailsPage> {
               Expanded(child: TextField(controller: other, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Other ₹', border: OutlineInputBorder()))),
             ]),
           ]))),
-          Card(child: ListTile(leading: Icon(otpOk ? Icons.verified : Icons.pin_outlined), title: Text(otpOk ? 'Customer OTP Verified' : 'Customer OTP Verification'), subtitle: Text(otpOk ? 'Customer approved service completion.' : 'Ask the customer for the OTP shown in their Customer App.'), trailing: otpOk ? const Icon(Icons.check_circle) : null)),
+          Card(child: ListTile(leading: Icon(otpOk ? Icons.verified : Icons.pin_outlined), title: Text(otpOk ? 'Customer OTP Verified' : 'Customer OTP Verification'), subtitle: Text(otpOk ? 'Customer approved service completion.' : 'Send a secure OTP to the customer before asking for the code.'), trailing: otpOk ? const Icon(Icons.check_circle) : null)),
+          if (!otpOk) SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: busy ? null : requestOtp,
+              icon: const Icon(Icons.sms_outlined),
+              label: const Text('SEND CUSTOMER OTP'),
+            ),
+          ),
           if (!otpOk) Row(children: [
             Expanded(child: TextField(controller: otp, keyboardType: TextInputType.number, maxLength: 6, decoration: const InputDecoration(labelText: 'Customer OTP', border: OutlineInputBorder()))),
             const SizedBox(width: 8), FilledButton(onPressed: busy ? null : verifyOtp, child: const Text('VERIFY')),

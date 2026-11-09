@@ -166,6 +166,16 @@ class _AdminHomePageState extends State<AdminHomePage> {
       const SizedBox(height:18),_grid(),
       const SizedBox(height:14),
       Card(child:ListTile(leading:const CircleAvatar(child:Icon(Icons.autorenew)),title:const Text('AMC Renewal Requests',style:TextStyle(fontWeight:FontWeight.w800)),subtitle:const Text('View and manage customer AMC renewals'),trailing:const Icon(Icons.chevron_right),onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const AdminAmcRenewalsPage())).then((_){load();}))),
+      const SizedBox(height:18),
+      SizedBox(
+        width: double.infinity,
+        child: OutlinedButton.icon(
+          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SosAlertsPage(service: service))),
+          style: OutlinedButton.styleFrom(foregroundColor: Colors.red, side: const BorderSide(color: Colors.red)),
+          icon: const Icon(Icons.sos),
+          label: const Text('OPEN TECHNICIAN SOS ALERTS'),
+        ),
+      ),
       const SizedBox(height:22),const Text('Live Complaints',style:TextStyle(fontSize:20,fontWeight:FontWeight.w800)),const SizedBox(height:10),
       ...complaints.take(10).map((c)=>AdminComplaintTile(complaint:c,technicians:technicians,onChanged:load)),
       if(complaints.isEmpty)const Card(child:Padding(padding:EdgeInsets.all(22),child:Text('No complaints found.'))),
@@ -238,5 +248,308 @@ class CustomersPage extends StatefulWidget { final AdminService service; const C
 class _CustomersPageState extends State<CustomersPage>{List<Map<String,dynamic>> rows=[];bool loading=true;@override void initState(){super.initState();load();}Future<void>load()async{try{rows=await widget.service.customers();if(mounted)setState(()=>loading=false);}catch(_){if(mounted)setState(()=>loading=false);}}@override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const Text('Customers')),body:loading?const Center(child:CircularProgressIndicator()):ListView.builder(padding:const EdgeInsets.all(12),itemCount:rows.length,itemBuilder:(_,i){final c=rows[i];return Card(child:ListTile(leading:const CircleAvatar(child:Icon(Icons.person_outline)),title:Text((c['name']??'Customer').toString(),style:const TextStyle(fontWeight:FontWeight.w800)),subtitle:Text((c['customer_code']??'-').toString()+' • '+(c['mobile']??'-').toString()),trailing:const Icon(Icons.chevron_right)));}));
 }
 
-class TechniciansPage extends StatefulWidget { final AdminService service; const TechniciansPage({super.key,required this.service}); @override State<TechniciansPage> createState()=>_TechniciansPageState(); }
-class _TechniciansPageState extends State<TechniciansPage>{List<Map<String,dynamic>> rows=[];bool loading=true;@override void initState(){super.initState();load();}Future<void>load()async{try{rows=await widget.service.technicians();if(mounted)setState(()=>loading=false);}catch(_){if(mounted)setState(()=>loading=false);}}@override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const Text('Technicians')),body:loading?const Center(child:CircularProgressIndicator()):ListView.builder(padding:const EdgeInsets.all(12),itemCount:rows.length,itemBuilder:(_,i){final t=rows[i];return Card(child:ListTile(leading:const CircleAvatar(child:Icon(Icons.engineering_outlined)),title:Text((t['name']??'Technician').toString(),style:const TextStyle(fontWeight:FontWeight.w800)),subtitle:Text((t['mobile']??'-').toString()),trailing:Chip(label:Text('Active'))));}));}
+class TechniciansPage extends StatefulWidget {
+  final AdminService service;
+  const TechniciansPage({super.key, required this.service});
+  @override
+  State<TechniciansPage> createState() => _TechniciansPageState();
+}
+
+class _TechniciansPageState extends State<TechniciansPage> {
+  List<Map<String, dynamic>> profiles = [];
+  List<Map<String, dynamic>> records = [];
+  Map<String, String?> selections = {};
+  bool loading = true;
+  final Set<String> saving = {};
+
+  @override
+  void initState() {
+    super.initState();
+    load();
+  }
+
+  Future<void> load() async {
+    try {
+      final results = await Future.wait([
+        widget.service.technicians(),
+        widget.service.technicianRecords(),
+      ]);
+      final nextProfiles = results[0] as List<Map<String, dynamic>>;
+      final nextRecords = results[1] as List<Map<String, dynamic>>;
+      if (!mounted) return;
+      setState(() {
+        profiles = nextProfiles;
+        records = nextRecords;
+        selections = {
+          for (final record in nextRecords)
+            record['id'].toString(): record['profile_id']?.toString(),
+        };
+        loading = false;
+      });
+    } catch (e) {
+      if (mounted) {
+        setState(() => loading = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    }
+  }
+
+  Future<void> saveLink(String recordId) async {
+    final profileId = selections[recordId];
+    if (profileId == null || profileId.isEmpty) return;
+    setState(() => saving.add(recordId));
+    try {
+      await widget.service.linkTechnicianProfile(recordId, profileId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Technician login profile linked successfully.')),
+        );
+        await load();
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    } finally {
+      if (mounted) setState(() => saving.remove(recordId));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(
+      title: const Text('Technicians & Login Links'),
+      actions: [IconButton(onPressed: loading ? null : load, icon: const Icon(Icons.refresh))],
+    ),
+    body: loading
+        ? const Center(child: CircularProgressIndicator())
+        : RefreshIndicator(
+            onRefresh: load,
+            child: ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                const Text('Technician Login Profiles', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
+                const SizedBox(height: 8),
+                if (profiles.isEmpty)
+                  const Card(child: Padding(padding: EdgeInsets.all(16), child: Text('No technician login profiles found.'))),
+                ...profiles.map((profile) => Card(
+                  child: ListTile(
+                    leading: const CircleAvatar(child: Icon(Icons.account_circle_outlined)),
+                    title: Text((profile['full_name'] ?? 'Technician').toString()),
+                    subtitle: Text((profile['phone'] ?? 'Email / phone profile').toString()),
+                    trailing: const Chip(label: Text('Login')),
+                  ),
+                )),
+                const SizedBox(height: 20),
+                const Text('Operational Technician Records', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
+                const SizedBox(height: 8),
+                if (records.isEmpty)
+                  const Card(child: Padding(padding: EdgeInsets.all(16), child: Text('No operational technician records found.'))),
+                ...records.map((record) {
+                  final id = record['id'].toString();
+                  final currentId = selections[id];
+                  final occupied = records
+                      .where((other) => other['id'].toString() != id && other['profile_id'] != null)
+                      .map((other) => other['profile_id'].toString())
+                      .toSet();
+                  final options = profiles.where((profile) {
+                    final profileId = profile['id'].toString();
+                    return profileId == currentId || !occupied.contains(profileId);
+                  }).toList();
+                  final validValue = options.any((profile) => profile['id'].toString() == currentId)
+                      ? currentId
+                      : null;
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text((record['name'] ?? 'Technician').toString(), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                          Text('Mobile: ${record['mobile'] ?? '-'} • Status: ${record['status'] ?? '-'}', style: const TextStyle(color: Colors.black54)),
+                          const SizedBox(height: 12),
+                          DropdownButtonFormField<String>(
+                            value: validValue,
+                            decoration: const InputDecoration(labelText: 'Link Login Profile'),
+                            items: options.map((profile) => DropdownMenuItem(
+                              value: profile['id'].toString(),
+                              child: Text((profile['full_name'] ?? profile['phone'] ?? profile['id']).toString()),
+                            )).toList(),
+                            onChanged: (value) => setState(() => selections[id] = value),
+                          ),
+                          const SizedBox(height: 10),
+                          SizedBox(
+                            width: double.infinity,
+                            child: FilledButton.icon(
+                              onPressed: saving.contains(id) || validValue == null ? null : () => saveLink(id),
+                              icon: saving.contains(id)
+                                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                                  : const Icon(Icons.link),
+                              label: Text(saving.contains(id) ? 'Saving...' : 'SAVE LOGIN LINK'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+  );
+}
+
+class SosAlertsPage extends StatefulWidget {
+  final AdminService service;
+  const SosAlertsPage({super.key, required this.service});
+  @override
+  State<SosAlertsPage> createState() => _SosAlertsPageState();
+}
+
+class _SosAlertsPageState extends State<SosAlertsPage> {
+  List<Map<String,dynamic>> alerts = [];
+  List<Map<String,dynamic>> profiles = [];
+  bool loading = true;
+  Timer? timer;
+  final Set<String> updating = {};
+
+  @override
+  void initState() {
+    super.initState();
+    load();
+    timer = Timer.periodic(const Duration(seconds: 10), (_) => load());
+  }
+
+  @override
+  void dispose() {
+    timer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> load() async {
+    try {
+      final results = await Future.wait([
+        widget.service.sosAlerts(),
+        widget.service.technicians(),
+      ]);
+      final rows = results[0] as List<Map<String,dynamic>>;
+      final loginProfiles = results[1] as List<Map<String,dynamic>>;
+      if (mounted) setState(() {
+        alerts = rows;
+        profiles = loginProfiles;
+        loading = false;
+      });
+    } catch (e) {
+      if (mounted) {
+        setState(() => loading = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    }
+  }
+
+  Future<void> updateStatus(String id, String status) async {
+    setState(() => updating.add(id));
+    try {
+      await widget.service.updateSosAlertStatus(id, status);
+      await load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(status == 'acknowledged' ? 'SOS acknowledged.' : 'SOS marked resolved.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    } finally {
+      if (mounted) setState(() => updating.remove(id));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(
+      title: const Text('Technician Emergency SOS'),
+      actions: [IconButton(onPressed: load, icon: const Icon(Icons.refresh))],
+    ),
+    body: loading
+        ? const Center(child: CircularProgressIndicator())
+        : RefreshIndicator(
+            onRefresh: load,
+            child: ListView(
+              padding: const EdgeInsets.all(14),
+              children: [
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(children: [
+                      const Icon(Icons.sos, color: Colors.red, size: 30),
+                      const SizedBox(width: 12),
+                      Expanded(child: Text(
+                        '${alerts.where((a) => a['status'] != 'resolved').length} active emergency alert(s)',
+                        style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+                      )),
+                    ]),
+                  ),
+                ),
+                if (alerts.isEmpty)
+                  const Card(child: Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Center(child: Text('No technician SOS alerts.')),
+                  )),
+                ...alerts.map((alert) {
+                  final id = alert['id'].toString();
+                  final status = (alert['status'] ?? 'open').toString();
+                  final lat = alert['latitude']?.toString();
+                  final lon = alert['longitude']?.toString();
+                  final linkedProfiles = profiles.where(
+                    (profile) => profile['id'].toString() == alert['technician_id'].toString(),
+                  );
+                  final technicianName = linkedProfiles.isEmpty
+                      ? (alert['technician_id'] ?? 'Unknown').toString()
+                      : (linkedProfiles.first['full_name'] ?? 'Technician').toString();
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(children: [
+                            const Icon(Icons.warning_amber_rounded, color: Colors.red),
+                            const SizedBox(width: 8),
+                            Expanded(child: Text(
+                              (alert['customer_name'] ?? 'Technician Emergency').toString(),
+                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+                            )),
+                            Chip(label: Text(status.toUpperCase())),
+                          ]),
+                          Text('Technician: $technicianName'),
+                          if (alert['complaint_id'] != null) Text('Ticket ID: ${alert['complaint_id']}'),
+                          Text('Location: ${alert['location_text'] ?? 'Not available'}'),
+                          if (lat != null && lon != null) Text('GPS: $lat, $lon'),
+                          const SizedBox(height: 6),
+                          Text((alert['notes'] ?? 'Emergency SOS').toString()),
+                          Text((alert['created_at'] ?? '').toString(), style: const TextStyle(color: Colors.black54, fontSize: 12)),
+                          if (status != 'resolved') ...[
+                            const SizedBox(height: 12),
+                            Row(children: [
+                              if (status == 'open')
+                                Expanded(child: OutlinedButton(
+                                  onPressed: updating.contains(id) ? null : () => updateStatus(id, 'acknowledged'),
+                                  child: const Text('ACKNOWLEDGE'),
+                                )),
+                              if (status == 'open') const SizedBox(width: 8),
+                              Expanded(child: FilledButton(
+                                onPressed: updating.contains(id) ? null : () => updateStatus(id, 'resolved'),
+                                child: const Text('MARK RESOLVED'),
+                              )),
+                            ]),
+                          ],
+                        ],
+                      ),
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+  );
+}
