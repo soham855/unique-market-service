@@ -784,6 +784,7 @@ function buildWhatsAppNotification(event, complaint, customer, recipientProfile)
   const location = customer?.address || complaint?.location_text || complaint?.address || 'Not provided'
   const statusText = formatServiceStatus(complaint?.status)
   const receivedAt = formatWhatsAppTime(complaint?.created_at || event?.created_at)
+  if (event.event_type === 'service_report_otp') return String(event.message || 'Your Unique Market service approval OTP is ready.')
   if (event.event_type === 'assigned') return [
     '🔔 *UNIQUE MARKET | NEW ASSIGNMENT*', '',
     'Hello ' + (recipientProfile?.full_name || 'Team Member') + ',',
@@ -832,6 +833,11 @@ async function sendNotificationEvent(jid, event) {
     if (!complaint) throw new Error('Complaint not found: ' + event.complaint_id)
   }
   if (event.recipient_user_id) recipientProfile = await getProfile(event.recipient_user_id)
+  if (event.event_type === 'service_report_otp') {
+    // Approval OTPs are sensitive: send only the exact server-generated text, no PDF or extra recipients.
+    await sendText(jid, String(event.message || ''))
+    return
+  }
   if (pdfUrl) {
     const response = await fetch(pdfUrl, { redirect: 'follow' })
     if (!response.ok) throw new Error('PDF URL download failed: HTTP ' + response.status)
@@ -919,7 +925,8 @@ async function processNotificationEvents() {
       const targets = []
       const normalizedCustomerPhone = String(customerPhone || event.phone || '').replace(/\D/g, '')
       const isLegacyAutomationNumber = normalizedCustomerPhone === '8554887026'
-      if (event.event_type === 'status_changed') {
+      if (event.event_type === 'status_changed' || event.event_type === 'service_report_otp') {
+        // Service approval OTPs must never be copied to office numbers or WhatsApp groups.
         const customerJid = isLegacyAutomationNumber ? null : recipientJid(normalizedCustomerPhone)
         if (customerJid) targets.push(customerJid)
       } else {
