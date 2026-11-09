@@ -170,43 +170,20 @@ class _LoginPageState extends State<LoginPage> {
   final identifier = TextEditingController();
   final otp = TextEditingController();
   bool sent = false, busy = false, remember = true;
-  int resendSeconds = 0;
-  Timer? _resendTimer;
-
-  void _startResendCooldown() {
-    _resendTimer?.cancel();
-    setState(() => resendSeconds = 60);
-    _resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted) { timer.cancel(); return; }
-      if (resendSeconds <= 1) { timer.cancel(); setState(() => resendSeconds = 0); }
-      else { setState(() => resendSeconds--); }
-    });
-  }
-
-  String _friendlyAuthError(Object error) {
-    final message = error.toString();
-    if (message.contains('over_email_send_rate_limit') || message.contains('429')) {
-      return 'Too many email requests. Please wait before requesting another code.';
-    }
-    if (message.contains('Signups not allowed')) return 'This email is not linked to an existing customer login. Contact Unique Market.';
-    return 'Could not send login code: $message';
-  }
 
   bool get isEmail => identifier.text.trim().contains('@');
 
   Future<void> send() async {
     final value = identifier.text.trim();
-    if (value.isEmpty || (value.contains('@') && !RegExp(r"^[^@\s]+@[^@\s]+\.[^@\s]+$").hasMatch(value))) {
+    if (value.isEmpty || (value.contains('@') && !RegExp(r'^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$').hasMatch(value))) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Enter a valid registered email or mobile number.')),
       );
       return;
     }
-    if (resendSeconds > 0) return;
     setState(() => busy = true);
     try {
       await AuthService(Supabase.instance.client).sendOtp(value);
-      _startResendCooldown();
       if (mounted) {
         setState(() { sent = true; busy = false; });
         ScaffoldMessenger.of(context).showSnackBar(
@@ -217,7 +194,7 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) return;
       setState(() => busy = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_friendlyAuthError(e))),
+        SnackBar(content: Text('Login failed. Only existing customer accounts can sign in. Details: $e')),
       );
     }
   }
@@ -246,7 +223,7 @@ class _LoginPageState extends State<LoginPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() => busy = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_friendlyAuthError(e))));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
     }
   }
 
@@ -254,7 +231,6 @@ class _LoginPageState extends State<LoginPage> {
   void dispose() {
     identifier.dispose();
     otp.dispose();
-    _resendTimer?.cancel();
     super.dispose();
   }
 
@@ -292,11 +268,7 @@ class _LoginPageState extends State<LoginPage> {
             onPressed: busy ? null : (sent ? verify : send),
             child: busy ? const CircularProgressIndicator(color: Colors.white) : Text(sent ? 'VERIFY & CONTINUE' : 'SEND LOGIN CODE'),
           )),
-          if (sent) ...[
-            Text('Didn’t receive the code? ${resendSeconds > 0 ? 'Try again in ${resendSeconds}s' : 'You can resend now.'}', style: const TextStyle(color: Colors.black54)),
-            TextButton(onPressed: busy || resendSeconds > 0 ? null : send, child: const Text('RESEND CODE')),
-            TextButton(onPressed: () { _resendTimer?.cancel(); setState(() { sent = false; otp.clear(); resendSeconds = 0; }); }, child: const Text('Change email or mobile number')),
-          ],
+          if (sent) TextButton(onPressed: () => setState(() { sent = false; otp.clear(); }), child: const Text('Change email or mobile number')),
           const SizedBox(height: 28),
           const Text('CCTV | IT Security | Service & AMC', style: TextStyle(fontWeight: FontWeight.w700)),
           const Text('Station Road, Hotel Rajdoot, Ichalkaranji\\n7350060071', style: TextStyle(color: Colors.black54)),
@@ -963,226 +935,3 @@ class _SettingsPageState extends State<SettingsPage>{
     })
   ]));
 }
-).hasMatch(input);
-    }
-    final digits = input.replaceAll(RegExp(r'\D'), '');
-    return digits.length == 10 ||
-        (digits.length == 11 && digits.startsWith('0')) ||
-        (digits.length == 12 && digits.startsWith('91'));
-  }
-
-  Future<void> send() async {
-    final value = identifier.text.trim();
-    if (!_isValidLoginIdentifier(value)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter one valid email address or a 10-digit mobile number.')),
-      );
-      return;
-    }
-    setState(() => busy = true);
-    try {
-      await AuthService(Supabase.instance.client).sendOtp(value);
-      if (mounted) {
-        setState(() { sent = true; busy = false; });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(isEmail ? 'Login code sent to your registered email.' : 'OTP sent to your registered mobile number.')),
-        );
-      }
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => busy = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Login failed. Only existing customer accounts can sign in. Details: $e')),
-      );
-    }
-  }
-
-  Future<void> verify() async {
-    setState(() => busy = true);
-    try {
-      final r = await AuthService(Supabase.instance.client).verifyOtp(
-        identifier: identifier.text.trim(),
-        token: otp.text,
-      );
-      if (r.user == null) throw Exception('OTP verification failed');
-      final role = await AuthService(Supabase.instance.client).resolveRole(r.user!.id);
-      if (role != 'customer') {
-        await Supabase.instance.client.auth.signOut();
-        throw Exception('This account is not a Customer account.');
-      }
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('remember_me', remember);
-      if (remember) {
-        await prefs.setInt('remember_until_ms', DateTime.now().add(const Duration(days: 15)).millisecondsSinceEpoch);
-      } else {
-        await prefs.remove('remember_until_ms');
-      }
-      if (mounted) Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const CustomerHomePage()), (_) => false);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => busy = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
-    }
-  }
-
-  @override
-  void dispose() {
-    identifier.dispose();
-    otp.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    body: SafeArea(child: Center(child: SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 460), child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(Icons.shield_outlined, size: 58, color: Color(0xFF0B63F6)),
-          const SizedBox(height: 18),
-          const Text('UNIQUE MARKET', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: 1.2)),
-          const SizedBox(height: 6),
-          const Text('Instant Services for Your Security'),
-          const SizedBox(height: 36),
-          Text(sent ? 'Verify Login Code' : 'Customer Login', style: const TextStyle(fontSize: 25, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 18),
-          if (!sent) ...[
-            TextField(
-              controller: identifier,
-              keyboardType: TextInputType.emailAddress,
-              autofillHints: const [AutofillHints.email, AutofillHints.telephoneNumber],
-              decoration: const InputDecoration(
-                labelText: 'Registered Email or Mobile Number',
-                helperText: 'New customer registration is not available in this app.',
-                prefixIcon: Icon(Icons.person_outline),
-              ),
-            ),
-            CheckboxListTile(value: remember, onChanged: (v) => setState(() => remember = v ?? true), contentPadding: EdgeInsets.zero, title: const Text('Remember Me'), subtitle: const Text('Stay signed in for 15 days')),
-          ] else
-            TextField(controller: otp, keyboardType: TextInputType.number, maxLength: 8, decoration: InputDecoration(labelText: isEmail ? 'Email Login Code' : 'SMS OTP', prefixIcon: const Icon(Icons.lock_outline))),
-          const SizedBox(height: 12),
-          SizedBox(width: double.infinity, height: 54, child: FilledButton(
-            onPressed: busy ? null : (sent ? verify : send),
-            child: busy ? const CircularProgressIndicator(color: Colors.white) : Text(sent ? 'VERIFY & CONTINUE' : 'SEND LOGIN CODE'),
-          )),
-          if (sent) TextButton(onPressed: () => setState(() { sent = false; otp.clear(); }), child: const Text('Change email or mobile number')),
-          const SizedBox(height: 28),
-          const Text('CCTV | IT Security | Service & AMC', style: TextStyle(fontWeight: FontWeight.w700)),
-          const Text('Station Road, Hotel Rajdoot, Ichalkaranji\\n7350060071', style: TextStyle(color: Colors.black54)),
-        ],
-      )),
-    ))),
-  );
-}
-
-).hasMatch(value))) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter a valid registered email or mobile number.')),
-      );
-      return;
-    }
-    if (resendSeconds > 0) return;
-    setState(() => busy = true);
-    try {
-      await AuthService(Supabase.instance.client).sendOtp(value);
-      _startResendCooldown();
-      if (mounted) {
-        setState(() { sent = true; busy = false; });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(isEmail ? 'Login code sent to your registered email.' : 'OTP sent to your registered mobile number.')),
-        );
-      }
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => busy = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_friendlyAuthError(e))),
-      );
-    }
-  }
-
-  Future<void> verify() async {
-    setState(() => busy = true);
-    try {
-      final r = await AuthService(Supabase.instance.client).verifyOtp(
-        identifier: identifier.text.trim(),
-        token: otp.text,
-      );
-      if (r.user == null) throw Exception('OTP verification failed');
-      final role = await AuthService(Supabase.instance.client).resolveRole(r.user!.id);
-      if (role != 'customer') {
-        await Supabase.instance.client.auth.signOut();
-        throw Exception('This account is not a Customer account.');
-      }
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('remember_me', remember);
-      if (remember) {
-        await prefs.setInt('remember_until_ms', DateTime.now().add(const Duration(days: 15)).millisecondsSinceEpoch);
-      } else {
-        await prefs.remove('remember_until_ms');
-      }
-      if (mounted) Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const CustomerHomePage()), (_) => false);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => busy = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_friendlyAuthError(e))));
-    }
-  }
-
-  @override
-  void dispose() {
-    identifier.dispose();
-    otp.dispose();
-    _resendTimer?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    body: SafeArea(child: Center(child: SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 460), child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(Icons.shield_outlined, size: 58, color: Color(0xFF0B63F6)),
-          const SizedBox(height: 18),
-          const Text('UNIQUE MARKET', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: 1.2)),
-          const SizedBox(height: 6),
-          const Text('Instant Services for Your Security'),
-          const SizedBox(height: 36),
-          Text(sent ? 'Verify Login Code' : 'Customer Login', style: const TextStyle(fontSize: 25, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 18),
-          if (!sent) ...[
-            TextField(
-              controller: identifier,
-              keyboardType: TextInputType.emailAddress,
-              autofillHints: const [AutofillHints.email, AutofillHints.telephoneNumber],
-              decoration: const InputDecoration(
-                labelText: 'Registered Email or Mobile Number',
-                helperText: 'New customer registration is not available in this app.',
-                prefixIcon: Icon(Icons.person_outline),
-              ),
-            ),
-            CheckboxListTile(value: remember, onChanged: (v) => setState(() => remember = v ?? true), contentPadding: EdgeInsets.zero, title: const Text('Remember Me'), subtitle: const Text('Stay signed in for 15 days')),
-          ] else
-            TextField(controller: otp, keyboardType: TextInputType.number, maxLength: 8, decoration: InputDecoration(labelText: isEmail ? 'Email Login Code' : 'SMS OTP', prefixIcon: const Icon(Icons.lock_outline))),
-          const SizedBox(height: 12),
-          SizedBox(width: double.infinity, height: 54, child: FilledButton(
-            onPressed: busy ? null : (sent ? verify : send),
-            child: busy ? const CircularProgressIndicator(color: Colors.white) : Text(sent ? 'VERIFY & CONTINUE' : 'SEND LOGIN CODE'),
-          )),
-          if (sent) ...[
-            Text('Didn’t receive the code? ${resendSeconds > 0 ? 'Try again in ${resendSeconds}s' : 'You can resend now.'}', style: const TextStyle(color: Colors.black54)),
-            TextButton(onPressed: busy || resendSeconds > 0 ? null : send, child: const Text('RESEND CODE')),
-            TextButton(onPressed: () { _resendTimer?.cancel(); setState(() { sent = false; otp.clear(); resendSeconds = 0; }); }, child: const Text('Change email or mobile number')),
-          ],
-          const SizedBox(height: 28),
-          const Text('CCTV | IT Security | Service & AMC', style: TextStyle(fontWeight: FontWeight.w700)),
-          const Text('Station Road, Hotel Rajdoot, Ichalkaranji\\n7350060071', style: TextStyle(color: Colors.black54)),
-        ],
-      )),
-    ))),
-  );
-}
-
