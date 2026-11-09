@@ -1,4 +1,5 @@
 name: Flutter Android Build
+# Admin release includes registered-email OTP fallback for email-only Admin Auth accounts.
 
 on:
   pull_request:
