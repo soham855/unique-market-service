@@ -7,6 +7,13 @@ on:
       - 'flutter_app/**'
       - '.github/workflows/flutter-android.yml'
       - 'supabase/migrations/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'flutter_app/**'
+      - '.github/workflows/flutter-android.yml'
+      - 'supabase/functions/service-report-otp/**'
+      - 'supabase/migrations/**'
   workflow_dispatch:
 
 jobs:
@@ -142,6 +149,52 @@ jobs:
 
       - name: Build release AAB
         run: flutter build appbundle --release --dart-define=SUPABASE_URL=https://tfscvycomllamoubtlcf.supabase.co --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_VeJIjcsILLniCHf2HjA20A_xlMydma0
+
+      - name: Build technician APK (separate app ID)
+        env:
+          TECHNICIAN_GOOGLE_SERVICES_JSON: ${{ secrets.TECHNICIAN_GOOGLE_SERVICES_JSON }}
+        run: |
+          set -euo pipefail
+          if [ -f android/app/build.gradle.kts ]; then
+            sed -i 's/applicationId = "com.uniquemarket.instantservices"/applicationId = "com.uniquemarket.technician"/' android/app/build.gradle.kts
+            if [ -n "${TECHNICIAN_GOOGLE_SERVICES_JSON:-}" ]; then
+              printf '%s' "$TECHNICIAN_GOOGLE_SERVICES_JSON" | base64 --decode > android/app/google-services.json
+              grep -q '"package_name": "com.uniquemarket.technician"' android/app/google-services.json
+              grep -q 'id("com.google.gms.google-services")' android/app/build.gradle.kts || sed -i '/id("dev.flutter.flutter-gradle-plugin")/a\    id("com.google.gms.google-services")' android/app/build.gradle.kts
+            else
+              sed -i '/id("com.google.gms.google-services")/d' android/app/build.gradle.kts
+              echo "Technician Firebase config secret not set; APK will build without FCM registration."
+            fi
+          else
+            sed -i 's/applicationId "com.uniquemarket.instantservices"/applicationId "com.uniquemarket.technician"/' android/app/build.gradle
+            if [ -n "${TECHNICIAN_GOOGLE_SERVICES_JSON:-}" ]; then
+              printf '%s' "$TECHNICIAN_GOOGLE_SERVICES_JSON" | base64 --decode > android/app/google-services.json
+              grep -q '"package_name": "com.uniquemarket.technician"' android/app/google-services.json
+              grep -q "id 'com.google.gms.google-services'" android/app/build.gradle || sed -i "/id 'dev.flutter.flutter-gradle-plugin'/a\\    id 'com.google.gms.google-services'" android/app/build.gradle
+            else
+              sed -i "/id 'com.google.gms.google-services'/d" android/app/build.gradle
+              echo "Technician Firebase config secret not set; APK will build without FCM registration."
+            fi
+          fi
+          sed -i 's/android:label="[^"]*"/android:label="Unique Market Technician"/' android/app/src/main/AndroidManifest.xml
+          flutter build apk --debug -t lib/technician_main.dart --dart-define=SUPABASE_URL=https://tfscvycomllamoubtlcf.supabase.co --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_VeJIjcsILLniCHf2HjA20A_xlMydma0
+          cp build/app/outputs/flutter-apk/app-debug.apk build/app/outputs/flutter-apk/technician-debug.apk
+          flutter build apk --release -t lib/technician_main.dart --dart-define=SUPABASE_URL=https://tfscvycomllamoubtlcf.supabase.co --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_VeJIjcsILLniCHf2HjA20A_xlMydma0
+          cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/technician-release.apk
+
+      - name: Upload technician debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: unique-market-technician-debug-apk
+          path: flutter_app/build/app/outputs/flutter-apk/technician-debug.apk
+          retention-days: 30
+
+      - name: Upload technician release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: unique-market-technician-release-apk
+          path: flutter_app/build/app/outputs/flutter-apk/technician-release.apk
+          retention-days: 30
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
