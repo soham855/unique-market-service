@@ -171,8 +171,8 @@ class _AdminHomePageState extends State<AdminHomePage> {
       if(complaints.isEmpty)const Card(child:Padding(padding:EdgeInsets.all(22),child:Text('No complaints found.'))),
       const SizedBox(height:20),const Center(child:Text('UNIQUE MARKET • 7350060071',style:TextStyle(color:Colors.black45)))
     ])),
-    bottomNavigationBar:NavigationBar(selectedIndex:tab,onDestinationSelected:(i){setState(()=>tab=i);if(i==1)Navigator.push(context,MaterialPageRoute(builder:(_)=>ComplaintsPage(service:service))).then((_){load();});else if(i==2)Navigator.push(context,MaterialPageRoute(builder:(_)=>CustomersPage(service:service)));else if(i==3)Navigator.push(context,MaterialPageRoute(builder:(_)=>TechniciansPage(service:service)));else if(i==4)Navigator.push(context,MaterialPageRoute(builder:(_)=>PaymentsPage(service:service)));else if(i==5)Navigator.push(context,MaterialPageRoute(builder:(_)=>ReportsPage(service:service)));},destinations:const[
-      NavigationDestination(icon:Icon(Icons.dashboard_outlined),label:'Dashboard'),NavigationDestination(icon:Icon(Icons.confirmation_num_outlined),label:'Complaints'),NavigationDestination(icon:Icon(Icons.people_outline),label:'Customers'),NavigationDestination(icon:Icon(Icons.engineering_outlined),label:'Technicians'),NavigationDestination(icon:Icon(Icons.payments_outlined),label:'Payments'),NavigationDestination(icon:Icon(Icons.analytics_outlined),label:'Reports')
+    bottomNavigationBar:NavigationBar(selectedIndex:tab,onDestinationSelected:(i){setState(()=>tab=i);if(i==1)Navigator.push(context,MaterialPageRoute(builder:(_)=>ComplaintsPage(service:service))).then((_){load();});else if(i==2)Navigator.push(context,MaterialPageRoute(builder:(_)=>CustomersPage(service:service)));else if(i==3)Navigator.push(context,MaterialPageRoute(builder:(_)=>TechniciansPage(service:service)));else if(i==4)Navigator.push(context,MaterialPageRoute(builder:(_)=>PaymentsPage(service:service)));else if(i==5)Navigator.push(context,MaterialPageRoute(builder:(_)=>ReportsPage(service:service)));else if(i==6)Navigator.push(context,MaterialPageRoute(builder:(_)=>SosAlertsPage(service:service)));},destinations:const[
+      NavigationDestination(icon:Icon(Icons.dashboard_outlined),label:'Dashboard'),NavigationDestination(icon:Icon(Icons.confirmation_num_outlined),label:'Complaints'),NavigationDestination(icon:Icon(Icons.people_outline),label:'Customers'),NavigationDestination(icon:Icon(Icons.engineering_outlined),label:'Technicians'),NavigationDestination(icon:Icon(Icons.payments_outlined),label:'Payments'),NavigationDestination(icon:Icon(Icons.analytics_outlined),label:'Reports'),NavigationDestination(icon:Icon(Icons.sos_outlined),label:'SOS')
     ])
   );
   Widget _grid()=>GridView.count(crossAxisCount:2,shrinkWrap:true,physics:const NeverScrollableScrollPhysics(),crossAxisSpacing:10,mainAxisSpacing:10,childAspectRatio:1.45,children:[
@@ -377,6 +377,146 @@ class _TechniciansPageState extends State<TechniciansPage> {
                               label: Text(saving.contains(id) ? 'Saving...' : 'SAVE LOGIN LINK'),
                             ),
                           ),
+                        ],
+                      ),
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+  );
+}
+
+class SosAlertsPage extends StatefulWidget {
+  final AdminService service;
+  const SosAlertsPage({super.key, required this.service});
+  @override
+  State<SosAlertsPage> createState() => _SosAlertsPageState();
+}
+
+class _SosAlertsPageState extends State<SosAlertsPage> {
+  List<Map<String,dynamic>> alerts = [];
+  bool loading = true;
+  Timer? timer;
+  final Set<String> updating = {};
+
+  @override
+  void initState() {
+    super.initState();
+    load();
+    timer = Timer.periodic(const Duration(seconds: 10), (_) => load());
+  }
+
+  @override
+  void dispose() {
+    timer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> load() async {
+    try {
+      final rows = await widget.service.sosAlerts();
+      if (mounted) setState(() { alerts = rows; loading = false; });
+    } catch (e) {
+      if (mounted) {
+        setState(() => loading = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    }
+  }
+
+  Future<void> updateStatus(String id, String status) async {
+    setState(() => updating.add(id));
+    try {
+      await widget.service.updateSosAlertStatus(id, status);
+      await load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(status == 'acknowledged' ? 'SOS acknowledged.' : 'SOS marked resolved.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    } finally {
+      if (mounted) setState(() => updating.remove(id));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(
+      title: const Text('Technician Emergency SOS'),
+      actions: [IconButton(onPressed: load, icon: const Icon(Icons.refresh))],
+    ),
+    body: loading
+        ? const Center(child: CircularProgressIndicator())
+        : RefreshIndicator(
+            onRefresh: load,
+            child: ListView(
+              padding: const EdgeInsets.all(14),
+              children: [
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(children: [
+                      const Icon(Icons.sos, color: Colors.red, size: 30),
+                      const SizedBox(width: 12),
+                      Expanded(child: Text(
+                        '${alerts.where((a) => a['status'] != 'resolved').length} active emergency alert(s)',
+                        style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+                      )),
+                    ]),
+                  ),
+                ),
+                if (alerts.isEmpty)
+                  const Card(child: Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Center(child: Text('No technician SOS alerts.')),
+                  )),
+                ...alerts.map((alert) {
+                  final id = alert['id'].toString();
+                  final status = (alert['status'] ?? 'open').toString();
+                  final lat = alert['latitude']?.toString();
+                  final lon = alert['longitude']?.toString();
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(children: [
+                            const Icon(Icons.warning_amber_rounded, color: Colors.red),
+                            const SizedBox(width: 8),
+                            Expanded(child: Text(
+                              (alert['customer_name'] ?? 'Technician Emergency').toString(),
+                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+                            )),
+                            Chip(label: Text(status.toUpperCase())),
+                          ]),
+                          Text('Technician ID: ${alert['technician_id'] ?? '-'}'),
+                          if (alert['complaint_id'] != null) Text('Ticket ID: ${alert['complaint_id']}'),
+                          Text('Location: ${alert['location_text'] ?? 'Not available'}'),
+                          if (lat != null && lon != null) Text('GPS: $lat, $lon'),
+                          const SizedBox(height: 6),
+                          Text((alert['notes'] ?? 'Emergency SOS').toString()),
+                          Text((alert['created_at'] ?? '').toString(), style: const TextStyle(color: Colors.black54, fontSize: 12)),
+                          if (status != 'resolved') ...[
+                            const SizedBox(height: 12),
+                            Row(children: [
+                              if (status == 'open')
+                                Expanded(child: OutlinedButton(
+                                  onPressed: updating.contains(id) ? null : () => updateStatus(id, 'acknowledged'),
+                                  child: const Text('ACKNOWLEDGE'),
+                                )),
+                              if (status == 'open') const SizedBox(width: 8),
+                              Expanded(child: FilledButton(
+                                onPressed: updating.contains(id) ? null : () => updateStatus(id, 'resolved'),
+                                child: const Text('MARK RESOLVED'),
+                              )),
+                            ]),
+                          ],
                         ],
                       ),
                     ),
