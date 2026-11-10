@@ -314,6 +314,8 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   Map<String,dynamic>? customer;
   List<Map<String,dynamic>> tickets = [];
   bool loading = true;
+  bool _loadingHome = false;
+  String homeError = '';
   int unreadNotifications = 0;
   Timer? _homeTimer;
   late final PushNotificationService pushService;
@@ -321,6 +323,8 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   @override void initState() { super.initState(); pushService = PushNotificationService(Supabase.instance.client); pushService.initialize(); load(); _homeTimer = Timer.periodic(const Duration(seconds: 10), (_) => load()); }
   @override void dispose() { _homeTimer?.cancel(); super.dispose(); }
   Future<void> load() async {
+    if (_loadingHome) return;
+    _loadingHome = true;
     try {
       customer = await service.customer();
       tickets = await service.tickets();
@@ -329,7 +333,12 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
         final rows = await Supabase.instance.client.from('notifications').select('id').eq('user_id', user.id).isFilter('read_at', null);
         unreadNotifications = rows.length;
       }
+      homeError = '';
+    } catch (error) {
+      homeError = 'Could not refresh your portal. Check your internet connection and try again.';
+      debugPrint('CUSTOMER_HOME_LOAD_ERROR: $error');
     } finally {
+      _loadingHome = false;
       if (mounted) setState(() => loading = false);
     }
   }
@@ -346,6 +355,14 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     body: RefreshIndicator(onRefresh: load, child: ListView(padding: const EdgeInsets.all(18), children: [
       Text('Namaskar, ' + (customer?['name']?.toString() ?? 'Customer'), style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900)),
       Text(customer?['customer_code']?.toString() ?? 'Customer Portal', style: const TextStyle(color: Colors.black54)),
+      if (homeError.isNotEmpty) ...[
+        const SizedBox(height: 10),
+        Card(child: ListTile(
+          leading: const Icon(Icons.wifi_off_outlined),
+          title: Text(homeError),
+          trailing: IconButton(onPressed: load, icon: const Icon(Icons.refresh), tooltip: 'Retry'),
+        )),
+      ],
       const SizedBox(height: 22),
       GridView.count(
         crossAxisCount: 2,
