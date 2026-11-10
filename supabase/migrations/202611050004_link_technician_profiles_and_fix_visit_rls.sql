@@ -90,6 +90,7 @@ drop policy if exists technicians_self_or_admin_select on public.technicians;
 drop policy if exists technicians_self_or_admin_select_hardened on public.technicians;
 
 -- Technician rows are visible only to the profile explicitly linked by an admin.
+drop policy if exists technicians_linked_profile_select on public.technicians;
 create policy technicians_linked_profile_select
   on public.technicians
   for select
