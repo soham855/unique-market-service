@@ -1,32 +1,32 @@
 import React from 'react'
 const PHONE='7350060071'
 const ADDRESS='Station Road, Hotel Rajdoot, Ichalkaranji'
-const MESSAGE='Hello Unique Market, I am interested in the 4 Camera CCTV Setup offer for ₹13,999. Please share details.'
+const MESSAGE='Hello Unique Market, I am interested in the 4 Camera CCTV Setup offer for ₹13,999.'
 export default function CCTVOfferSlider(){
  const whatsapp=`https://wa.me/91${PHONE}?text=${encodeURIComponent(MESSAGE)}`
- return <section className="um-offer-wrap" aria-label="Special CCTV offer">
- <style>{`
- .um-offer-wrap{width:min(1240px,calc(100% - 36px));margin:18px auto 48px}
- .um-offer-slide{position:relative;isolation:isolate;overflow:hidden;display:grid;grid-template-columns:1.05fr .9fr .8fr;align-items:center;gap:22px;min-height:300px;padding:clamp(22px,4vw,44px);border:1px solid rgba(103,232,249,.28);border-radius:26px;background:radial-gradient(circle at 78% 20%,rgba(34,211,238,.22),transparent 28%),radial-gradient(circle at 10% 100%,rgba(250,204,21,.16),transparent 30%),linear-gradient(120deg,#07152c,#0b2a52 52%,#071326);box-shadow:0 22px 65px rgba(0,0,0,.28)}
- .um-offer-slide:before{content:"";position:absolute;inset:0;z-index:-1;background:repeating-linear-gradient(135deg,transparent 0 24px,rgba(255,255,255,.018) 25px 26px)}
- .um-offer-kicker{display:inline-flex;padding:7px 11px;border:1px solid rgba(250,204,21,.4);border-radius:999px;background:rgba(250,204,21,.1);color:#fde68a;font-size:10px;font-weight:950;letter-spacing:.15em;text-transform:uppercase}
- .um-offer-copy h2{margin:16px 0 8px;color:#fff;font-size:clamp(30px,4.4vw,52px);line-height:.98;letter-spacing:-.045em;font-weight:950}.um-offer-copy h2 span{color:#67e8f9}
- .um-offer-copy p{margin:0;color:#b7c8dc;font-size:13px;line-height:1.65}
- .um-offer-points{display:grid;grid-template-columns:1fr 1fr;gap:9px 14px;margin:20px 0 0;padding:0;list-style:none}.um-offer-points li{color:#eff6ff;font-size:11px;font-weight:750}.um-offer-points li:before{content:"✓";display:inline-grid;place-items:center;width:17px;height:17px;margin-right:7px;border-radius:50%;background:#facc15;color:#10213b;font-weight:1000}
- .um-offer-kit{display:grid;place-items:center;min-height:220px;position:relative}.um-camera-row{display:flex;gap:8px;justify-content:center}.um-camera{width:clamp(42px,5vw,64px);height:clamp(42px,5vw,64px);display:grid;place-items:center;border:2px solid #dbeafe;border-radius:18px 18px 24px 24px;background:linear-gradient(145deg,#fff,#9fb8d1);box-shadow:0 12px 25px rgba(0,0,0,.3);font-size:25px;color:#10243b}
- .um-dvr{width:90%;max-width:270px;margin:16px auto 0;padding:16px 14px;border:1px solid rgba(255,255,255,.25);border-radius:12px;background:linear-gradient(145deg,#25364b,#07101d);box-shadow:0 15px 30px rgba(0,0,0,.35);color:#e2e8f0;text-align:center;font-size:11px;font-weight:900;letter-spacing:.16em}.um-dvr small{display:block;margin-top:8px;color:#67e8f9;font-size:9px}
- .um-mobile{position:absolute;right:2%;bottom:0;width:58px;height:104px;padding:6px;border:2px solid #cbd5e1;border-radius:13px;background:#020617;box-shadow:0 12px 25px rgba(0,0,0,.4);transform:rotate(7deg)}.um-mobile-screen{height:100%;display:grid;grid-template-columns:1fr 1fr;gap:3px;padding:4px;border-radius:7px;background:#164e63}.um-mobile-screen i{border-radius:3px;background:linear-gradient(135deg,#a7f3d0,#0f766e)}.um-mobile-label{position:absolute;left:50%;bottom:-22px;transform:translateX(-50%);white-space:nowrap;color:#bae6fd;font-size:9px;font-weight:850}
- .um-price-panel{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:22px 16px;border:1px solid rgba(250,204,21,.45);border-radius:20px;background:linear-gradient(145deg,rgba(250,204,21,.16),rgba(15,23,42,.65));text-align:center}.um-price-label{color:#fde68a;font-size:11px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}.um-price{margin:6px 0;color:#fff;font-size:clamp(34px,4vw,48px);font-weight:1000;letter-spacing:-.055em}.um-free{margin:0 0 14px;padding:7px 11px;border-radius:999px;background:#dc2626;color:#fff;font-size:10px;font-weight:950;text-transform:uppercase}
- .um-offer-actions{display:grid;gap:8px;width:100%}.um-offer-actions a{display:block;padding:12px 10px;border-radius:11px;text-align:center;text-decoration:none;font-size:11px;font-weight:950}.um-offer-whatsapp{background:#16a34a;color:#fff!important}.um-offer-call{border:1px solid rgba(255,255,255,.24);background:rgba(255,255,255,.06);color:#fff!important}
- .um-offer-footer{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:13px;padding:0 4px;color:#8094ad;font-size:10px}.um-offer-footer strong{color:#cbd5e1}
- @media(max-width:850px){.um-offer-slide{grid-template-columns:1fr 1fr}.um-offer-kit{grid-column:2;grid-row:1}.um-offer-copy{grid-column:1;grid-row:1}.um-price-panel{grid-column:1/-1;display:grid;grid-template-columns:1fr auto;gap:4px 14px;align-items:center}.um-price-label,.um-price,.um-free{grid-column:1}.um-offer-actions{grid-column:2;grid-row:1/4;min-width:170px}}
- @media(max-width:560px){.um-offer-wrap{width:calc(100% - 24px);margin:12px auto 36px}.um-offer-slide{grid-template-columns:1fr;padding:22px 18px;gap:16px;border-radius:20px}.um-offer-copy,.um-offer-kit,.um-price-panel{grid-column:1;grid-row:auto}.um-offer-copy h2{font-size:37px}.um-offer-copy p{font-size:12px}.um-offer-points{gap:8px 7px}.um-offer-points li{font-size:10px}.um-offer-kit{min-height:175px}.um-camera{width:48px;height:48px;font-size:21px}.um-mobile{right:4%;width:50px;height:88px}.um-dvr{max-width:220px}.um-price-panel{display:flex;padding:18px}.um-price{font-size:43px}.um-offer-actions{width:100%;min-width:0}.um-offer-footer{font-size:9px}}
- @media(prefers-reduced-motion:reduce){.um-offer-slide *{scroll-behavior:auto}}
- `}</style>
- <div className="um-offer-slide">
-  <div className="um-offer-copy"><div className="um-offer-kicker">★ Special CCTV Combo Offer</div><h2>4 Camera<br/><span>CCTV Setup</span></h2><p>Live mobile viewing with Day &amp; Night Color cameras. Protect your home, shop or office with a complete 4-channel setup.</p><ul className="um-offer-points"><li>4 HD Color Cameras</li><li>50 Meter Cable</li><li>4 Channel DVR</li><li>Power Supply</li><li>8 BNC Connectors</li><li>4 DC Connectors</li></ul></div>
-  <div className="um-offer-kit" aria-label="Four cameras and DVR illustration"><div><div className="um-camera-row"><span className="um-camera">◉</span><span className="um-camera">◉</span><span className="um-camera">◉</span><span className="um-camera">◉</span></div><div className="um-dvr">UNIQUE MARKET DVR<small>4 CHANNEL • MOBILE VIEW</small></div></div><div className="um-mobile"><div className="um-mobile-screen"><i/><i/><i/><i/></div><span className="um-mobile-label">MOBILE VIEW</span></div></div>
-  <div className="um-price-panel"><div className="um-price-label">Complete Setup Only</div><div className="um-price">₹13,999/-</div><div className="um-free">Installation FREE</div><div className="um-offer-actions"><a className="um-offer-whatsapp" href={whatsapp} target="_blank" rel="noreferrer">WhatsApp Enquiry</a><a className="um-offer-call" href={`tel:+91${PHONE}`}>Call {PHONE}</a></div></div>
- </div><div className="um-offer-footer"><span><strong>UNIQUE MARKET</strong> • CCTV | IT Security | Service &amp; AMC</span><span>{ADDRESS} • <strong>salesuniquemarket.com</strong></span></div>
+ return <section className="um-offer-wrap" aria-label="4 camera CCTV offer">
+  <style>{`
+   .um-offer-wrap{width:min(1180px,calc(100% - 32px));margin:12px auto 24px}
+   .um-offer-slide{display:grid;grid-template-columns:1fr auto;align-items:center;gap:18px;padding:18px 24px;border:1px solid rgba(103,232,249,.25);border-radius:18px;background:radial-gradient(circle at 85% 10%,rgba(34,211,238,.17),transparent 30%),linear-gradient(110deg,#07152c,#0b2a52 60%,#071326);box-shadow:0 10px 30px rgba(0,0,0,.16)}
+   .um-offer-tag{display:inline-block;padding:4px 9px;border-radius:20px;background:rgba(250,204,21,.13);color:#fde68a;font-size:9px;font-weight:900;letter-spacing:.12em;text-transform:uppercase}
+   .um-offer-title{margin:7px 0 5px;color:#fff;font-size:clamp(21px,3vw,32px);line-height:1.05;font-weight:950;letter-spacing:-.035em}
+   .um-offer-title span{color:#67e8f9}
+   .um-offer-details{margin:0;color:#c6d5e6;font-size:11px;line-height:1.55}
+   .um-offer-pricebox{display:flex;align-items:center;gap:14px}
+   .um-offer-price{color:#fff;font-size:clamp(27px,3.6vw,40px);font-weight:1000;white-space:nowrap;letter-spacing:-.05em}
+   .um-offer-price small{display:block;color:#fde68a;font-size:9px;letter-spacing:.12em;text-align:center}
+   .um-offer-buttons{display:flex;flex-direction:column;gap:6px;min-width:126px}
+   .um-offer-buttons a{padding:9px 12px;border-radius:9px;text-align:center;text-decoration:none;font-size:10px;font-weight:900;white-space:nowrap}
+   .um-offer-wa{background:#16a34a;color:#fff}.um-offer-call{border:1px solid #64748b;color:#fff}
+   .um-offer-address{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin:7px 3px 0;color:#8194ad;font-size:9px}
+   .um-offer-address strong{color:#cbd5e1}
+   @media(max-width:600px){.um-offer-wrap{width:calc(100% - 20px);margin:9px auto 18px}.um-offer-slide{grid-template-columns:1fr auto;gap:8px;padding:14px;border-radius:14px}.um-offer-title{font-size:22px}.um-offer-details{font-size:10px;max-width:310px}.um-offer-pricebox{flex-direction:column;gap:6px;align-items:center}.um-offer-price{font-size:27px}.um-offer-buttons{min-width:100px}.um-offer-buttons a{padding:8px 7px;font-size:9px}.um-offer-address{font-size:8px}}
+   @media(max-width:370px){.um-offer-slide{grid-template-columns:1fr}.um-offer-pricebox{flex-direction:row;justify-content:space-between}.um-offer-buttons{flex-direction:row;min-width:0}.um-offer-buttons a{flex:1}}
+  `}</style>
+  <div className="um-offer-slide">
+   <div><span className="um-offer-tag">Special CCTV Combo Offer</span><h2 className="um-offer-title">4 Camera CCTV Setup <span>• FREE Installation</span></h2><p className="um-offer-details">Mobile View • Day &amp; Night Color • 4CH DVR • Power Supply • 50m Cable • 8 BNC + 4 DC Connectors</p></div>
+   <div className="um-offer-pricebox"><div className="um-offer-price">₹13,999/-<small>COMPLETE SETUP</small></div><div className="um-offer-buttons"><a className="um-offer-wa" href={whatsapp} target="_blank" rel="noreferrer">WhatsApp</a><a className="um-offer-call" href={`tel:+91${PHONE}`}>Call {PHONE}</a></div></div>
+  </div>
+  <div className="um-offer-address"><span><strong>UNIQUE MARKET</strong> • CCTV | IT Security | Service &amp; AMC</span><span>{ADDRESS} • salesuniquemarket.com</span></div>
  </section>
 }
