@@ -105,7 +105,7 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
     const Text('UNIQUE MARKET',style:TextStyle(fontSize:28,fontWeight:FontWeight.w900,letterSpacing:1.2)),const Text('Admin Service Portal'),
     const SizedBox(height:36),Text(sent?'Verify OTP':'Admin Login',style:const TextStyle(fontSize:25,fontWeight:FontWeight.w800)),const SizedBox(height:18),
     if(!sent)TextField(controller:mobile,keyboardType:TextInputType.emailAddress,decoration:const InputDecoration(labelText:'Registered Admin Email or Mobile',prefixIcon:Icon(Icons.person_outline)))
-    else TextField(controller:otp,keyboardType:TextInputType.number,maxLength:6,decoration:const InputDecoration(labelText:'OTP',prefixIcon:Icon(Icons.lock_outline))),
+    else TextField(controller:otp,keyboardType:TextInputType.number,maxLength:8,decoration:const InputDecoration(labelText:'OTP',helperText:'Enter the complete code from your email or SMS.',prefixIcon:Icon(Icons.lock_outline))),
     if(!sent)const Padding(padding:EdgeInsets.only(top:8),child:Text('Use the email already registered to the Admin account. Mobile OTP works only when that mobile is linked to the Admin Auth account.',style:TextStyle(color:Colors.black54,fontSize:12))),
     const SizedBox(height:12),SizedBox(width:double.infinity,height:54,child:FilledButton(onPressed:busy?null:(sent?verify:send),child:busy?const CircularProgressIndicator(color:Colors.white):Text(sent?'VERIFY & CONTINUE':'SEND OTP'))),
     if(sent)TextButton(onPressed:()=>setState(()=>sent=false),child:const Text('Change mobile number')),
