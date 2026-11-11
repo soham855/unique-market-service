@@ -10,15 +10,23 @@ import 'services/admin_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await SharedPreferences.getInstance();
-  if (SupabaseConfig.isConfigured) {
-    await Supabase.initialize(url: SupabaseConfig.url, publishableKey: SupabaseConfig.publishableKey);
+  Object? startupError;
+  try {
+    await SharedPreferences.getInstance();
+    if (SupabaseConfig.isConfigured) {
+      await Supabase.initialize(url: SupabaseConfig.url, publishableKey: SupabaseConfig.publishableKey);
+    }
+  } catch (error, stackTrace) {
+    startupError = error;
+    debugPrint('APP_STARTUP_ERROR: $error');
+    debugPrintStack(stackTrace: stackTrace);
   }
-  runApp(const AdminApp());
+  runApp(AdminApp(startupError: startupError));
 }
 
 class AdminApp extends StatelessWidget {
-  const AdminApp({super.key});
+  final Object? startupError;
+  const AdminApp({super.key, this.startupError});
   @override Widget build(BuildContext context) => MaterialApp(
     debugShowCheckedModeBanner: false,
     title: 'Unique Market Admin',
@@ -74,7 +82,39 @@ class AdminApp extends StatelessWidget {
         ),
       ),
     ),
-    home: SupabaseConfig.isConfigured ? const AdminSessionGate() : const Scaffold(body: Center(child: Text('Supabase is not configured.'))),
+    home: startupError != null
+        ? _StartupFailurePage(error: startupError!)
+        : SupabaseConfig.isConfigured
+            ? const AdminSessionGate()
+            : const Scaffold(body: Center(child: Text('Supabase is not configured.'))),
+  );
+}
+
+class _StartupFailurePage extends StatelessWidget {
+  final Object error;
+  const _StartupFailurePage({required this.error});
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    body: SafeArea(
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline, color: Colors.red, size: 56),
+              const SizedBox(height: 16),
+              const Text('Admin app startup failed', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 12),
+              const Text('Share this error with Unique Market support.', textAlign: TextAlign.center),
+              const SizedBox(height: 16),
+              SelectableText(error.toString(), textAlign: TextAlign.center),
+            ],
+          ),
+        ),
+      ),
+    ),
   );
 }
 
