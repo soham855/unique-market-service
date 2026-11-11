@@ -16,17 +16,23 @@ class AuthService {
     return '+$digits';
   }
 
-  Future<void> sendOtp(String identifier) async {
+  Future<void> sendOtp(
+    String identifier, {
+    bool shouldCreateUser = false,
+    Map<String, dynamic>? data,
+  }) async {
     final value = identifier.trim();
     if (isEmail(value)) {
       await client.auth.signInWithOtp(
         email: value.toLowerCase(),
-        shouldCreateUser: false,
+        shouldCreateUser: shouldCreateUser,
+        data: data,
       );
     } else {
       await client.auth.signInWithOtp(
         phone: normalizePhone(value),
-        shouldCreateUser: false,
+        shouldCreateUser: shouldCreateUser,
+        data: data,
       );
     }
   }
