@@ -1,4 +1,5 @@
 import React,{useEffect} from 'react'
+import './LocalSeoPage.css'
 const SITE='https://www.salesuniquemarket.com'
 const PHONE='+917350600071'
 const ADDRESS='Station Road, Hotel Rajdoot, Ichalkaranji, Maharashtra 416115, India'
@@ -26,7 +27,7 @@ export default function LocalSeoPage(){
  return <main className='seo-page'>
   <header className='seo-header'><a className='seo-brand' href='/'>UNIQUE MARKET</a><a className='seo-login' href='/login'>Customer / Technician Login</a></header>
   <section className='seo-hero'><span className='seo-badge'>ICHALKARANJI • CCTV • COMPUTER • IT SECURITY</span><h1>{page.heading}</h1><p>{page.intro}</p><div className='seo-actions'><a href={`tel:${PHONE}`}>Call +91 7350060071</a><a href={`https://wa.me/${PHONE.replace('+','')}`}>WhatsApp Us</a></div></section>
-  <section className='seo-section'><h2>{page.service} in Ichalkaranji</h2><p>Unique Market provides practical CCTV, computer and IT solutions with product supply, installation, configuration, troubleshooting and after-sales support. We serve residential, commercial and industrial customers in Ichalkaranji and nearby areas.</p><div className='seo-grid'>{page.points.map(point=><article key={point}><strong>{point}</strong><p>Professional support focused on reliable products, correct installation and dependable after-sales service.</p></article>)}</div></section>
+  <section className='seo-section'><h2>Products, installation & local support</h2><p>Unique Market provides practical CCTV, computer and IT solutions with product supply, installation, configuration, troubleshooting and after-sales support. We serve residential, commercial and industrial customers in Ichalkaranji and nearby areas.</p><div className='seo-grid'>{page.points.map(point=><article key={point}><strong>{point}</strong><p>Professional support focused on reliable products, correct installation and dependable after-sales service.</p></article>)}</div></section>
   <section className='seo-section'><h2>Why choose Unique Market?</h2><div className='seo-grid'><article><strong>Local Ichalkaranji support</strong><p>Based at Station Road, Hotel Rajdoot, Ichalkaranji.</p></article><article><strong>Complete CCTV solutions</strong><p>From camera selection and cabling to DVR/NVR configuration and remote viewing.</p></article><article><strong>Computer & networking support</strong><p>PC setup, Windows and driver support, routers, LAN, PoE and IT peripherals.</p></article><article><strong>Service & AMC</strong><p>Ongoing troubleshooting, preventive maintenance and CCTV AMC support.</p></article></div></section>
   <section className='seo-section'><h2>Frequently Asked Questions</h2><div className='seo-grid'>{page.faqs.map(([q,a])=><article key={q}><strong>{q}</strong><p>{a}</p></article>)}</div></section>
   <section className='seo-section seo-links'><h2>CCTV & Computer Services in Ichalkaranji</h2><div>{links.map(link=><a key={link} href={link}>{pages[link].heading}</a>)}</div></section>
