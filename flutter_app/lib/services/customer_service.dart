@@ -101,6 +101,8 @@ class CustomerService {
   }) async {
     final customer = await this.customer();
     if (customer == null) throw Exception('Customer profile not found');
+    if (mode.toUpperCase() != 'UPI') throw Exception('Customer app payments must be submitted through UPI. Cash payments require technician/admin verification.');
+    if (referenceNo == null || referenceNo.trim().isEmpty) throw Exception('Enter the UTR / transaction reference number after paying.');
     final existing = await client.from('payments').select('id,payment_status,status').eq('complaint_id', complaintId);
     if (existing.any((p) => (p['payment_status'] ?? p['status'] ?? '').toString().toLowerCase() == 'pending')) {
       throw Exception('A payment for this ticket is already pending admin verification.');
@@ -112,9 +114,9 @@ class CustomerService {
       'mode': mode,
       'reference_no': referenceNo,
       'payment_date': DateTime.now().toUtc().toIso8601String().substring(0, 10),
-      'status': 'Pending',
+      'status': 'pending',
       'payment_status': 'Pending',
-      'source': 'customer_app',
+      'source': 'customer',
     };
     final result = await client.from('payments').insert(payload).select().single();
     return Map<String, dynamic>.from(result);

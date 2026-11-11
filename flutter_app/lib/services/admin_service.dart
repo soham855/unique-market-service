@@ -116,6 +116,19 @@ class AdminService {
     return List<Map<String,dynamic>>.from(rows);
   }
 
+  Future<Map<String,dynamic>> provisionExistingCustomer(String customerId) async {
+    final response = await client.functions.invoke(
+      'admin-provision-existing-customer',
+      body: {'customer_id': customerId},
+    );
+    final data = response.data;
+    if (response.status < 200 || response.status >= 300 || data is! Map || data['ok'] != true) {
+      final message = data is Map ? (data['error'] ?? 'Unable to provision customer login') : 'Unable to provision customer login';
+      throw Exception(message.toString());
+    }
+    return Map<String,dynamic>.from(data);
+  }
+
   Future<void> updatePayment(String id, String status) async {
     final payment = await client.from('payments').select('id,amount,complaint_id,customer_id,mode,reference_no').eq('id', id).single();
     final complaint = payment['complaint_id'] == null ? null : await client.from('complaints').select('ticket_no,customer_name').eq('id', payment['complaint_id']).maybeSingle();

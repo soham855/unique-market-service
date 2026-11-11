@@ -90,10 +90,10 @@ class AdminLoginPage extends StatefulWidget {
 class _AdminLoginPageState extends State<AdminLoginPage> {
   final mobile = TextEditingController(), otp = TextEditingController();
   bool sent=false,busy=false;
-  String phone() { var p=mobile.text.trim(); if(p.startsWith('0'))p='+91'+p.substring(1); if(!p.startsWith('+'))p='+91'+p; return p; }
-  Future<void> send() async { setState(()=>busy=true); try { await AuthService(Supabase.instance.client).sendOtp(phone()); if(mounted)setState(()=>sent=true); } catch(e) { if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(e.toString()))); } finally { if(mounted)setState(()=>busy=false); } }
+  String identifier() { final value=mobile.text.trim(); if(value.contains('@')) return value.toLowerCase(); var p=value.replaceAll(RegExp(r'[\\s()-]'), ''); if(p.startsWith('0'))p='+91'+p.substring(1); if(!p.startsWith('+'))p='+91'+p; return p; }
+  Future<void> send() async { setState(()=>busy=true); try { await AuthService(Supabase.instance.client).sendOtp(identifier()); if(mounted)setState(()=>sent=true); } catch(e) { if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(e.toString()))); } finally { if(mounted)setState(()=>busy=false); } }
   Future<void> verify() async { setState(()=>busy=true); try {
-    final r=await AuthService(Supabase.instance.client).verifyOtp(identifier:phone(),token:otp.text);
+    final r=await AuthService(Supabase.instance.client).verifyOtp(identifier:identifier(),token:otp.text);
     if(r.user==null)throw Exception('OTP verification failed.');
     final role=await AuthService(Supabase.instance.client).resolveRole(r.user!.id);
     if(role!='admin'){await Supabase.instance.client.auth.signOut();throw Exception('This account is not an Admin account.');}
@@ -104,8 +104,9 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
     const Icon(Icons.admin_panel_settings_outlined,size:58,color:Color(0xFF0B63F6)),const SizedBox(height:18),
     const Text('UNIQUE MARKET',style:TextStyle(fontSize:28,fontWeight:FontWeight.w900,letterSpacing:1.2)),const Text('Admin Service Portal'),
     const SizedBox(height:36),Text(sent?'Verify OTP':'Admin Login',style:const TextStyle(fontSize:25,fontWeight:FontWeight.w800)),const SizedBox(height:18),
-    if(!sent)TextField(controller:mobile,keyboardType:TextInputType.phone,decoration:const InputDecoration(labelText:'Registered Admin Mobile',prefixIcon:Icon(Icons.phone_outlined)))
-    else TextField(controller:otp,keyboardType:TextInputType.number,maxLength:6,decoration:const InputDecoration(labelText:'OTP',prefixIcon:Icon(Icons.lock_outline))),
+    if(!sent)TextField(controller:mobile,keyboardType:TextInputType.emailAddress,decoration:const InputDecoration(labelText:'Registered Admin Email or Mobile',prefixIcon:Icon(Icons.person_outline)))
+    else TextField(controller:otp,keyboardType:TextInputType.number,maxLength:8,decoration:const InputDecoration(labelText:'OTP',helperText:'Enter the complete code from your email or SMS.',prefixIcon:Icon(Icons.lock_outline))),
+    if(!sent)const Padding(padding:EdgeInsets.only(top:8),child:Text('Use the email already registered to the Admin account. Mobile OTP works only when that mobile is linked to the Admin Auth account.',style:TextStyle(color:Colors.black54,fontSize:12))),
     const SizedBox(height:12),SizedBox(width:double.infinity,height:54,child:FilledButton(onPressed:busy?null:(sent?verify:send),child:busy?const CircularProgressIndicator(color:Colors.white):Text(sent?'VERIFY & CONTINUE':'SEND OTP'))),
     if(sent)TextButton(onPressed:()=>setState(()=>sent=false),child:const Text('Change mobile number')),
     const SizedBox(height:28),const Text('CCTV | IT Security | Service & AMC',style:TextStyle(fontWeight:FontWeight.w700)),const Text('Station Road, Hotel Rajdoot, Ichalkaranji\n7350060071',style:TextStyle(color:Colors.black54))
@@ -235,7 +236,52 @@ Future<void>exportPdf()async{final doc=pw.Document();final now=DateTime.now();do
 Widget _metric(String title,String value,IconData icon)=>Card(child:Padding(padding:const EdgeInsets.all(14),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Icon(icon,color:const Color(0xFF0B63F6)),const SizedBox(height:5),Text(value,style:const TextStyle(fontSize:21,fontWeight:FontWeight.w900)),Text(title,style:const TextStyle(color:Colors.black54))])));}
 
 class CustomersPage extends StatefulWidget { final AdminService service; const CustomersPage({super.key,required this.service}); @override State<CustomersPage> createState()=>_CustomersPageState(); }
-class _CustomersPageState extends State<CustomersPage>{List<Map<String,dynamic>> rows=[];bool loading=true;@override void initState(){super.initState();load();}Future<void>load()async{try{rows=await widget.service.customers();if(mounted)setState(()=>loading=false);}catch(_){if(mounted)setState(()=>loading=false);}}@override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const Text('Customers')),body:loading?const Center(child:CircularProgressIndicator()):ListView.builder(padding:const EdgeInsets.all(12),itemCount:rows.length,itemBuilder:(_,i){final c=rows[i];return Card(child:ListTile(leading:const CircleAvatar(child:Icon(Icons.person_outline)),title:Text((c['name']??'Customer').toString(),style:const TextStyle(fontWeight:FontWeight.w800)),subtitle:Text((c['customer_code']??'-').toString()+' • '+(c['mobile']??'-').toString()),trailing:const Icon(Icons.chevron_right)));}));
+class _CustomersPageState extends State<CustomersPage>{
+  List<Map<String,dynamic>> rows=[];
+  bool loading=true;
+  final Set<String> provisioning={};
+  @override void initState(){super.initState();load();}
+  Future<void>load()async{try{rows=await widget.service.customers();if(mounted)setState(()=>loading=false);}catch(e){if(mounted){setState(()=>loading=false);ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(e.toString())));}}}
+  Future<void>provision(Map<String,dynamic> customer)async{
+    final id=(customer['id']??'').toString();
+    if(id.isEmpty)return;
+    final approved=await showDialog<bool>(context:context,builder:(ctx)=>AlertDialog(
+      title:const Text('Create Customer Login?'),
+      content:Text('Create an unverified login for '+(customer['name']??'this customer').toString()+' using '+(customer['mobile']??'').toString()+'. The customer must verify ownership by SMS OTP before signing in.'),
+      actions:[TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('Cancel')),FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:const Text('Create Login'))],
+    ));
+    if(approved!=true)return;
+    setState(()=>provisioning.add(id));
+    try{
+      final result=await widget.service.provisionExistingCustomer(id);
+      await load();
+      if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('Login created for '+(result['phone']??customer['mobile']??'customer').toString()+'. Phone is not verified yet; customer must complete OTP.')));
+    }catch(e){
+      if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(e.toString())));
+    }finally{if(mounted)setState(()=>provisioning.remove(id));}
+  }
+  @override Widget build(BuildContext context)=>Scaffold(
+    appBar:AppBar(title:const Text('Customers'),actions:[IconButton(onPressed:load,icon:const Icon(Icons.refresh))]),
+    body:loading?const Center(child:CircularProgressIndicator()):RefreshIndicator(
+      onRefresh:load,
+      child:ListView.builder(padding:const EdgeInsets.all(12),itemCount:rows.length,itemBuilder:(_,i){
+        final c=rows[i];
+        final id=(c['id']??'').toString();
+        final linked=(c['user_id']!=null||c['profile_id']!=null);
+        final busy=provisioning.contains(id);
+        return Card(child:ListTile(
+          leading:const CircleAvatar(child:Icon(Icons.person_outline)),
+          title:Text((c['name']??'Customer').toString(),style:const TextStyle(fontWeight:FontWeight.w800)),
+          subtitle:Text((c['customer_code']??'-').toString()+' • '+(c['mobile']??'-').toString()),
+          trailing:linked?const Chip(label:Text('Login Linked')):IconButton(
+            tooltip:'Create secure customer login',
+            onPressed:busy?null:()=>provision(c),
+            icon:busy?const SizedBox(width:20,height:20,child:CircularProgressIndicator(strokeWidth:2)):const Icon(Icons.person_add_alt_1),
+          ),
+        ));
+      }),
+    ),
+  );
 }
 
 class TechniciansPage extends StatefulWidget { final AdminService service; const TechniciansPage({super.key,required this.service}); @override State<TechniciansPage> createState()=>_TechniciansPageState(); }

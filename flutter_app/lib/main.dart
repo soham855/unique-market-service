@@ -6,6 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import 'config/supabase_config.dart';
 import 'services/auth_service.dart';
 import 'services/customer_service.dart';
+import 'customer_portal_pages.dart';
 import 'services/push_notification_service.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -169,32 +170,98 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final identifier = TextEditingController();
   final otp = TextEditingController();
+  final fullName = TextEditingController();
+  final emailAddress = TextEditingController();
+  final mobileNumber = TextEditingController();
+  final companyName = TextEditingController();
+  final serviceAddress = TextEditingController();
   bool sent = false, busy = false, remember = true;
+  bool registering = false, signupViaEmail = true;
+  String? otpIdentifier;
+  int resendSeconds = 0;
+  Timer? _resendTimer;
 
-  bool get isEmail => identifier.text.trim().contains('@');
+  void _startResendCooldown() {
+    _resendTimer?.cancel();
+    setState(() => resendSeconds = 60);
+    _resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) { timer.cancel(); return; }
+      if (resendSeconds <= 1) { timer.cancel(); setState(() => resendSeconds = 0); }
+      else { setState(() => resendSeconds--); }
+    });
+  }
+
+  String _friendlyAuthError(Object error) {
+    final message = error.toString();
+    if (message.contains('over_email_send_rate_limit') || message.contains('429')) return 'Too many OTP requests. Please wait before requesting another code.';
+    if (message.contains('Signups not allowed')) return 'Customer registration is disabled on the server. Contact Unique Market.';
+    return 'Login failed: $message';
+  }
+
+  String get _otpIdentifier => otpIdentifier ?? identifier.text.trim();
+  bool get isEmail => _otpIdentifier.contains('@');
 
   Future<void> send() async {
-    final value = identifier.text.trim();
-    if (value.isEmpty || (value.contains('@') && !RegExp(r'^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$').hasMatch(value))) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter a valid registered email or mobile number.')),
-      );
-      return;
+    final auth = AuthService(Supabase.instance.client);
+    String value;
+    Map<String, dynamic>? signupData;
+    final emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+    if (registering) {
+      final name = fullName.text.trim();
+      final email = emailAddress.text.trim().toLowerCase();
+      final phone = mobileNumber.text.trim();
+      final phoneDigits = phone.replaceAll(RegExp(r'\D'), '');
+      if (name.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter your full name.')));
+        return;
+      }
+      if (!emailPattern.hasMatch(email)) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a valid email address.')));
+        return;
+      }
+      if (phoneDigits.length < 10 || phoneDigits.length > 13) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a valid mobile number.')));
+        return;
+      }
+      value = signupViaEmail ? email : auth.normalizePhone(phone);
+      signupData = {
+        'name': name,
+        'full_name': name,
+        'mobile': auth.normalizePhone(phone),
+        'email': email,
+        'company_name': companyName.text.trim(),
+        'address': serviceAddress.text.trim(),
+      };
+    } else {
+      value = identifier.text.trim();
+      final phoneDigits = value.replaceAll(RegExp(r'\D'), '');
+      if (value.isEmpty ||
+          (value.contains('@') && !emailPattern.hasMatch(value)) ||
+          (!value.contains('@') && (phoneDigits.length < 10 || phoneDigits.length > 13))) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Enter a valid registered email or mobile number.')),
+        );
+        return;
+      }
     }
+    if (resendSeconds > 0) return;
+    otpIdentifier = value;
     setState(() => busy = true);
     try {
-      await AuthService(Supabase.instance.client).sendOtp(value);
+      await auth.sendOtp(value, shouldCreateUser: registering, data: signupData);
+      _startResendCooldown();
       if (mounted) {
         setState(() { sent = true; busy = false; });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(isEmail ? 'Login code sent to your registered email.' : 'OTP sent to your registered mobile number.')),
-        );
+        final message = registering
+            ? (isEmail ? 'Registration code sent to your email.' : 'Registration code sent to your mobile.')
+            : (isEmail ? 'Login code sent to your registered email.' : 'OTP sent to your registered mobile number.');
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
       }
     } catch (e) {
       if (!mounted) return;
       setState(() => busy = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Login failed. Only existing customer accounts can sign in. Details: $e')),
+        SnackBar(content: Text(_friendlyAuthError(e))),
       );
     }
   }
@@ -203,7 +270,7 @@ class _LoginPageState extends State<LoginPage> {
     setState(() => busy = true);
     try {
       final r = await AuthService(Supabase.instance.client).verifyOtp(
-        identifier: identifier.text.trim(),
+        identifier: _otpIdentifier,
         token: otp.text,
       );
       if (r.user == null) throw Exception('OTP verification failed');
@@ -231,6 +298,12 @@ class _LoginPageState extends State<LoginPage> {
   void dispose() {
     identifier.dispose();
     otp.dispose();
+    fullName.dispose();
+    emailAddress.dispose();
+    mobileNumber.dispose();
+    companyName.dispose();
+    serviceAddress.dispose();
+    _resendTimer?.cancel();
     super.dispose();
   }
 
@@ -247,28 +320,65 @@ class _LoginPageState extends State<LoginPage> {
           const SizedBox(height: 6),
           const Text('Instant Services for Your Security'),
           const SizedBox(height: 36),
-          Text(sent ? 'Verify Login Code' : 'Customer Login', style: const TextStyle(fontSize: 25, fontWeight: FontWeight.w800)),
+          Text(sent ? 'Verify Code' : registering ? 'New Customer Registration' : 'Customer Login', style: const TextStyle(fontSize: 25, fontWeight: FontWeight.w800)),
           const SizedBox(height: 18),
-          if (!sent) ...[
+          if (!sent && !registering) ...[
             TextField(
               controller: identifier,
               keyboardType: TextInputType.emailAddress,
               autofillHints: const [AutofillHints.email, AutofillHints.telephoneNumber],
               decoration: const InputDecoration(
                 labelText: 'Registered Email or Mobile Number',
-                helperText: 'New customer registration is not available in this app.',
                 prefixIcon: Icon(Icons.person_outline),
               ),
             ),
-            CheckboxListTile(value: remember, onChanged: (v) => setState(() => remember = v ?? true), contentPadding: EdgeInsets.zero, title: const Text('Remember Me'), subtitle: const Text('Stay signed in for 15 days')),
-          ] else
-            TextField(controller: otp, keyboardType: TextInputType.number, maxLength: 8, decoration: InputDecoration(labelText: isEmail ? 'Email Login Code' : 'SMS OTP', prefixIcon: const Icon(Icons.lock_outline))),
+          ],
+          if (!sent && registering) ...[
+            TextField(controller: fullName, textCapitalization: TextCapitalization.words, decoration: const InputDecoration(labelText: 'Full Name', prefixIcon: Icon(Icons.person_outline))),
+            const SizedBox(height: 10),
+            TextField(controller: emailAddress, keyboardType: TextInputType.emailAddress, autofillHints: const [AutofillHints.email], decoration: const InputDecoration(labelText: 'Email Address', prefixIcon: Icon(Icons.email_outlined))),
+            const SizedBox(height: 10),
+            TextField(controller: mobileNumber, keyboardType: TextInputType.phone, autofillHints: const [AutofillHints.telephoneNumber], decoration: const InputDecoration(labelText: 'Mobile Number', prefixIcon: Icon(Icons.phone_outlined))),
+            const SizedBox(height: 10),
+            DropdownButtonFormField<bool>(
+              initialValue: signupViaEmail,
+              decoration: const InputDecoration(labelText: 'Send registration code to'),
+              items: const [
+                DropdownMenuItem(value: true, child: Text('Email')),
+                DropdownMenuItem(value: false, child: Text('Mobile')),
+              ],
+              onChanged: busy ? null : (value) => setState(() => signupViaEmail = value ?? true),
+            ),
+            const SizedBox(height: 10),
+            TextField(controller: companyName, textCapitalization: TextCapitalization.words, decoration: const InputDecoration(labelText: 'Company (Optional)', prefixIcon: Icon(Icons.business_outlined))),
+            const SizedBox(height: 10),
+            TextField(controller: serviceAddress, textCapitalization: TextCapitalization.sentences, maxLines: 2, decoration: const InputDecoration(labelText: 'Service Address (Optional)', prefixIcon: Icon(Icons.location_on_outlined))),
+          ],
+          if (!sent)
+            CheckboxListTile(value: remember, onChanged: busy ? null : (value) => setState(() => remember = value ?? true), contentPadding: EdgeInsets.zero, title: const Text('Remember Me'), subtitle: const Text('Stay signed in for 15 days')),
+          if (sent)
+            TextField(controller: otp, keyboardType: TextInputType.number, maxLength: 8, decoration: InputDecoration(labelText: isEmail ? 'Email Code' : 'SMS OTP', helperText: 'Enter the complete code from your message.', prefixIcon: const Icon(Icons.lock_outline))),
           const SizedBox(height: 12),
           SizedBox(width: double.infinity, height: 54, child: FilledButton(
             onPressed: busy ? null : (sent ? verify : send),
-            child: busy ? const CircularProgressIndicator(color: Colors.white) : Text(sent ? 'VERIFY & CONTINUE' : 'SEND LOGIN CODE'),
+            child: busy ? const CircularProgressIndicator(color: Colors.white) : Text(sent ? 'VERIFY & CONTINUE' : registering ? 'SEND REGISTRATION CODE' : 'SEND LOGIN CODE'),
           )),
-          if (sent) TextButton(onPressed: () => setState(() { sent = false; otp.clear(); }), child: const Text('Change email or mobile number')),
+          if (sent) ...[
+            Text('Didn’t receive the code? ${resendSeconds > 0 ? 'Try again in ${resendSeconds}s' : 'You can resend now.'}', style: const TextStyle(color: Colors.black54)),
+            TextButton(onPressed: busy || resendSeconds > 0 ? null : send, child: const Text('RESEND CODE')),
+            TextButton(onPressed: () { _resendTimer?.cancel(); setState(() { sent = false; otp.clear(); resendSeconds = 0; }); }, child: const Text('Change email or mobile number')),
+          ],
+          if (!sent)
+            Align(
+              alignment: Alignment.center,
+              child: TextButton(
+                onPressed: busy ? null : () => setState(() {
+                  registering = !registering;
+                  otpIdentifier = null;
+                }),
+                child: Text(registering ? 'Already have an account? Sign in' : 'New customer? Create account'),
+              ),
+            ),
           const SizedBox(height: 28),
           const Text('CCTV | IT Security | Service & AMC', style: TextStyle(fontWeight: FontWeight.w700)),
           const Text('Station Road, Hotel Rajdoot, Ichalkaranji\\n7350060071', style: TextStyle(color: Colors.black54)),
@@ -287,6 +397,8 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   Map<String,dynamic>? customer;
   List<Map<String,dynamic>> tickets = [];
   bool loading = true;
+  bool _loadingHome = false;
+  String homeError = '';
   int unreadNotifications = 0;
   Timer? _homeTimer;
   late final PushNotificationService pushService;
@@ -294,6 +406,8 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   @override void initState() { super.initState(); pushService = PushNotificationService(Supabase.instance.client); pushService.initialize(); load(); _homeTimer = Timer.periodic(const Duration(seconds: 10), (_) => load()); }
   @override void dispose() { _homeTimer?.cancel(); super.dispose(); }
   Future<void> load() async {
+    if (_loadingHome) return;
+    _loadingHome = true;
     try {
       customer = await service.customer();
       tickets = await service.tickets();
@@ -302,7 +416,12 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
         final rows = await Supabase.instance.client.from('notifications').select('id').eq('user_id', user.id).isFilter('read_at', null);
         unreadNotifications = rows.length;
       }
+      homeError = '';
+    } catch (error) {
+      homeError = 'Could not refresh your portal. Check your internet connection and try again.';
+      debugPrint('CUSTOMER_HOME_LOAD_ERROR: $error');
     } finally {
+      _loadingHome = false;
       if (mounted) setState(() => loading = false);
     }
   }
@@ -319,16 +438,35 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     body: RefreshIndicator(onRefresh: load, child: ListView(padding: const EdgeInsets.all(18), children: [
       Text('Namaskar, ' + (customer?['name']?.toString() ?? 'Customer'), style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900)),
       Text(customer?['customer_code']?.toString() ?? 'Customer Portal', style: const TextStyle(color: Colors.black54)),
+      if (homeError.isNotEmpty) ...[
+        const SizedBox(height: 10),
+        Card(child: ListTile(
+          leading: const Icon(Icons.wifi_off_outlined),
+          title: Text(homeError),
+          trailing: IconButton(onPressed: load, icon: const Icon(Icons.refresh), tooltip: 'Retry'),
+        )),
+      ],
       const SizedBox(height: 22),
-      Row(children: [
-        Expanded(child: _homeCard(Icons.add_circle_outline, 'Raise Complaint', () async { await Navigator.push(context, MaterialPageRoute(builder: (_) => const RaiseComplaintPage())); load(); })),
-        const SizedBox(width: 12),
-        Expanded(child: _homeCard(Icons.confirmation_num_outlined, 'My Tickets', () => Navigator.push(context, MaterialPageRoute(builder: (_) => TicketListPage(tickets: tickets))))),
-      ]),
-      const SizedBox(height: 12),
-      _homeCard(Icons.verified_user_outlined, 'AMC Contracts', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AmcContractsPage()))),
-      const SizedBox(height: 12),
-      _homeCard(Icons.support_agent_outlined, 'Help & Support', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpSupportPage()))),
+      GridView.count(
+        crossAxisCount: 2,
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: 1.75,
+        children: [
+          _homeCard(Icons.smart_toy_outlined, 'AI Service Assistant', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomerAiServiceAssistantPage()))),
+          _homeCard(Icons.add_circle_outline, 'Raise Complaint', () async { await Navigator.push(context, MaterialPageRoute(builder: (_) => const RaiseComplaintPage())); await load(); }),
+          _homeCard(Icons.confirmation_num_outlined, 'My Complaints', () async { await Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerMyComplaintsPage(onOpenTicket: (ticket) => Navigator.push(context, MaterialPageRoute(builder: (_) => TicketDetailsPage(ticket: ticket)))))); await load(); }),
+          _homeCard(Icons.history, 'Service History', () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerServiceHistoryPage(onOpenTicket: (ticket) => Navigator.push(context, MaterialPageRoute(builder: (_) => TicketDetailsPage(ticket: ticket))))))),
+          _homeCard(Icons.star_outline, 'Feedback', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomerFeedbackPage()))),
+          _homeCard(Icons.verified_user_outlined, 'AMC Details', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AmcContractsPage()))),
+          _homeCard(Icons.payments_outlined, 'Payments', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomerPortalPaymentsPage()))),
+          _homeCard(Icons.card_giftcard_outlined, 'Referral System', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomerReferralPage()))),
+          _homeCard(Icons.person_outline, 'My Profile', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfilePage()))),
+          _homeCard(Icons.support_agent_outlined, 'Help & Support', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpSupportPage()))),
+        ],
+      ),
       const SizedBox(height: 24),
       const Text('Recent Service', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
       const SizedBox(height: 10),
@@ -340,10 +478,10 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     ])),
     bottomNavigationBar: NavigationBar(destinations: const [
       NavigationDestination(icon: Icon(Icons.home_outlined), label: 'Home'),
-      NavigationDestination(icon: Icon(Icons.confirmation_num_outlined), label: 'Tickets'),
+      NavigationDestination(icon: Icon(Icons.confirmation_num_outlined), label: 'My Complaints'),
       NavigationDestination(icon: Icon(Icons.payments_outlined), label: 'Payments'),
       NavigationDestination(icon: Icon(Icons.person_outline), label: 'Profile'),
-    ], onDestinationSelected: (i) { if (i == 1) Navigator.push(context, MaterialPageRoute(builder: (_) => TicketListPage(tickets: tickets))); else if (i == 2) Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomerPaymentsPage())); else if (i == 3) Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfilePage())); }),
+    ], onDestinationSelected: (i) { if (i == 1) Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerMyComplaintsPage(onOpenTicket: (ticket) => Navigator.push(context, MaterialPageRoute(builder: (_) => TicketDetailsPage(ticket: ticket)))))); else if (i == 2) Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomerPortalPaymentsPage())); else if (i == 3) Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfilePage())); }),
   );
 
   Widget _homeCard(IconData icon, String title, VoidCallback onTap) => Card(child: InkWell(
@@ -391,13 +529,14 @@ class AmcContractsPage extends StatefulWidget {
   @override State<AmcContractsPage> createState()=>_AmcContractsPageState();
 }
 class _AmcContractsPageState extends State<AmcContractsPage>{
-  final service=CustomerService(Supabase.instance.client); List<Map<String,dynamic>> items=[]; bool loading=true; Timer? timer;
+  final service=CustomerService(Supabase.instance.client); List<Map<String,dynamic>> items=[]; bool loading=true; Timer? timer; String loadError='';
   @override void initState(){super.initState();load();timer=Timer.periodic(const Duration(seconds:10),(_)=>load());}
   @override void dispose(){timer?.cancel();super.dispose();}
-  Future<void> load()async{try{items=await service.amcContracts();}catch(_){items=[];}if(mounted)setState(()=>loading=false);}
+  Future<void> load()async{try{items=await service.amcContracts();loadError='';}catch(e){items=[];loadError=e.toString();}if(mounted)setState(()=>loading=false);}
   @override Widget build(BuildContext context)=>Scaffold(
-    appBar:AppBar(title:const Text('AMC Contracts'),actions:[IconButton(onPressed:load,icon:const Icon(Icons.refresh))]),
+    appBar:AppBar(title:const Text('AMC Details'),actions:[IconButton(onPressed:load,icon:const Icon(Icons.refresh))]),
     body:loading?const Center(child:CircularProgressIndicator()):RefreshIndicator(onRefresh:load,child:ListView(padding:const EdgeInsets.all(16),children:[
+      if(loadError.isNotEmpty) Card(child:Padding(padding:const EdgeInsets.all(16),child:Text('AMC details could not be loaded. Please refresh or contact Unique Market.\n'+loadError,style:const TextStyle(color:Colors.red)))),
       if(items.isEmpty) const Card(child:Padding(padding:EdgeInsets.all(24),child:Center(child:Text('No AMC contracts found.')))),
       ...items.map((a){final status=(a['status']??'').toString();final start=(a['start_date']??'').toString();final end=(a['end_date']??'').toString();return Card(margin:const EdgeInsets.only(bottom:12),child:Padding(padding:const EdgeInsets.all(16),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         Row(children:[const Icon(Icons.shield_outlined),const SizedBox(width:10),Expanded(child:Text(status.isEmpty?'AMC Contract':status,style:const TextStyle(fontSize:17,fontWeight:FontWeight.w800)))]),
@@ -800,7 +939,7 @@ class _PaymentPageState extends State<PaymentPage> {
     const SizedBox(height:18),if(serviceTotal<=0)const Card(child:Padding(padding:EdgeInsets.all(14),child:Text('Final service charges are not available yet. You can still submit a payment amount.'))),const SizedBox(height:8),
     TextField(controller:amount,keyboardType:const TextInputType.numberWithOptions(decimal:true),decoration:const InputDecoration(labelText:'Amount',prefixText:'₹ ')),const SizedBox(height:16),
     const Text('Payment Mode',style:TextStyle(fontWeight:FontWeight.w700)),const SizedBox(height:8),
-    Wrap(spacing:8,children:['UPI','Cash'].map((m)=>ChoiceChip(label:Text(m),selected:mode==m,onSelected:(_)=>setState(()=>mode=m))).toList()),
+    const Card(child:Padding(padding:EdgeInsets.all(14),child:Text('Customer payments are accepted through UPI. Cash payments are recorded only after technician/admin verification.'))),
     if(mode=='UPI')...[
       const SizedBox(height:16),const Card(child:Padding(padding:EdgeInsets.all(16),child:Text('Pay using your UPI app, then enter the UTR / reference number below.'))),const SizedBox(height:12),
       TextField(controller:utr,decoration:const InputDecoration(labelText:'UTR / Reference Number'))],
@@ -899,19 +1038,35 @@ class _InvoicePageState extends State<InvoicePage>{
     )
   );
 }
-class ProfilePage extends StatefulWidget { const ProfilePage({super.key}); @override State<ProfilePage> createState()=>_ProfilePageState(); }
+class ProfilePage extends StatefulWidget {
+  const ProfilePage({super.key});
+  @override State<ProfilePage> createState()=>_ProfilePageState();
+}
 class _ProfilePageState extends State<ProfilePage>{
-  final service=CustomerService(Supabase.instance.client); Map<String,dynamic>? customer;
-  @override void initState(){super.initState();load();} Future<void> load()async{final c=await service.customer();if(mounted)setState(()=>customer=c);}
-  @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const Text('Profile')),body:ListView(padding:const EdgeInsets.all(18),children:[
+  final service=CustomerService(Supabase.instance.client);
+  Map<String,dynamic>? customer;
+  Map<String,dynamic>? profile;
+  @override void initState(){super.initState();load();}
+  Future<void> load()async{
+    try{
+      final rows=await Future.wait([service.customer(),service.profile()]);
+      customer=rows[0];
+      profile=rows[1];
+    }catch(_){}
+    if(mounted)setState((){});
+  }
+  String _value(dynamic primary,dynamic fallback)=>((primary??fallback??'').toString().trim().isEmpty?'-':(primary??fallback).toString());
+  @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const Text('Profile'),actions:[IconButton(onPressed:load,icon:const Icon(Icons.refresh))]),body:ListView(padding:const EdgeInsets.all(18),children:[
     const CircleAvatar(radius:42,child:Icon(Icons.person_outline,size:42)),const SizedBox(height:14),
-    Center(child:Text(customer?['name']?.toString()??'Customer',style:const TextStyle(fontSize:23,fontWeight:FontWeight.w900))),
+    Center(child:Text(_value(profile?['full_name'],customer?['name']),style:const TextStyle(fontSize:23,fontWeight:FontWeight.w900))),
     Center(child:Text(customer?['customer_code']?.toString()??'',style:const TextStyle(color:Colors.black54))),const SizedBox(height:24),
     Card(child:Column(children:[
-      ListTile(leading:const Icon(Icons.phone_outlined),title:const Text('Mobile'),subtitle:Text(customer?['mobile']?.toString()??'-')),
-      ListTile(leading:const Icon(Icons.business_outlined),title:const Text('Company'),subtitle:Text(customer?['company_name']?.toString()??'-')),
-      ListTile(leading:const Icon(Icons.location_on_outlined),title:const Text('Address'),subtitle:Text(customer?['address']?.toString()??'-'))
+      ListTile(leading:const Icon(Icons.phone_outlined),title:const Text('Mobile'),subtitle:Text(_value(profile?['phone'],customer?['mobile']))),
+      ListTile(leading:const Icon(Icons.email_outlined),title:const Text('Email'),subtitle:Text(_value(Supabase.instance.client.auth.currentUser?.email,customer?['email']))),
+      ListTile(leading:const Icon(Icons.business_outlined),title:const Text('Company'),subtitle:Text(_value(profile?['company_name'],customer?['company_name']))),
+      ListTile(leading:const Icon(Icons.location_on_outlined),title:const Text('Site Address'),subtitle:Text(_value(profile?['site_address'],customer?['address']))),
     ])),const SizedBox(height:12),
+    ListTile(leading:const Icon(Icons.edit_outlined),title:const Text('Edit Profile'),subtitle:const Text('Update your contact and site details'),onTap:()async{await Navigator.push(context,MaterialPageRoute(builder:(_)=>const CustomerProfileEditPage()));await load();}),
     ListTile(leading:const Icon(Icons.settings_outlined),title:const Text('Settings'),onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const SettingsPage())))
   ]));
 }
