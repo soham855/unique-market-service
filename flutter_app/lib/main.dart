@@ -170,7 +170,14 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final identifier = TextEditingController();
   final otp = TextEditingController();
+  final fullName = TextEditingController();
+  final emailAddress = TextEditingController();
+  final mobileNumber = TextEditingController();
+  final companyName = TextEditingController();
+  final serviceAddress = TextEditingController();
   bool sent = false, busy = false, remember = true;
+  bool registering = false, signupViaEmail = true;
+  String? otpIdentifier;
   int resendSeconds = 0;
   Timer? _resendTimer;
 
@@ -187,30 +194,68 @@ class _LoginPageState extends State<LoginPage> {
   String _friendlyAuthError(Object error) {
     final message = error.toString();
     if (message.contains('over_email_send_rate_limit') || message.contains('429')) return 'Too many OTP requests. Please wait before requesting another code.';
-    if (message.contains('Signups not allowed')) return 'This email is not linked to an existing customer login. Contact Unique Market.';
+    if (message.contains('Signups not allowed')) return 'Customer registration is disabled on the server. Contact Unique Market.';
     return 'Login failed: $message';
   }
 
-  bool get isEmail => identifier.text.trim().contains('@');
+  String get _otpIdentifier => otpIdentifier ?? identifier.text.trim();
+  bool get isEmail => _otpIdentifier.contains('@');
 
   Future<void> send() async {
-    final value = identifier.text.trim();
-    if (value.isEmpty || (value.contains('@') && !RegExp(r'^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$').hasMatch(value))) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter a valid registered email or mobile number.')),
-      );
-      return;
+    final auth = AuthService(Supabase.instance.client);
+    String value;
+    Map<String, dynamic>? signupData;
+    final emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+    if (registering) {
+      final name = fullName.text.trim();
+      final email = emailAddress.text.trim().toLowerCase();
+      final phone = mobileNumber.text.trim();
+      final phoneDigits = phone.replaceAll(RegExp(r'\D'), '');
+      if (name.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter your full name.')));
+        return;
+      }
+      if (!emailPattern.hasMatch(email)) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a valid email address.')));
+        return;
+      }
+      if (phoneDigits.length < 10 || phoneDigits.length > 13) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a valid mobile number.')));
+        return;
+      }
+      value = signupViaEmail ? email : auth.normalizePhone(phone);
+      signupData = {
+        'name': name,
+        'full_name': name,
+        'mobile': auth.normalizePhone(phone),
+        'email': email,
+        'company_name': companyName.text.trim(),
+        'address': serviceAddress.text.trim(),
+      };
+    } else {
+      value = identifier.text.trim();
+      final phoneDigits = value.replaceAll(RegExp(r'\D'), '');
+      if (value.isEmpty ||
+          (value.contains('@') && !emailPattern.hasMatch(value)) ||
+          (!value.contains('@') && (phoneDigits.length < 10 || phoneDigits.length > 13))) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Enter a valid registered email or mobile number.')),
+        );
+        return;
+      }
     }
     if (resendSeconds > 0) return;
+    otpIdentifier = value;
     setState(() => busy = true);
     try {
-      await AuthService(Supabase.instance.client).sendOtp(value);
+      await auth.sendOtp(value, shouldCreateUser: registering, data: signupData);
       _startResendCooldown();
       if (mounted) {
         setState(() { sent = true; busy = false; });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(isEmail ? 'Login code sent to your registered email.' : 'OTP sent to your registered mobile number.')),
-        );
+        final message = registering
+            ? (isEmail ? 'Registration code sent to your email.' : 'Registration code sent to your mobile.')
+            : (isEmail ? 'Login code sent to your registered email.' : 'OTP sent to your registered mobile number.');
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
       }
     } catch (e) {
       if (!mounted) return;
@@ -225,7 +270,7 @@ class _LoginPageState extends State<LoginPage> {
     setState(() => busy = true);
     try {
       final r = await AuthService(Supabase.instance.client).verifyOtp(
-        identifier: identifier.text.trim(),
+        identifier: _otpIdentifier,
         token: otp.text,
       );
       if (r.user == null) throw Exception('OTP verification failed');
@@ -253,6 +298,11 @@ class _LoginPageState extends State<LoginPage> {
   void dispose() {
     identifier.dispose();
     otp.dispose();
+    fullName.dispose();
+    emailAddress.dispose();
+    mobileNumber.dispose();
+    companyName.dispose();
+    serviceAddress.dispose();
     _resendTimer?.cancel();
     super.dispose();
   }
@@ -270,32 +320,65 @@ class _LoginPageState extends State<LoginPage> {
           const SizedBox(height: 6),
           const Text('Instant Services for Your Security'),
           const SizedBox(height: 36),
-          Text(sent ? 'Verify Login Code' : 'Customer Login', style: const TextStyle(fontSize: 25, fontWeight: FontWeight.w800)),
+          Text(sent ? 'Verify Code' : registering ? 'New Customer Registration' : 'Customer Login', style: const TextStyle(fontSize: 25, fontWeight: FontWeight.w800)),
           const SizedBox(height: 18),
-          if (!sent) ...[
+          if (!sent && !registering) ...[
             TextField(
               controller: identifier,
               keyboardType: TextInputType.emailAddress,
               autofillHints: const [AutofillHints.email, AutofillHints.telephoneNumber],
               decoration: const InputDecoration(
                 labelText: 'Registered Email or Mobile Number',
-                helperText: 'New customer registration is not available in this app.',
                 prefixIcon: Icon(Icons.person_outline),
               ),
             ),
-            CheckboxListTile(value: remember, onChanged: (v) => setState(() => remember = v ?? true), contentPadding: EdgeInsets.zero, title: const Text('Remember Me'), subtitle: const Text('Stay signed in for 15 days')),
-          ] else
-            TextField(controller: otp, keyboardType: TextInputType.number, maxLength: 8, decoration: InputDecoration(labelText: isEmail ? 'Email Login Code' : 'SMS OTP', prefixIcon: const Icon(Icons.lock_outline))),
+          ],
+          if (!sent && registering) ...[
+            TextField(controller: fullName, textCapitalization: TextCapitalization.words, decoration: const InputDecoration(labelText: 'Full Name', prefixIcon: Icon(Icons.person_outline))),
+            const SizedBox(height: 10),
+            TextField(controller: emailAddress, keyboardType: TextInputType.emailAddress, autofillHints: const [AutofillHints.email], decoration: const InputDecoration(labelText: 'Email Address', prefixIcon: Icon(Icons.email_outlined))),
+            const SizedBox(height: 10),
+            TextField(controller: mobileNumber, keyboardType: TextInputType.phone, autofillHints: const [AutofillHints.telephoneNumber], decoration: const InputDecoration(labelText: 'Mobile Number', prefixIcon: Icon(Icons.phone_outlined))),
+            const SizedBox(height: 10),
+            DropdownButtonFormField<bool>(
+              initialValue: signupViaEmail,
+              decoration: const InputDecoration(labelText: 'Send registration code to'),
+              items: const [
+                DropdownMenuItem(value: true, child: Text('Email')),
+                DropdownMenuItem(value: false, child: Text('Mobile')),
+              ],
+              onChanged: busy ? null : (value) => setState(() => signupViaEmail = value ?? true),
+            ),
+            const SizedBox(height: 10),
+            TextField(controller: companyName, textCapitalization: TextCapitalization.words, decoration: const InputDecoration(labelText: 'Company (Optional)', prefixIcon: Icon(Icons.business_outlined))),
+            const SizedBox(height: 10),
+            TextField(controller: serviceAddress, textCapitalization: TextCapitalization.sentences, maxLines: 2, decoration: const InputDecoration(labelText: 'Service Address (Optional)', prefixIcon: Icon(Icons.location_on_outlined))),
+          ],
+          if (!sent)
+            CheckboxListTile(value: remember, onChanged: busy ? null : (value) => setState(() => remember = value ?? true), contentPadding: EdgeInsets.zero, title: const Text('Remember Me'), subtitle: const Text('Stay signed in for 15 days')),
+          if (sent)
+            TextField(controller: otp, keyboardType: TextInputType.number, maxLength: 8, decoration: InputDecoration(labelText: isEmail ? 'Email Code' : 'SMS OTP', helperText: 'Enter the complete code from your message.', prefixIcon: const Icon(Icons.lock_outline))),
           const SizedBox(height: 12),
           SizedBox(width: double.infinity, height: 54, child: FilledButton(
             onPressed: busy ? null : (sent ? verify : send),
-            child: busy ? const CircularProgressIndicator(color: Colors.white) : Text(sent ? 'VERIFY & CONTINUE' : 'SEND LOGIN CODE'),
+            child: busy ? const CircularProgressIndicator(color: Colors.white) : Text(sent ? 'VERIFY & CONTINUE' : registering ? 'SEND REGISTRATION CODE' : 'SEND LOGIN CODE'),
           )),
           if (sent) ...[
             Text('Didn’t receive the code? ${resendSeconds > 0 ? 'Try again in ${resendSeconds}s' : 'You can resend now.'}', style: const TextStyle(color: Colors.black54)),
             TextButton(onPressed: busy || resendSeconds > 0 ? null : send, child: const Text('RESEND CODE')),
             TextButton(onPressed: () { _resendTimer?.cancel(); setState(() { sent = false; otp.clear(); resendSeconds = 0; }); }, child: const Text('Change email or mobile number')),
           ],
+          if (!sent)
+            Align(
+              alignment: Alignment.center,
+              child: TextButton(
+                onPressed: busy ? null : () => setState(() {
+                  registering = !registering;
+                  otpIdentifier = null;
+                }),
+                child: Text(registering ? 'Already have an account? Sign in' : 'New customer? Create account'),
+              ),
+            ),
           const SizedBox(height: 28),
           const Text('CCTV | IT Security | Service & AMC', style: TextStyle(fontWeight: FontWeight.w700)),
           const Text('Station Road, Hotel Rajdoot, Ichalkaranji\\n7350060071', style: TextStyle(color: Colors.black54)),
