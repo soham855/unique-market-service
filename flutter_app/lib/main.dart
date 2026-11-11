@@ -175,7 +175,8 @@ class _LoginPageState extends State<LoginPage> {
 
   Future<void> send() async {
     final value = identifier.text.trim();
-    if (value.isEmpty || (value.contains('@') && !RegExp(r'^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$').hasMatch(value))) {
+    final auth = AuthService(Supabase.instance.client);
+    if (value.isEmpty || (auth.isEmail(value) && !auth.isValidEmail(value))) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Enter a valid registered email or mobile number.')),
       );
@@ -183,7 +184,7 @@ class _LoginPageState extends State<LoginPage> {
     }
     setState(() => busy = true);
     try {
-      await AuthService(Supabase.instance.client).sendOtp(value);
+      await auth.sendOtp(value);
       if (mounted) {
         setState(() { sent = true; busy = false; });
         ScaffoldMessenger.of(context).showSnackBar(

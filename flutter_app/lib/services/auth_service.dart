@@ -5,9 +5,10 @@ class AuthService {
   AuthService(this.client);
 
   bool isEmail(String identifier) => identifier.trim().contains('@');
+  bool isValidEmail(String identifier) => RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(identifier.trim());
 
   String normalizePhone(String value) {
-    var phone = value.trim().replaceAll(RegExp(r'[\\s()-]'), '');
+    var phone = value.trim().replaceAll(RegExp(r'[\s()-]'), '');
     if (phone.startsWith('0')) phone = '+91${phone.substring(1)}';
     if (!phone.startsWith('+')) phone = '+91$phone';
     return phone;
@@ -55,7 +56,7 @@ class AuthService {
 
     final phone = client.auth.currentUser?.phone;
     if (phone == null || phone.isEmpty) return null;
-    final digits = phone.replaceAll(RegExp(r'\\D'), '');
+    final digits = phone.replaceAll(RegExp(r'\D'), '');
     final local = digits.length > 10 ? digits.substring(digits.length - 10) : digits;
     final techRows = await client.from('technicians').select('id,name,mobile,status').eq('mobile', local).limit(1);
     if (techRows.isEmpty) return null;

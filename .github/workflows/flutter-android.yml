@@ -7,6 +7,11 @@ on:
       - 'flutter_app/**'
       - '.github/workflows/flutter-android.yml'
       - 'supabase/migrations/**'
+  pull_request:
+    paths:
+      - 'flutter_app/**'
+      - '.github/workflows/flutter-android.yml'
+      - 'supabase/migrations/**'
   workflow_dispatch:
 
 jobs:
@@ -130,6 +135,9 @@ jobs:
           </adaptive-icon>
           EOF
           cp "$RES/mipmap-anydpi-v26/ic_launcher.xml" "$RES/mipmap-anydpi-v26/ic_launcher_round.xml"
+
+      - name: Test Flutter app
+        run: flutter test
 
       - name: Analyze
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
