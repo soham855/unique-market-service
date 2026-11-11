@@ -5,6 +5,7 @@ class AuthService {
   AuthService(this.client);
 
   bool isEmail(String identifier) => identifier.trim().contains('@');
+  bool isValidEmail(String identifier) => RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(identifier.trim());
 
   String normalizePhone(String value) {
     var phone = value.trim().replaceAll(RegExp(r'[\s()-]'), '');
