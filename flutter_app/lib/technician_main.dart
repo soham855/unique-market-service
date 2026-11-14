@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'theme/instant_theme.dart';
+import 'theme/instant_quick_action.dart';
 import 'theme/instant_dashboard_banner.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -232,6 +233,18 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
           Expanded(child: _metric('Jobs', jobs.length.toString(), Icons.today_outlined)),
           const SizedBox(width: 10), Expanded(child: _metric('Pending', pending.toString(), Icons.pending_actions_outlined)),
           const SizedBox(width: 10), Expanded(child: _metric('Done', completed.toString(), Icons.check_circle_outline)),
+        ]),
+        const Text('Quick Actions', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900)),
+        const SizedBox(height: 10),
+        Row(children: [
+          Expanded(child: InstantQuickAction(icon: Icons.work_outline, label: 'All Jobs',
+            onTap: () async { await Navigator.push(context, MaterialPageRoute(builder: (_) => TechnicianJobsPage(service: service))); if (mounted) load(); })),
+          const SizedBox(width: 10),
+          Expanded(child: InstantQuickAction(icon: Icons.calendar_month_outlined, label: 'Schedule',
+            onTap: () async { await Navigator.push(context, MaterialPageRoute(builder: (_) => TechnicianSchedulePage(service: service))); if (mounted) load(); })),
+          const SizedBox(width: 10),
+          Expanded(child: InstantQuickAction(icon: Icons.person_outline, label: 'Profile',
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TechnicianProfilePage(technician: tech, onLogout: logout)))),
         ]),
         const SizedBox(height: 24), const Text('My Jobs', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)), const SizedBox(height: 10),
         if (loading) const Center(child: CircularProgressIndicator())
