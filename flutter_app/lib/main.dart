@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'theme/instant_theme.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:geolocator/geolocator.dart';
@@ -26,58 +27,7 @@ class UniqueMarketApp extends StatelessWidget {
   Widget build(BuildContext context) => MaterialApp(
     debugShowCheckedModeBanner: false,
     title: 'Unique Market',
-    theme: ThemeData(
-      useMaterial3: true,
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: const Color(0xFF171717),
-        brightness: Brightness.light,
-        primary: const Color(0xFF171717),
-        secondary: const Color(0xFF2563EB),
-        surface: Colors.white,
-      ),
-      scaffoldBackgroundColor: const Color(0xFFF7F7F5),
-      appBarTheme: const AppBarTheme(
-        backgroundColor: Colors.white,
-        foregroundColor: Color(0xFF171717),
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        centerTitle: false,
-      ),
-      cardTheme: const CardThemeData(
-        color: Colors.white,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        margin: EdgeInsets.zero,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(18)),
-          side: BorderSide(color: Color(0xFFE8E8E5)),
-        ),
-      ),
-      inputDecorationTheme: const InputDecorationTheme(
-        filled: true,
-        fillColor: Colors.white,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.all(Radius.circular(14)),
-          borderSide: BorderSide(color: Color(0xFFE1E1DE)),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.all(Radius.circular(14)),
-          borderSide: BorderSide(color: Color(0xFFE1E1DE)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.all(Radius.circular(14)),
-          borderSide: BorderSide(color: Color(0xFF171717), width: 1.4),
-        ),
-      ),
-      navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        indicatorColor: const Color(0xFFEDEDED),
-        labelTextStyle: WidgetStatePropertyAll(
-          TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-        ),
-      ),
-    ),
+    theme: InstantTheme.light(),
     home: SupabaseConfig.isConfigured ? const SessionGate() : const Scaffold(body: Center(child: Text('Supabase is not configured.'))),
   );
 }
