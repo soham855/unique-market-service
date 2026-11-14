@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'theme/instant_theme.dart';
+import 'theme/instant_dashboard_banner.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -225,6 +226,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
       body: RefreshIndicator(onRefresh: load, child: ListView(padding: const EdgeInsets.all(18), children: [
         Text('Namaskar, ' + (tech?['name']?.toString() ?? 'Technician'), style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900)),
         Text('Technician ID: ' + (tech?['id']?.toString() ?? '-'), style: const TextStyle(color: Colors.black54)),
+        const InstantDashboardBanner(eyebrow: 'FIELD SERVICE', title: 'My work today', subtitle: 'Manage visits, jobs and service updates', icon: Icons.engineering_outlined),
         const SizedBox(height: 20),
         Row(children: [
           Expanded(child: _metric('Jobs', jobs.length.toString(), Icons.today_outlined)),
