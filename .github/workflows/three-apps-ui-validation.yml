@@ -1,0 +1,34 @@
+name: Three Apps Flutter UI Validation
+
+on:
+  pull_request:
+    branches:
+      - website-completion-main-sync-2026-11-05
+    paths:
+      - 'flutter_app/**'
+      - '.github/workflows/three-apps-ui-validation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-three-apps:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: flutter_app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.35.2'
+          channel: stable
+          cache: true
+      - name: Resolve dependencies
+        run: flutter pub get
+      - name: Analyze shared and three app entry points
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings lib/main.dart lib/technician_main.dart lib/admin_main.dart lib/theme
+      - name: Run widget and unit tests
+        run: flutter test

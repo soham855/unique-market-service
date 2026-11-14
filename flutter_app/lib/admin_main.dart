@@ -1,5 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'theme/instant_theme.dart';
+import 'theme/instant_quick_action.dart';
+import 'theme/instant_dashboard_banner.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -22,58 +25,7 @@ class AdminApp extends StatelessWidget {
   @override Widget build(BuildContext context) => MaterialApp(
     debugShowCheckedModeBanner: false,
     title: 'Unique Market Admin',
-    theme: ThemeData(
-      useMaterial3: true,
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: const Color(0xFF171717),
-        brightness: Brightness.light,
-        primary: const Color(0xFF171717),
-        secondary: const Color(0xFF2563EB),
-        surface: Colors.white,
-      ),
-      scaffoldBackgroundColor: const Color(0xFFF7F7F5),
-      appBarTheme: const AppBarTheme(
-        backgroundColor: Colors.white,
-        foregroundColor: Color(0xFF171717),
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        centerTitle: false,
-      ),
-      cardTheme: const CardThemeData(
-        color: Colors.white,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        margin: EdgeInsets.zero,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(18)),
-          side: BorderSide(color: Color(0xFFE8E8E5)),
-        ),
-      ),
-      inputDecorationTheme: const InputDecorationTheme(
-        filled: true,
-        fillColor: Colors.white,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.all(Radius.circular(14)),
-          borderSide: BorderSide(color: Color(0xFFE1E1DE)),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.all(Radius.circular(14)),
-          borderSide: BorderSide(color: Color(0xFFE1E1DE)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.all(Radius.circular(14)),
-          borderSide: BorderSide(color: Color(0xFF171717), width: 1.4),
-        ),
-      ),
-      navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        indicatorColor: const Color(0xFFEDEDED),
-        labelTextStyle: WidgetStatePropertyAll(
-          TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-        ),
-      ),
-    ),
+    theme: InstantTheme.light(),
     home: SupabaseConfig.isConfigured ? const AdminSessionGate() : const Scaffold(body: Center(child: Text('Supabase is not configured.'))),
   );
 }
@@ -163,6 +115,25 @@ class _AdminHomePageState extends State<AdminHomePage> {
     appBar:AppBar(title:const Text('Admin Dashboard',style:TextStyle(fontWeight:FontWeight.w800)),actions:[IconButton(onPressed:load,icon:const Icon(Icons.refresh)),PopupMenuButton<String>(onSelected:(v){if(v=='logout')logout();},itemBuilder:(_)=>const[PopupMenuItem(value:'logout',child:Text('Logout'))])]),
     body:loading?const Center(child:CircularProgressIndicator()):RefreshIndicator(onRefresh:load,child:ListView(padding:const EdgeInsets.all(16),children:[
       const Text('UNIQUE MARKET',style:TextStyle(fontSize:13,fontWeight:FontWeight.w800,letterSpacing:1.4)),const SizedBox(height:4),const Text('Operations Dashboard',style:TextStyle(fontSize:26,fontWeight:FontWeight.w900)),
+      const SizedBox(height:14),const InstantDashboardBanner(eyebrow:'UNIQUE MARKET',title:'Business overview',subtitle:'Complaints • Technicians • AMC • Payments',icon:Icons.space_dashboard_outlined),
+      const SizedBox(height:18),
+      const Text('Quick Actions',style:TextStyle(fontSize:19,fontWeight:FontWeight.w900)),
+      const SizedBox(height:10),
+      Row(children:[
+        Expanded(child:InstantQuickAction(icon:Icons.confirmation_num_outlined,label:'Complaints',onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>ComplaintsPage(service:service))).then((_){load();}))),
+        const SizedBox(width:8),
+        Expanded(child:InstantQuickAction(icon:Icons.people_outline,label:'Customers',onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>CustomersPage(service:service))))),
+        const SizedBox(width:8),
+        Expanded(child:InstantQuickAction(icon:Icons.engineering_outlined,label:'Technicians',onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>TechniciansPage(service:service))))),
+      ]),
+      const SizedBox(height:10),
+      Row(children:[
+        Expanded(child:InstantQuickAction(icon:Icons.payments_outlined,label:'Payments',onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>PaymentsPage(service:service))))),
+        const SizedBox(width:8),
+        Expanded(child:InstantQuickAction(icon:Icons.analytics_outlined,label:'Reports',onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>ReportsPage(service:service))))),
+        const SizedBox(width:8),
+        Expanded(child:InstantQuickAction(icon:Icons.autorenew_outlined,label:'AMC',onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const AdminAmcRenewalsPage())).then((_){load();}))),
+      ]),
       const SizedBox(height:18),_grid(),
       const SizedBox(height:14),
       Card(child:ListTile(leading:const CircleAvatar(child:Icon(Icons.autorenew)),title:const Text('AMC Renewal Requests',style:TextStyle(fontWeight:FontWeight.w800)),subtitle:const Text('View and manage customer AMC renewals'),trailing:const Icon(Icons.chevron_right),onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const AdminAmcRenewalsPage())).then((_){load();}))),

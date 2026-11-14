@@ -2,6 +2,9 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'theme/instant_theme.dart';
+import 'theme/instant_quick_action.dart';
+import 'theme/instant_dashboard_banner.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -28,58 +31,7 @@ class TechnicianApp extends StatelessWidget {
   Widget build(BuildContext context) => MaterialApp(
     debugShowCheckedModeBanner: false,
     title: 'Unique Market Technician',
-    theme: ThemeData(
-      useMaterial3: true,
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: const Color(0xFF171717),
-        brightness: Brightness.light,
-        primary: const Color(0xFF171717),
-        secondary: const Color(0xFF2563EB),
-        surface: Colors.white,
-      ),
-      scaffoldBackgroundColor: const Color(0xFFF7F7F5),
-      appBarTheme: const AppBarTheme(
-        backgroundColor: Colors.white,
-        foregroundColor: Color(0xFF171717),
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        centerTitle: false,
-      ),
-      cardTheme: const CardThemeData(
-        color: Colors.white,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        margin: EdgeInsets.zero,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(18)),
-          side: BorderSide(color: Color(0xFFE8E8E5)),
-        ),
-      ),
-      inputDecorationTheme: const InputDecorationTheme(
-        filled: true,
-        fillColor: Colors.white,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.all(Radius.circular(14)),
-          borderSide: BorderSide(color: Color(0xFFE1E1DE)),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.all(Radius.circular(14)),
-          borderSide: BorderSide(color: Color(0xFFE1E1DE)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.all(Radius.circular(14)),
-          borderSide: BorderSide(color: Color(0xFF171717), width: 1.4),
-        ),
-      ),
-      navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        indicatorColor: const Color(0xFFEDEDED),
-        labelTextStyle: WidgetStatePropertyAll(
-          TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-        ),
-      ),
-    ),
+    theme: InstantTheme.light(),
     home: SupabaseConfig.isConfigured ? const TechnicianSessionGate() : const Scaffold(body: Center(child: Text('Supabase is not configured.'))),
   );
 }
@@ -275,11 +227,24 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
       body: RefreshIndicator(onRefresh: load, child: ListView(padding: const EdgeInsets.all(18), children: [
         Text('Namaskar, ' + (tech?['name']?.toString() ?? 'Technician'), style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900)),
         Text('Technician ID: ' + (tech?['id']?.toString() ?? '-'), style: const TextStyle(color: Colors.black54)),
+        const InstantDashboardBanner(eyebrow: 'FIELD SERVICE', title: 'My work today', subtitle: 'Manage visits, jobs and service updates', icon: Icons.engineering_outlined),
         const SizedBox(height: 20),
         Row(children: [
           Expanded(child: _metric('Jobs', jobs.length.toString(), Icons.today_outlined)),
           const SizedBox(width: 10), Expanded(child: _metric('Pending', pending.toString(), Icons.pending_actions_outlined)),
           const SizedBox(width: 10), Expanded(child: _metric('Done', completed.toString(), Icons.check_circle_outline)),
+        ]),
+        const Text('Quick Actions', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900)),
+        const SizedBox(height: 10),
+        Row(children: [
+          Expanded(child: InstantQuickAction(icon: Icons.work_outline, label: 'All Jobs',
+            onTap: () async { await Navigator.push(context, MaterialPageRoute(builder: (_) => TechnicianJobsPage(service: service))); if (mounted) load(); })),
+          const SizedBox(width: 10),
+          Expanded(child: InstantQuickAction(icon: Icons.calendar_month_outlined, label: 'Schedule',
+            onTap: () async { await Navigator.push(context, MaterialPageRoute(builder: (_) => TechnicianSchedulePage(service: service))); if (mounted) load(); })),
+          const SizedBox(width: 10),
+          Expanded(child: InstantQuickAction(icon: Icons.person_outline, label: 'Profile',
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TechnicianProfilePage(technician: tech, onLogout: logout)))),
         ]),
         const SizedBox(height: 24), const Text('My Jobs', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)), const SizedBox(height: 10),
         if (loading) const Center(child: CircularProgressIndicator())
