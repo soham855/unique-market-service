@@ -244,7 +244,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
             onTap: () async { await Navigator.push(context, MaterialPageRoute(builder: (_) => TechnicianSchedulePage(service: service))); if (mounted) load(); })),
           const SizedBox(width: 10),
           Expanded(child: InstantQuickAction(icon: Icons.person_outline, label: 'Profile',
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TechnicianProfilePage(technician: tech, onLogout: logout)))),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TechnicianProfilePage(technician: tech, onLogout: logout))))),
         ]),
         const SizedBox(height: 24), const Text('My Jobs', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)), const SizedBox(height: 10),
         if (loading) const Center(child: CircularProgressIndicator())
