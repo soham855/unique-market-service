@@ -189,6 +189,37 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
       Text(customer?['customer_code']?.toString() ?? 'Customer Portal', style: const TextStyle(color: Colors.black54)),
       const InstantDashboardBanner(eyebrow: 'INSTANT SERVICE', title: 'Book trusted services', subtitle: 'CCTV • IT Support • Installation • AMC', icon: Icons.home_repair_service_outlined),
       const SizedBox(height: 22),
+      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        const Text('Our Services', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+        TextButton(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RaiseComplaintPage())).then((_) => load()), child: const Text('Request service')),
+      ]),
+      const SizedBox(height: 10),
+      GridView.count(
+        crossAxisCount: 4,
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        mainAxisSpacing: 10,
+        crossAxisSpacing: 10,
+        childAspectRatio: .77,
+        children: const [
+          _CustomerCategoryTile(Icons.videocam_outlined, 'CCTV'),
+          _CustomerCategoryTile(Icons.computer_outlined, 'Computer'),
+          _CustomerCategoryTile(Icons.wifi_outlined, 'Wi-Fi'),
+          _CustomerCategoryTile(Icons.build_outlined, 'Repair'),
+          _CustomerCategoryTile(Icons.security_outlined, 'Security'),
+          _CustomerCategoryTile(Icons.fingerprint_outlined, 'Biometric'),
+          _CustomerCategoryTile(Icons.settings_remote_outlined, 'Video Door'),
+          _CustomerCategoryTile(Icons.verified_user_outlined, 'AMC'),
+        ].map((tile) => InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () async {
+            await Navigator.push(context, MaterialPageRoute(builder: (_) => const RaiseComplaintPage()));
+            if (mounted) load();
+          },
+          child: tile,
+        )).toList(),
+      ),
+      const SizedBox(height: 22),
       Row(children: [
         Expanded(child: _homeCard(Icons.add_circle_outline, 'Raise Complaint', () async { await Navigator.push(context, MaterialPageRoute(builder: (_) => const RaiseComplaintPage())); load(); })),
         const SizedBox(width: 12),
@@ -223,6 +254,35 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
       const SizedBox(height: 4), const Text('Open', style: TextStyle(color: Colors.black45)),
     ])),
   ));
+}
+
+class _CustomerCategoryTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  const _CustomerCategoryTile(this.icon, this.label);
+
+  @override
+  Widget build(BuildContext context) => Container(
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: const Color(0xFFE7ECE5)),
+    ),
+    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+    child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+      Container(
+        padding: const EdgeInsets.all(9),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFF4BC),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Icon(icon, color: InstantTheme.green, size: 24),
+      ),
+      const SizedBox(height: 8),
+      Text(label, textAlign: TextAlign.center, maxLines: 2,
+        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+    ]),
+  );
 }
 
 class HelpSupportPage extends StatelessWidget {
