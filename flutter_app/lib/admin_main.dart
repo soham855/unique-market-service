@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'theme/instant_theme.dart';
+import 'theme/instant_dashboard_banner.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -113,6 +114,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
     appBar:AppBar(title:const Text('Admin Dashboard',style:TextStyle(fontWeight:FontWeight.w800)),actions:[IconButton(onPressed:load,icon:const Icon(Icons.refresh)),PopupMenuButton<String>(onSelected:(v){if(v=='logout')logout();},itemBuilder:(_)=>const[PopupMenuItem(value:'logout',child:Text('Logout'))])]),
     body:loading?const Center(child:CircularProgressIndicator()):RefreshIndicator(onRefresh:load,child:ListView(padding:const EdgeInsets.all(16),children:[
       const Text('UNIQUE MARKET',style:TextStyle(fontSize:13,fontWeight:FontWeight.w800,letterSpacing:1.4)),const SizedBox(height:4),const Text('Operations Dashboard',style:TextStyle(fontSize:26,fontWeight:FontWeight.w900)),
+      const SizedBox(height:14),const InstantDashboardBanner(eyebrow:'UNIQUE MARKET',title:'Business overview',subtitle:'Complaints • Technicians • AMC • Payments',icon:Icons.space_dashboard_outlined),
       const SizedBox(height:18),_grid(),
       const SizedBox(height:14),
       Card(child:ListTile(leading:const CircleAvatar(child:Icon(Icons.autorenew)),title:const Text('AMC Renewal Requests',style:TextStyle(fontWeight:FontWeight.w800)),subtitle:const Text('View and manage customer AMC renewals'),trailing:const Icon(Icons.chevron_right),onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const AdminAmcRenewalsPage())).then((_){load();}))),
