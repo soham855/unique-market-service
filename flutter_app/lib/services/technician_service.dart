@@ -19,7 +19,7 @@ class TechnicianService {
     // Supabase Auth phone to the registered technician mobile instead.
     final phone = user.phone;
     if (phone == null || phone.isEmpty) return null;
-    final digits = phone.replaceAll(RegExp(r'\\D'), '');
+    final digits = phone.replaceAll(RegExp(r'[^0-9]'), '');
     final mobile = digits.length > 10 ? digits.substring(digits.length - 10) : digits;
     if (mobile.length != 10) return null;
     final row = await client.from('technicians').select().eq('mobile', mobile).maybeSingle();
