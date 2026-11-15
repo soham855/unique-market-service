@@ -15,7 +15,17 @@ class TechnicianService {
   Future<Map<String, dynamic>?> technician() async {
     final user = client.auth.currentUser;
     if (user == null) return null;
-    final row = await client.from('technicians').select().eq('profile_id', user.id).maybeSingle();
+    // Prefer the linked profile; use the verified phone for legacy records.
+    final linked = await client.from('technicians')
+        .select().eq('profile_id', user.id).maybeSingle();
+    if (linked != null) return Map<String, dynamic>.from(linked);
+    final phone = user.phone;
+    if (phone == null || phone.isEmpty) return null;
+    final digits = phone.replaceAll(RegExp(r'[^0-9]'), '');
+    final mobile = digits.length > 10 ? digits.substring(digits.length - 10) : digits;
+    if (mobile.length != 10) return null;
+    final row = await client.from('technicians')
+        .select().eq('mobile', mobile).maybeSingle();
     return row == null ? null : Map<String, dynamic>.from(row);
   }
 

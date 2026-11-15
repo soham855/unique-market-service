@@ -1,0 +1,75 @@
+name: Build Three Crash-Fixed Android APKs
+
+on:
+  push:
+    branches:
+      - design/blinkit-style-three-apps-2026-11-14
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: flutter_app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.35.2'
+          cache: true
+      - name: Generate Android and fix launcher package mismatch
+        run: |
+          flutter create --project-name instant_services --org com.uniquemarket --platforms android .
+          if [ -f android/app/build.gradle.kts ]; then
+            sed -i 's/com.uniquemarket.instant_services/com.uniquemarket.instantservices/g' android/app/build.gradle.kts
+          fi
+          if [ -f android/app/build.gradle ]; then
+            sed -i 's/com.uniquemarket.instant_services/com.uniquemarket.instantservices/g' android/app/build.gradle
+          fi
+          # flutter create uses an underscore in the Kotlin package, while
+          # Gradle applicationId is intentionally normalized without it.
+          # The launcher class MUST match the final applicationId.
+          ACTIVITY=android/app/src/main/kotlin/com/uniquemarket/instant_services/MainActivity.kt
+          test -f "$ACTIVITY"
+          sed -i 's/^package com.uniquemarket.instant_services$/package com.uniquemarket.instantservices/' "$ACTIVITY"
+          grep -qx 'package com.uniquemarket.instantservices' "$ACTIVITY"
+      - name: Configure Firebase plugin
+        run: |
+          if [ -f android/settings.gradle.kts ]; then
+            sed -i '/id("org.jetbrains.kotlin.android") version/a\    id("com.google.gms.google-services") version "4.4.3" apply false' android/settings.gradle.kts
+            sed -i '/id("dev.flutter.flutter-gradle-plugin")/a\    id("com.google.gms.google-services")' android/app/build.gradle.kts
+          else
+            sed -i "/id 'org.jetbrains.kotlin.android' version/a\    id 'com.google.gms.google-services' version '4.4.3' apply false" android/settings.gradle
+            sed -i "/id 'dev.flutter.flutter-gradle-plugin'/a\    id 'com.google.gms.google-services'" android/app/build.gradle
+          fi
+          test -f android/app/google-services.json
+      - run: flutter pub get
+      - name: Build and verify Customer APK
+        run: |
+          flutter build apk --debug -t lib/main.dart --dart-define=SUPABASE_URL=https://tfscvycomllamoubtlcf.supabase.co --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_VeJIjcsILLniCHf2HjA20A_xlMydma0
+          test -s build/app/outputs/flutter-apk/app-debug.apk
+          mkdir -p ../fixed-apks
+          cp build/app/outputs/flutter-apk/app-debug.apk ../fixed-apks/UniqueMarket-Customer-fixed.apk
+      - name: Build and verify Technician APK
+        run: |
+          flutter build apk --debug -t lib/technician_main.dart --dart-define=SUPABASE_URL=https://tfscvycomllamoubtlcf.supabase.co --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_VeJIjcsILLniCHf2HjA20A_xlMydma0
+          test -s build/app/outputs/flutter-apk/app-debug.apk
+          cp build/app/outputs/flutter-apk/app-debug.apk ../fixed-apks/UniqueMarket-Technician-fixed.apk
+      - name: Build and verify Admin APK
+        run: |
+          flutter build apk --debug -t lib/admin_main.dart --dart-define=SUPABASE_URL=https://tfscvycomllamoubtlcf.supabase.co --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_VeJIjcsILLniCHf2HjA20A_xlMydma0
+          test -s build/app/outputs/flutter-apk/app-debug.apk
+          cp build/app/outputs/flutter-apk/app-debug.apk ../fixed-apks/UniqueMarket-Admin-fixed.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: three-crash-fixed-debug-apks
+          path: fixed-apks/*.apk
+          retention-days: 14

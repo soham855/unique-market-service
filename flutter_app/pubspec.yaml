@@ -23,6 +23,11 @@ dependencies:
   url_launcher: ^6.3.2
   image_picker: ^1.1.2
 
+# Pin image until the Dart SDK bundled with Flutter 3.35.2 supports
+# the ZLibDecoder.decodeLazy API used by newer image releases.
+dependency_overrides:
+  image: 4.5.4
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -30,3 +35,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+# Android build variants: customer, technician, admin (separate application IDs).

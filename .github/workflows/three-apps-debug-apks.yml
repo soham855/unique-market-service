@@ -1,0 +1,214 @@
+name: Build Three Flutter Debug APKs
+
+on:
+  pull_request:
+    branches: [website-completion-main-sync-2026-11-05]
+    paths:
+      - 'flutter_app/**'
+      - '.github/workflows/three-apps-debug-apks.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-three-apks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: flutter_app
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Java 17 for Android Gradle
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.35.2'
+          channel: stable
+          cache: true
+      - name: Generate Android project
+        run: |
+          flutter create --project-name instant_services --org com.uniquemarket --platforms android .
+          if [ -f android/app/build.gradle.kts ]; then
+            sed -i 's/com.uniquemarket.instant_services/com.uniquemarket.instantservices/g' android/app/build.gradle.kts
+          else
+            sed -i 's/com.uniquemarket.instant_services/com.uniquemarket.instantservices/g' android/app/build.gradle
+          fi
+          # The launcher is relative (.MainActivity). Keep its Kotlin class
+          # in the same package as the normalized Android application ID.
+          activity=android/app/src/main/kotlin/com/uniquemarket/instant_services/MainActivity.kt
+          test -f "$activity"
+          sed -i 's/^package com.uniquemarket.instant_services$/package com.uniquemarket.instantservices/' "$activity"
+          grep -qx 'package com.uniquemarket.instantservices' "$activity"
+          grep -q 'com.uniquemarket.instantservices' android/app/build.gradle.kts
+      - name: Install Flutter packages
+        run: flutter pub get
+      - name: Set Customer variant
+        run: echo "APP_VARIANT=customer" >> "$GITHUB_ENV"
+      - name: Configure separate Android app identity
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import os, re, json
+          app = os.environ['APP_VARIANT']
+          package = 'com.uniquemarket.' + app
+          gradle = Path('android/app/build.gradle.kts')
+          source = gradle.read_text()
+          source = re.sub(r'namespace\s*=\s*"[^"]+"', f'namespace = "{package}"', source)
+          source = re.sub(r'applicationId\s*=\s*"[^"]+"', f'applicationId = "{package}"', source)
+          gradle.write_text(source)
+          kt = Path('android/app/src/main/kotlin/com/uniquemarket/instant_services/MainActivity.kt')
+          kt.write_text('package ' + package + '\n\nimport io.flutter.embedding.android.FlutterActivity\n\nclass MainActivity: FlutterActivity()\n')
+          manifest = Path('android/app/src/main/AndroidManifest.xml')
+          xml = manifest.read_text()
+          xml = xml.replace('android:name=".MainActivity"', 'android:name="' + package + '.MainActivity"')
+          xml = re.sub(r'android:label="[^"]+"', 'android:label="' + {'customer':'Instant Service Customer','technician':'Unique Market Technician','admin':'Unique Market Admin'}[app] + '"', xml, count=1)
+          manifest.write_text(xml)
+          print('Configured', app, package)
+          PY
+      - name: Configure Firebase only when registered for this app ID
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json,os,pathlib
+          p=pathlib.Path('android/app/google-services.json')
+          app_id='com.uniquemarket.'+os.environ['APP_VARIANT']
+          if p.exists():
+            data=json.loads(p.read_text())
+            registered=[c.get('client_info',{}).get('android_client_info',{}).get('package_name') for c in data.get('client',[])]
+            if app_id not in registered:
+              print('Firebase app not registered for '+app_id+'; omitting incompatible google-services.json')
+              p.unlink()
+          PY
+          if [ -f android/app/google-services.json ]; then
+            sed -i '/id("org.jetbrains.kotlin.android") version/a\    id("com.google.gms.google-services") version "4.4.3" apply false' android/settings.gradle.kts
+            sed -i '/id("dev.flutter.flutter-gradle-plugin")/a\    id("com.google.gms.google-services")' android/app/build.gradle.kts
+          fi
+      - name: Build Customer APK
+        run: flutter build apk --debug -t lib/main.dart --dart-define=SUPABASE_URL=https://tfscvycomllamoubtlcf.supabase.co --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_VeJIjcsILLniCHf2HjA20A_xlMydma0
+      - name: Verify Customer APK metadata
+        run: |
+          test -s build/app/outputs/flutter-apk/app-debug.apk
+          sha256sum build/app/outputs/flutter-apk/app-debug.apk
+          ls -lh build/app/outputs/flutter-apk/app-debug.apk
+      - name: Save Customer APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: unique-market-customer-debug-apk
+          path: flutter_app/build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 14
+      - name: Set Technician variant
+        run: echo "APP_VARIANT=technician" >> "$GITHUB_ENV"
+      - name: Configure separate Android app identity
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import os, re, json
+          app = os.environ['APP_VARIANT']
+          package = 'com.uniquemarket.' + app
+          gradle = Path('android/app/build.gradle.kts')
+          source = gradle.read_text()
+          source = re.sub(r'namespace\s*=\s*"[^"]+"', f'namespace = "{package}"', source)
+          source = re.sub(r'applicationId\s*=\s*"[^"]+"', f'applicationId = "{package}"', source)
+          gradle.write_text(source)
+          kt = Path('android/app/src/main/kotlin/com/uniquemarket/instant_services/MainActivity.kt')
+          kt.write_text('package ' + package + '\n\nimport io.flutter.embedding.android.FlutterActivity\n\nclass MainActivity: FlutterActivity()\n')
+          manifest = Path('android/app/src/main/AndroidManifest.xml')
+          xml = manifest.read_text()
+          xml = xml.replace('android:name=".MainActivity"', 'android:name="' + package + '.MainActivity"')
+          xml = re.sub(r'android:label="[^"]+"', 'android:label="' + {'customer':'Instant Service Customer','technician':'Unique Market Technician','admin':'Unique Market Admin'}[app] + '"', xml, count=1)
+          manifest.write_text(xml)
+          print('Configured', app, package)
+          PY
+      - name: Configure Firebase only when registered for this app ID
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json,os,pathlib
+          p=pathlib.Path('android/app/google-services.json')
+          app_id='com.uniquemarket.'+os.environ['APP_VARIANT']
+          if p.exists():
+            data=json.loads(p.read_text())
+            registered=[c.get('client_info',{}).get('android_client_info',{}).get('package_name') for c in data.get('client',[])]
+            if app_id not in registered:
+              print('Firebase app not registered for '+app_id+'; omitting incompatible google-services.json')
+              p.unlink()
+          PY
+          if [ -f android/app/google-services.json ]; then
+            sed -i '/id("org.jetbrains.kotlin.android") version/a\    id("com.google.gms.google-services") version "4.4.3" apply false' android/settings.gradle.kts
+            sed -i '/id("dev.flutter.flutter-gradle-plugin")/a\    id("com.google.gms.google-services")' android/app/build.gradle.kts
+          fi
+      - name: Build Technician APK
+        run: flutter build apk --debug -t lib/technician_main.dart --dart-define=SUPABASE_URL=https://tfscvycomllamoubtlcf.supabase.co --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_VeJIjcsILLniCHf2HjA20A_xlMydma0
+      - name: Verify Technician APK metadata
+        run: |
+          test -s build/app/outputs/flutter-apk/app-debug.apk
+          sha256sum build/app/outputs/flutter-apk/app-debug.apk
+          ls -lh build/app/outputs/flutter-apk/app-debug.apk
+      - name: Save Technician APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: unique-market-technician-debug-apk
+          path: flutter_app/build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 14
+      - name: Set Admin variant
+        run: echo "APP_VARIANT=admin" >> "$GITHUB_ENV"
+      - name: Configure separate Android app identity
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import os, re, json
+          app = os.environ['APP_VARIANT']
+          package = 'com.uniquemarket.' + app
+          gradle = Path('android/app/build.gradle.kts')
+          source = gradle.read_text()
+          source = re.sub(r'namespace\s*=\s*"[^"]+"', f'namespace = "{package}"', source)
+          source = re.sub(r'applicationId\s*=\s*"[^"]+"', f'applicationId = "{package}"', source)
+          gradle.write_text(source)
+          kt = Path('android/app/src/main/kotlin/com/uniquemarket/instant_services/MainActivity.kt')
+          kt.write_text('package ' + package + '\n\nimport io.flutter.embedding.android.FlutterActivity\n\nclass MainActivity: FlutterActivity()\n')
+          manifest = Path('android/app/src/main/AndroidManifest.xml')
+          xml = manifest.read_text()
+          xml = xml.replace('android:name=".MainActivity"', 'android:name="' + package + '.MainActivity"')
+          xml = re.sub(r'android:label="[^"]+"', 'android:label="' + {'customer':'Instant Service Customer','technician':'Unique Market Technician','admin':'Unique Market Admin'}[app] + '"', xml, count=1)
+          manifest.write_text(xml)
+          print('Configured', app, package)
+          PY
+      - name: Configure Firebase only when registered for this app ID
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json,os,pathlib
+          p=pathlib.Path('android/app/google-services.json')
+          app_id='com.uniquemarket.'+os.environ['APP_VARIANT']
+          if p.exists():
+            data=json.loads(p.read_text())
+            registered=[c.get('client_info',{}).get('android_client_info',{}).get('package_name') for c in data.get('client',[])]
+            if app_id not in registered:
+              print('Firebase app not registered for '+app_id+'; omitting incompatible google-services.json')
+              p.unlink()
+          PY
+          if [ -f android/app/google-services.json ]; then
+            sed -i '/id("org.jetbrains.kotlin.android") version/a\    id("com.google.gms.google-services") version "4.4.3" apply false' android/settings.gradle.kts
+            sed -i '/id("dev.flutter.flutter-gradle-plugin")/a\    id("com.google.gms.google-services")' android/app/build.gradle.kts
+          fi
+      - name: Build Admin APK
+        run: flutter build apk --debug -t lib/admin_main.dart --dart-define=SUPABASE_URL=https://tfscvycomllamoubtlcf.supabase.co --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_VeJIjcsILLniCHf2HjA20A_xlMydma0
+      - name: Verify Admin APK metadata
+        run: |
+          test -s build/app/outputs/flutter-apk/app-debug.apk
+          sha256sum build/app/outputs/flutter-apk/app-debug.apk
+          ls -lh build/app/outputs/flutter-apk/app-debug.apk
+      - name: Save Admin APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: unique-market-admin-debug-apk
+          path: flutter_app/build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 14

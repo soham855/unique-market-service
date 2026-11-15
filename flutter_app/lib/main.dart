@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'theme/instant_theme.dart';
+import 'theme/instant_dashboard_banner.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:geolocator/geolocator.dart';
@@ -13,11 +15,35 @@ import 'package:url_launcher/url_launcher.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await SharedPreferences.getInstance();
-  if (SupabaseConfig.isConfigured) {
-    await Supabase.initialize(url: SupabaseConfig.url, publishableKey: SupabaseConfig.publishableKey);
+  try {
+    await SharedPreferences.getInstance();
+    if (SupabaseConfig.isConfigured) {
+      await Supabase.initialize(
+        url: SupabaseConfig.url,
+        publishableKey: SupabaseConfig.publishableKey,
+      );
+    }
+    runApp(const UniqueMarketApp());
+  } catch (error, stackTrace) {
+    // Show startup failures on screen instead of terminating without a clue.
+    debugPrint('STARTUP_FAILURE: $error');
+    debugPrintStack(stackTrace: stackTrace);
+    runApp(MaterialApp(
+      home: Scaffold(
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: SelectableText(
+                'Unable to start the app.\\n\\n$error',
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+        ),
+      ),
+    ));
   }
-  runApp(const UniqueMarketApp());
 }
 
 class UniqueMarketApp extends StatelessWidget {
@@ -26,58 +52,7 @@ class UniqueMarketApp extends StatelessWidget {
   Widget build(BuildContext context) => MaterialApp(
     debugShowCheckedModeBanner: false,
     title: 'Unique Market',
-    theme: ThemeData(
-      useMaterial3: true,
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: const Color(0xFF171717),
-        brightness: Brightness.light,
-        primary: const Color(0xFF171717),
-        secondary: const Color(0xFF2563EB),
-        surface: Colors.white,
-      ),
-      scaffoldBackgroundColor: const Color(0xFFF7F7F5),
-      appBarTheme: const AppBarTheme(
-        backgroundColor: Colors.white,
-        foregroundColor: Color(0xFF171717),
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        centerTitle: false,
-      ),
-      cardTheme: const CardThemeData(
-        color: Colors.white,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        margin: EdgeInsets.zero,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(18)),
-          side: BorderSide(color: Color(0xFFE8E8E5)),
-        ),
-      ),
-      inputDecorationTheme: const InputDecorationTheme(
-        filled: true,
-        fillColor: Colors.white,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.all(Radius.circular(14)),
-          borderSide: BorderSide(color: Color(0xFFE1E1DE)),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.all(Radius.circular(14)),
-          borderSide: BorderSide(color: Color(0xFFE1E1DE)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.all(Radius.circular(14)),
-          borderSide: BorderSide(color: Color(0xFF171717), width: 1.4),
-        ),
-      ),
-      navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        indicatorColor: const Color(0xFFEDEDED),
-        labelTextStyle: WidgetStatePropertyAll(
-          TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-        ),
-      ),
-    ),
+    theme: InstantTheme.light(),
     home: SupabaseConfig.isConfigured ? const SessionGate() : const Scaffold(body: Center(child: Text('Supabase is not configured.'))),
   );
 }
@@ -115,6 +90,8 @@ class LoginPage extends StatefulWidget {
 }
 class _LoginPageState extends State<LoginPage> {
   final phone = TextEditingController();
+  final email = TextEditingController();
+  bool useEmail = false;
   final otp = TextEditingController();
   bool sent = false, busy = false, remember = true;
 
@@ -128,7 +105,7 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> send() async {
     setState(() => busy = true);
     try {
-      await AuthService(Supabase.instance.client).sendOtp(normalizedPhone());
+      await (useEmail ? AuthService(Supabase.instance.client).sendEmailOtp(email.text) : AuthService(Supabase.instance.client).sendOtp(normalizedPhone()));
       setState(() { sent = true; busy = false; });
     } catch (e) {
       setState(() => busy = false);
@@ -139,7 +116,7 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> verify() async {
     setState(() => busy = true);
     try {
-      final r = await AuthService(Supabase.instance.client).verifyOtp(phone: normalizedPhone(), token: otp.text);
+      final r = await (useEmail ? AuthService(Supabase.instance.client).verifyEmailOtp(email: email.text, token: otp.text) : AuthService(Supabase.instance.client).verifyOtp(phone: normalizedPhone(), token: otp.text));
       if (r.user == null) throw Exception('OTP verification failed');
       final role = await AuthService(Supabase.instance.client).resolveRole(r.user!.id);
       if (role != 'customer') {
@@ -176,7 +153,15 @@ class _LoginPageState extends State<LoginPage> {
           Text(sent ? 'Verify OTP' : 'Customer Login', style: const TextStyle(fontSize: 25, fontWeight: FontWeight.w800)),
           const SizedBox(height: 18),
           if (!sent) ...[
-            TextField(controller: phone, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Mobile Number', prefixIcon: Icon(Icons.phone_outlined))),
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          SegmentedButton<bool>(
+            segments: const [ButtonSegment(value: false, label: Text('Mobile OTP'), icon: Icon(Icons.phone_outlined)), ButtonSegment(value: true, label: Text('Email OTP'), icon: Icon(Icons.email_outlined))],
+            selected: {useEmail},
+            onSelectionChanged: (v) => setState(() { useEmail = v.first; sent = false; otp.clear(); }),
+          ),
+          const SizedBox(height: 14),
+          useEmail ? TextField(controller: email, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(labelText: 'Registered Email ID', prefixIcon: Icon(Icons.email_outlined))) : TextField(controller: phone, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Mobile Number', prefixIcon: Icon(Icons.phone_outlined))),
+        ]),
             CheckboxListTile(value: remember, onChanged: (v) => setState(() => remember = v ?? true), contentPadding: EdgeInsets.zero, title: const Text('Remember Me'), subtitle: const Text('Stay signed in for 15 days')),
           ] else
             TextField(controller: otp, keyboardType: TextInputType.number, maxLength: 6, decoration: const InputDecoration(labelText: 'OTP', prefixIcon: Icon(Icons.lock_outline))),
@@ -185,7 +170,7 @@ class _LoginPageState extends State<LoginPage> {
             onPressed: busy ? null : (sent ? verify : send),
             child: busy ? const CircularProgressIndicator(color: Colors.white) : Text(sent ? 'VERIFY & CONTINUE' : 'SEND OTP'),
           )),
-          if (sent) TextButton(onPressed: () => setState(() => sent = false), child: const Text('Change mobile number')),
+          if (sent) TextButton(onPressed: () => setState(() => sent = false), child: const Text('Change login ID')),
           const SizedBox(height: 28),
           const Text('CCTV | IT Security | Service & AMC', style: TextStyle(fontWeight: FontWeight.w700)),
           const Text('Station Road, Hotel Rajdoot, Ichalkaranji\n7350060071', style: TextStyle(color: Colors.black54)),
@@ -236,6 +221,38 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     body: RefreshIndicator(onRefresh: load, child: ListView(padding: const EdgeInsets.all(18), children: [
       Text('Namaskar, ' + (customer?['name']?.toString() ?? 'Customer'), style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900)),
       Text(customer?['customer_code']?.toString() ?? 'Customer Portal', style: const TextStyle(color: Colors.black54)),
+      const InstantDashboardBanner(eyebrow: 'INSTANT SERVICE', title: 'Book trusted services', subtitle: 'CCTV • IT Support • Installation • AMC', icon: Icons.home_repair_service_outlined),
+      const SizedBox(height: 22),
+      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        const Text('Our Services', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+        TextButton(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RaiseComplaintPage())).then((_) => load()), child: const Text('Request service')),
+      ]),
+      const SizedBox(height: 10),
+      GridView.count(
+        crossAxisCount: 4,
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        mainAxisSpacing: 10,
+        crossAxisSpacing: 10,
+        childAspectRatio: .77,
+        children: const [
+          _CustomerCategoryTile(Icons.videocam_outlined, 'CCTV'),
+          _CustomerCategoryTile(Icons.computer_outlined, 'Computer'),
+          _CustomerCategoryTile(Icons.wifi_outlined, 'Wi-Fi'),
+          _CustomerCategoryTile(Icons.build_outlined, 'Repair'),
+          _CustomerCategoryTile(Icons.security_outlined, 'Security'),
+          _CustomerCategoryTile(Icons.fingerprint_outlined, 'Biometric'),
+          _CustomerCategoryTile(Icons.settings_remote_outlined, 'Video Door'),
+          _CustomerCategoryTile(Icons.verified_user_outlined, 'AMC'),
+        ].map((tile) => InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () async {
+            await Navigator.push(context, MaterialPageRoute(builder: (_) => const RaiseComplaintPage()));
+            if (mounted) load();
+          },
+          child: tile,
+        )).toList(),
+      ),
       const SizedBox(height: 22),
       Row(children: [
         Expanded(child: _homeCard(Icons.add_circle_outline, 'Raise Complaint', () async { await Navigator.push(context, MaterialPageRoute(builder: (_) => const RaiseComplaintPage())); load(); })),
@@ -271,6 +288,35 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
       const SizedBox(height: 4), const Text('Open', style: TextStyle(color: Colors.black45)),
     ])),
   ));
+}
+
+class _CustomerCategoryTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  const _CustomerCategoryTile(this.icon, this.label);
+
+  @override
+  Widget build(BuildContext context) => Container(
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: const Color(0xFFE7ECE5)),
+    ),
+    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+    child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+      Container(
+        padding: const EdgeInsets.all(9),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFF4BC),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Icon(icon, color: InstantTheme.green, size: 24),
+      ),
+      const SizedBox(height: 8),
+      Text(label, textAlign: TextAlign.center, maxLines: 2,
+        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+    ]),
+  );
 }
 
 class HelpSupportPage extends StatelessWidget {

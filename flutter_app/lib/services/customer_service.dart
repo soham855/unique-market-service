@@ -101,6 +101,25 @@ class CustomerService {
   }) async {
     final customer = await this.customer();
     if (customer == null) throw Exception('Customer profile not found');
+    // Customer-side payments must match the UPI-only production RLS policy.
+    if (mode.trim().toUpperCase() != 'UPI') {
+      throw ArgumentError('Customer payments must use UPI. Cash requires technician OTP verification.');
+    }
+    final utr = referenceNo?.trim() ?? '';
+    if (utr.isEmpty) {
+      throw ArgumentError('UPI transaction reference (UTR) is required.');
+    }
+    if (amount <= 0) {
+      throw ArgumentError('Payment amount must be greater than zero.');
+    }
+    final ownedComplaint = await client.from('complaints')
+        .select('id')
+        .eq('id', complaintId)
+        .eq('customer_id', customer['id'])
+        .maybeSingle();
+    if (ownedComplaint == null) {
+      throw StateError('Complaint not found for this customer.');
+    }
     final existing = await client.from('payments').select('id,payment_status,status').eq('complaint_id', complaintId);
     if (existing.any((p) => (p['payment_status'] ?? p['status'] ?? '').toString().toLowerCase() == 'pending')) {
       throw Exception('A payment for this ticket is already pending admin verification.');
@@ -109,12 +128,12 @@ class CustomerService {
       'customer_id': customer['id'],
       'complaint_id': complaintId,
       'amount': amount,
-      'mode': mode,
-      'reference_no': referenceNo,
+      'mode': 'UPI',
+      'reference_no': utr,
       'payment_date': DateTime.now().toUtc().toIso8601String().substring(0, 10),
-      'status': 'Pending',
+      'status': 'pending',
       'payment_status': 'Pending',
-      'source': 'customer_app',
+      'source': 'customer',
     };
     final result = await client.from('payments').insert(payload).select().single();
     return Map<String, dynamic>.from(result);

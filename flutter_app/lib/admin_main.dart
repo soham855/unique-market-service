@@ -1,5 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'theme/instant_theme.dart';
+import 'theme/instant_quick_action.dart';
+import 'theme/instant_dashboard_banner.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -10,11 +13,35 @@ import 'services/admin_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await SharedPreferences.getInstance();
-  if (SupabaseConfig.isConfigured) {
-    await Supabase.initialize(url: SupabaseConfig.url, publishableKey: SupabaseConfig.publishableKey);
+  try {
+    await SharedPreferences.getInstance();
+    if (SupabaseConfig.isConfigured) {
+      await Supabase.initialize(
+        url: SupabaseConfig.url,
+        publishableKey: SupabaseConfig.publishableKey,
+      );
+    }
+    runApp(const AdminApp());
+  } catch (error, stackTrace) {
+    // Show startup failures on screen instead of terminating without a clue.
+    debugPrint('STARTUP_FAILURE: $error');
+    debugPrintStack(stackTrace: stackTrace);
+    runApp(MaterialApp(
+      home: Scaffold(
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: SelectableText(
+                'Unable to start the app.\\n\\n$error',
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+        ),
+      ),
+    ));
   }
-  runApp(const AdminApp());
 }
 
 class AdminApp extends StatelessWidget {
@@ -22,58 +49,7 @@ class AdminApp extends StatelessWidget {
   @override Widget build(BuildContext context) => MaterialApp(
     debugShowCheckedModeBanner: false,
     title: 'Unique Market Admin',
-    theme: ThemeData(
-      useMaterial3: true,
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: const Color(0xFF171717),
-        brightness: Brightness.light,
-        primary: const Color(0xFF171717),
-        secondary: const Color(0xFF2563EB),
-        surface: Colors.white,
-      ),
-      scaffoldBackgroundColor: const Color(0xFFF7F7F5),
-      appBarTheme: const AppBarTheme(
-        backgroundColor: Colors.white,
-        foregroundColor: Color(0xFF171717),
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        centerTitle: false,
-      ),
-      cardTheme: const CardThemeData(
-        color: Colors.white,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        margin: EdgeInsets.zero,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(18)),
-          side: BorderSide(color: Color(0xFFE8E8E5)),
-        ),
-      ),
-      inputDecorationTheme: const InputDecorationTheme(
-        filled: true,
-        fillColor: Colors.white,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.all(Radius.circular(14)),
-          borderSide: BorderSide(color: Color(0xFFE1E1DE)),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.all(Radius.circular(14)),
-          borderSide: BorderSide(color: Color(0xFFE1E1DE)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.all(Radius.circular(14)),
-          borderSide: BorderSide(color: Color(0xFF171717), width: 1.4),
-        ),
-      ),
-      navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        indicatorColor: const Color(0xFFEDEDED),
-        labelTextStyle: WidgetStatePropertyAll(
-          TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-        ),
-      ),
-    ),
+    theme: InstantTheme.light(),
     home: SupabaseConfig.isConfigured ? const AdminSessionGate() : const Scaffold(body: Center(child: Text('Supabase is not configured.'))),
   );
 }
@@ -89,11 +65,13 @@ class AdminLoginPage extends StatefulWidget {
 }
 class _AdminLoginPageState extends State<AdminLoginPage> {
   final mobile = TextEditingController(), otp = TextEditingController();
+  final email = TextEditingController();
+  bool useEmail = false;
   bool sent=false,busy=false;
   String phone() { var p=mobile.text.trim(); if(p.startsWith('0'))p='+91'+p.substring(1); if(!p.startsWith('+'))p='+91'+p; return p; }
-  Future<void> send() async { setState(()=>busy=true); try { await AuthService(Supabase.instance.client).sendOtp(phone()); if(mounted)setState(()=>sent=true); } catch(e) { if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(e.toString()))); } finally { if(mounted)setState(()=>busy=false); } }
+  Future<void> send() async { setState(()=>busy=true); try { await (useEmail ? AuthService(Supabase.instance.client).sendEmailOtp(email.text) : AuthService(Supabase.instance.client).sendOtp(phone())); if(mounted)setState(()=>sent=true); } catch(e) { if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(e.toString()))); } finally { if(mounted)setState(()=>busy=false); } }
   Future<void> verify() async { setState(()=>busy=true); try {
-    final r=await AuthService(Supabase.instance.client).verifyOtp(phone:phone(),token:otp.text);
+    final r=await (useEmail ? AuthService(Supabase.instance.client).verifyEmailOtp(email: email.text, token: otp.text) : AuthService(Supabase.instance.client).verifyOtp(phone:phone(),token:otp.text));
     if(r.user==null)throw Exception('OTP verification failed.');
     final role=await AuthService(Supabase.instance.client).resolveRole(r.user!.id);
     if(role!='admin'){await Supabase.instance.client.auth.signOut();throw Exception('This account is not an Admin account.');}
@@ -104,10 +82,18 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
     const Icon(Icons.admin_panel_settings_outlined,size:58,color:Color(0xFF0B63F6)),const SizedBox(height:18),
     const Text('UNIQUE MARKET',style:TextStyle(fontSize:28,fontWeight:FontWeight.w900,letterSpacing:1.2)),const Text('Admin Service Portal'),
     const SizedBox(height:36),Text(sent?'Verify OTP':'Admin Login',style:const TextStyle(fontSize:25,fontWeight:FontWeight.w800)),const SizedBox(height:18),
-    if(!sent)TextField(controller:mobile,keyboardType:TextInputType.phone,decoration:const InputDecoration(labelText:'Registered Admin Mobile',prefixIcon:Icon(Icons.phone_outlined)))
+    if(!sent)Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          SegmentedButton<bool>(
+            segments: const [ButtonSegment(value: false, label: Text('Mobile OTP'), icon: Icon(Icons.phone_outlined)), ButtonSegment(value: true, label: Text('Email OTP'), icon: Icon(Icons.email_outlined))],
+            selected: {useEmail},
+            onSelectionChanged: (v) => setState(() { useEmail = v.first; sent = false; otp.clear(); }),
+          ),
+          const SizedBox(height: 14),
+          useEmail ? TextField(controller: email, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(labelText: 'Registered Email ID', prefixIcon: Icon(Icons.email_outlined))) : TextField(controller:mobile,keyboardType:TextInputType.phone,decoration:const InputDecoration(labelText:'Registered Admin Mobile',prefixIcon:Icon(Icons.phone_outlined))),
+        ])
     else TextField(controller:otp,keyboardType:TextInputType.number,maxLength:6,decoration:const InputDecoration(labelText:'OTP',prefixIcon:Icon(Icons.lock_outline))),
     const SizedBox(height:12),SizedBox(width:double.infinity,height:54,child:FilledButton(onPressed:busy?null:(sent?verify:send),child:busy?const CircularProgressIndicator(color:Colors.white):Text(sent?'VERIFY & CONTINUE':'SEND OTP'))),
-    if(sent)TextButton(onPressed:()=>setState(()=>sent=false),child:const Text('Change mobile number')),
+    if(sent)TextButton(onPressed:()=>setState(()=>sent=false),child:const Text('Change login ID')),
     const SizedBox(height:28),const Text('CCTV | IT Security | Service & AMC',style:TextStyle(fontWeight:FontWeight.w700)),const Text('Station Road, Hotel Rajdoot, Ichalkaranji\n7350060071',style:TextStyle(color:Colors.black54))
   ]))))));
 }
@@ -163,6 +149,25 @@ class _AdminHomePageState extends State<AdminHomePage> {
     appBar:AppBar(title:const Text('Admin Dashboard',style:TextStyle(fontWeight:FontWeight.w800)),actions:[IconButton(onPressed:load,icon:const Icon(Icons.refresh)),PopupMenuButton<String>(onSelected:(v){if(v=='logout')logout();},itemBuilder:(_)=>const[PopupMenuItem(value:'logout',child:Text('Logout'))])]),
     body:loading?const Center(child:CircularProgressIndicator()):RefreshIndicator(onRefresh:load,child:ListView(padding:const EdgeInsets.all(16),children:[
       const Text('UNIQUE MARKET',style:TextStyle(fontSize:13,fontWeight:FontWeight.w800,letterSpacing:1.4)),const SizedBox(height:4),const Text('Operations Dashboard',style:TextStyle(fontSize:26,fontWeight:FontWeight.w900)),
+      const SizedBox(height:14),const InstantDashboardBanner(eyebrow:'UNIQUE MARKET',title:'Business overview',subtitle:'Complaints • Technicians • AMC • Payments',icon:Icons.space_dashboard_outlined),
+      const SizedBox(height:18),
+      const Text('Quick Actions',style:TextStyle(fontSize:19,fontWeight:FontWeight.w900)),
+      const SizedBox(height:10),
+      Row(children:[
+        Expanded(child:InstantQuickAction(icon:Icons.confirmation_num_outlined,label:'Complaints',onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>ComplaintsPage(service:service))).then((_){load();}))),
+        const SizedBox(width:8),
+        Expanded(child:InstantQuickAction(icon:Icons.people_outline,label:'Customers',onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>CustomersPage(service:service))))),
+        const SizedBox(width:8),
+        Expanded(child:InstantQuickAction(icon:Icons.engineering_outlined,label:'Technicians',onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>TechniciansPage(service:service))))),
+      ]),
+      const SizedBox(height:10),
+      Row(children:[
+        Expanded(child:InstantQuickAction(icon:Icons.payments_outlined,label:'Payments',onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>PaymentsPage(service:service))))),
+        const SizedBox(width:8),
+        Expanded(child:InstantQuickAction(icon:Icons.analytics_outlined,label:'Reports',onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>ReportsPage(service:service))))),
+        const SizedBox(width:8),
+        Expanded(child:InstantQuickAction(icon:Icons.autorenew_outlined,label:'AMC',onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const AdminAmcRenewalsPage())).then((_){load();}))),
+      ]),
       const SizedBox(height:18),_grid(),
       const SizedBox(height:14),
       Card(child:ListTile(leading:const CircleAvatar(child:Icon(Icons.autorenew)),title:const Text('AMC Renewal Requests',style:TextStyle(fontWeight:FontWeight.w800)),subtitle:const Text('View and manage customer AMC renewals'),trailing:const Icon(Icons.chevron_right),onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const AdminAmcRenewalsPage())).then((_){load();}))),
@@ -176,7 +181,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
     ])
   );
   Widget _grid()=>GridView.count(crossAxisCount:2,shrinkWrap:true,physics:const NeverScrollableScrollPhysics(),crossAxisSpacing:10,mainAxisSpacing:10,childAspectRatio:1.45,children:[
-    _metric('Open',summary!['open'].toString(),Icons.pending_actions_outlined),_metric('New',summary!['new'].toString(),Icons.fiber_new_outlined),_metric('In Service',summary!['in_service'].toString(),Icons.build_circle_outlined),_metric('Completed',summary!['completed'].toString(),Icons.check_circle_outline),_metric('Technicians',summary!['technicians'].toString(),Icons.engineering_outlined),_metric('Collected','₹'+(summary!['collected'] as double).toStringAsFixed(0),Icons.payments_outlined)
+    _metric('Open',summary!['open'].toString(),Icons.pending_actions_outlined),_metric('New',summary!['new'].toString(),Icons.fiber_new_outlined),_metric('In Service',summary!['in_service'].toString(),Icons.build_circle_outlined),_metric('Completed',summary!['completed'].toString(),Icons.check_circle_outline),_metric('Technicians',summary!['technicians'].toString(),Icons.engineering_outlined),_metric('Collected','₹'+(num.tryParse((summary?['collected'] ?? 0).toString()) ?? 0).toStringAsFixed(0),Icons.payments_outlined)
   ]);
   Widget _metric(String title,String value,IconData icon)=>Card(child:Padding(padding:const EdgeInsets.all(14),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Icon(icon,color:const Color(0xFF0B63F6)),const SizedBox(height:5),Text(value,style:const TextStyle(fontSize:21,fontWeight:FontWeight.w900)),Text(title,style:const TextStyle(color:Colors.black54))])));
 }
@@ -233,7 +238,6 @@ Map<String,int> get techCompleted{final m=<String,int>{};for(final v in visits){
 Future<void>exportPdf()async{final doc=pw.Document();final now=DateTime.now();doc.addPage(pw.MultiPage(build:(c)=>[pw.Header(level:0,child:pw.Text('UNIQUE MARKET - Admin Report')),pw.Text('CCTV | IT Security | Service & AMC'),pw.Text('Station Road, Hotel Rajdoot, Ichalkaranji | 7350060071'),pw.SizedBox(height:12),pw.Text('Generated: '+now.toLocal().toString()),pw.SizedBox(height:16),pw.Table.fromTextArray(data:[['Metric','Value'],['Total Complaints',complaints.length.toString()],['Open Complaints',(complaints.length-countStatus('Completed')).toString()],['Completed',countStatus('Completed').toString()],['New',countStatus('New').toString()],['In Service',countStatus('In Service').toString()],['Collected','₹'+collected.toStringAsFixed(2)],['Pending Payment','₹'+pending.toStringAsFixed(2)]]),pw.SizedBox(height:18),pw.Text('Complaints by Service',style:pw.TextStyle(fontSize:16,fontWeight:pw.FontWeight.bold)),pw.Table.fromTextArray(headers:['Service','Count'],data:serviceBreakdown.entries.map((e)=>[e.key,e.value.toString()]).toList()),pw.SizedBox(height:18),pw.Text('Technician Performance',style:pw.TextStyle(fontSize:16,fontWeight:pw.FontWeight.bold)),pw.Table.fromTextArray(headers:['Technician','Status','Completed Jobs'],data:technicians.map((t)=>[(t['name']??t['id']??'-').toString(),(t['status']??'-').toString(),(techCompleted[(t['id']??'').toString()]??0).toString()]).toList())]));await Printing.sharePdf(bytes:await doc.save(),filename:'unique-market-admin-report-'+now.year.toString()+'-'+now.month.toString()+'-'+now.day.toString()+'.pdf');}
 @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const Text('Reports & Analytics'),actions:[IconButton(onPressed:loading?null:exportPdf,icon:const Icon(Icons.picture_as_pdf_outlined)),IconButton(onPressed:load,icon:const Icon(Icons.refresh))]),body:loading?const Center(child:CircularProgressIndicator()):RefreshIndicator(onRefresh:load,child:ListView(padding:const EdgeInsets.all(16),children:[const Text('Business Overview',style:TextStyle(fontSize:23,fontWeight:FontWeight.w900)),const SizedBox(height:12),GridView.count(crossAxisCount:2,shrinkWrap:true,physics:const NeverScrollableScrollPhysics(),crossAxisSpacing:10,mainAxisSpacing:10,childAspectRatio:1.45,children:[_metric('Complaints',complaints.length.toString(),Icons.confirmation_num_outlined),_metric('Completed',countStatus('Completed').toString(),Icons.check_circle_outline),_metric('Collected','₹'+collected.toStringAsFixed(0),Icons.payments_outlined),_metric('Pending','₹'+pending.toStringAsFixed(0),Icons.pending_actions_outlined),_metric('Visits',visits.length.toString(),Icons.event_note_outlined),_metric('Technicians',technicians.length.toString(),Icons.engineering_outlined)]),const SizedBox(height:22),const Text('Complaint Status',style:TextStyle(fontSize:19,fontWeight:FontWeight.w800)),...['New','Assigned','Scheduled','On The Way','Reached','In Service','Completed'].map((x)=>ListTile(title:Text(x),trailing:Text(countStatus(x).toString(),style:const TextStyle(fontWeight:FontWeight.w800)))),const SizedBox(height:12),const Text('Service Type',style:TextStyle(fontSize:19,fontWeight:FontWeight.w800)),...serviceBreakdown.entries.map((e)=>ListTile(title:Text(e.key),trailing:Text(e.value.toString(),style:const TextStyle(fontWeight:FontWeight.w800)))),const SizedBox(height:12),const Text('Technician Performance',style:TextStyle(fontSize:19,fontWeight:FontWeight.w800)),...technicians.map((t)=>ListTile(title:Text((t['name']??'Technician').toString()),subtitle:Text((t['status']??'-').toString()),trailing:Text((techCompleted[(t['id']??'').toString()]??0).toString()+' completed'))),const SizedBox(height:18),FilledButton.icon(onPressed:exportPdf,icon:const Icon(Icons.picture_as_pdf),label:const Text('EXPORT PDF REPORT')),const SizedBox(height:20),const Center(child:Text('UNIQUE MARKET • 7350060071',style:TextStyle(color:Colors.black45)))])));
 Widget _metric(String title,String value,IconData icon)=>Card(child:Padding(padding:const EdgeInsets.all(14),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Icon(icon,color:const Color(0xFF0B63F6)),const SizedBox(height:5),Text(value,style:const TextStyle(fontSize:21,fontWeight:FontWeight.w900)),Text(title,style:const TextStyle(color:Colors.black54))])));}
-}
 
 class CustomersPage extends StatefulWidget { final AdminService service; const CustomersPage({super.key,required this.service}); @override State<CustomersPage> createState()=>_CustomersPageState(); }
 class _CustomersPageState extends State<CustomersPage>{List<Map<String,dynamic>> rows=[];bool loading=true;@override void initState(){super.initState();load();}Future<void>load()async{try{rows=await widget.service.customers();if(mounted)setState(()=>loading=false);}catch(_){if(mounted)setState(()=>loading=false);}}@override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const Text('Customers')),body:loading?const Center(child:CircularProgressIndicator()):ListView.builder(padding:const EdgeInsets.all(12),itemCount:rows.length,itemBuilder:(_,i){final c=rows[i];return Card(child:ListTile(leading:const CircleAvatar(child:Icon(Icons.person_outline)),title:Text((c['name']??'Customer').toString(),style:const TextStyle(fontWeight:FontWeight.w800)),subtitle:Text((c['customer_code']??'-').toString()+' • '+(c['mobile']??'-').toString()),trailing:const Icon(Icons.chevron_right)));}));
