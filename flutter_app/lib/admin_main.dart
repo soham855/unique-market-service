@@ -13,11 +13,35 @@ import 'services/admin_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await SharedPreferences.getInstance();
-  if (SupabaseConfig.isConfigured) {
-    await Supabase.initialize(url: SupabaseConfig.url, publishableKey: SupabaseConfig.publishableKey);
+  try {
+    await SharedPreferences.getInstance();
+    if (SupabaseConfig.isConfigured) {
+      await Supabase.initialize(
+        url: SupabaseConfig.url,
+        publishableKey: SupabaseConfig.publishableKey,
+      );
+    }
+    runApp(const AdminApp());
+  } catch (error, stackTrace) {
+    // Show startup failures on screen instead of terminating without a clue.
+    debugPrint('STARTUP_FAILURE: $error');
+    debugPrintStack(stackTrace: stackTrace);
+    runApp(MaterialApp(
+      home: Scaffold(
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: SelectableText(
+                'Unable to start the app.\\n\\n$error',
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+        ),
+      ),
+    ));
   }
-  runApp(const AdminApp());
 }
 
 class AdminApp extends StatelessWidget {
