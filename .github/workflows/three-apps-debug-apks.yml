@@ -38,6 +38,13 @@ jobs:
           else
             sed -i 's/com.uniquemarket.instant_services/com.uniquemarket.instantservices/g' android/app/build.gradle
           fi
+          # The launcher is relative (.MainActivity). Keep its Kotlin class
+          # in the same package as the normalized Android application ID.
+          activity=android/app/src/main/kotlin/com/uniquemarket/instant_services/MainActivity.kt
+          test -f "$activity"
+          sed -i 's/^package com.uniquemarket.instant_services$/package com.uniquemarket.instantservices/' "$activity"
+          grep -qx 'package com.uniquemarket.instantservices' "$activity"
+          grep -q 'com.uniquemarket.instantservices' android/app/build.gradle.kts
       - name: Configure Firebase Android plugin
         run: |
           if [ -f android/settings.gradle.kts ]; then
