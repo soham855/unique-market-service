@@ -1,0 +1,71 @@
+name: Build Three Flutter Debug APKs
+
+on:
+  pull_request:
+    branches: [website-completion-main-sync-2026-11-05]
+    paths:
+      - 'flutter_app/**'
+      - '.github/workflows/three-apps-debug-apks.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-three-apks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: flutter_app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.35.2'
+          channel: stable
+          cache: true
+      - name: Generate Android project
+        run: |
+          flutter create --project-name instant_services --org com.uniquemarket --platforms android .
+          if [ -f android/app/build.gradle.kts ]; then
+            sed -i 's/com.uniquemarket.instant_services/com.uniquemarket.instantservices/g' android/app/build.gradle.kts
+          else
+            sed -i 's/com.uniquemarket.instant_services/com.uniquemarket.instantservices/g' android/app/build.gradle
+          fi
+      - name: Configure Firebase Android plugin
+        run: |
+          if [ -f android/settings.gradle.kts ]; then
+            sed -i '/id("org.jetbrains.kotlin.android") version/a\    id("com.google.gms.google-services") version "4.4.3" apply false' android/settings.gradle.kts
+            sed -i '/id("dev.flutter.flutter-gradle-plugin")/a\    id("com.google.gms.google-services")' android/app/build.gradle.kts
+          else
+            sed -i "/id 'org.jetbrains.kotlin.android' version/a\    id 'com.google.gms.google-services' version '4.4.3' apply false" android/settings.gradle
+            sed -i "/id 'dev.flutter.flutter-gradle-plugin'/a\    id 'com.google.gms.google-services'" android/app/build.gradle
+          fi
+          test -f android/app/google-services.json
+      - name: Install Flutter packages
+        run: flutter pub get
+      - name: Build Customer APK
+        run: flutter build apk --debug -t lib/main.dart --dart-define=SUPABASE_URL=https://tfscvycomllamoubtlcf.supabase.co --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_VeJIjcsILLniCHf2HjA20A_xlMydma0
+      - name: Save Customer APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: unique-market-customer-debug-apk
+          path: flutter_app/build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 14
+      - name: Build Technician APK
+        run: flutter build apk --debug -t lib/technician_main.dart --dart-define=SUPABASE_URL=https://tfscvycomllamoubtlcf.supabase.co --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_VeJIjcsILLniCHf2HjA20A_xlMydma0
+      - name: Save Technician APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: unique-market-technician-debug-apk
+          path: flutter_app/build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 14
+      - name: Build Admin APK
+        run: flutter build apk --debug -t lib/admin_main.dart --dart-define=SUPABASE_URL=https://tfscvycomllamoubtlcf.supabase.co --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_VeJIjcsILLniCHf2HjA20A_xlMydma0
+      - name: Save Admin APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: unique-market-admin-debug-apk
+          path: flutter_app/build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 14
