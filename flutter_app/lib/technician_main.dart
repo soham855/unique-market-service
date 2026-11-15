@@ -120,7 +120,7 @@ class _TechnicianLoginPageState extends State<TechnicianLoginPage> {
   Future<void> send() async {
     setState(() => busy = true);
     try {
-      await AuthService(Supabase.instance.client).(useEmail ? AuthService(Supabase.instance.client).sendEmailOtp(email.text) : AuthService(Supabase.instance.client).sendOtp(phone()));
+      await (useEmail ? AuthService(Supabase.instance.client).sendEmailOtp(email.text) : AuthService(Supabase.instance.client).sendOtp(phone()));
       if (mounted) setState(() { sent = true; busy = false; });
     } catch (e) {
       if (mounted) { setState(() => busy = false); ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()))); }
@@ -129,7 +129,7 @@ class _TechnicianLoginPageState extends State<TechnicianLoginPage> {
   Future<void> verify() async {
     setState(() => busy = true);
     try {
-      final r = await AuthService(Supabase.instance.client).(useEmail ? AuthService(Supabase.instance.client).verifyEmailOtp(email: email.text, token: otp.text) : AuthService(Supabase.instance.client).verifyOtp(phone: phone(), token: otp.text));
+      final r = await (useEmail ? AuthService(Supabase.instance.client).verifyEmailOtp(email: email.text, token: otp.text) : AuthService(Supabase.instance.client).verifyOtp(phone: phone(), token: otp.text));
       if (r.user == null) throw Exception('OTP verification failed.');
       final role = await AuthService(Supabase.instance.client).resolveRole(r.user!.id);
       if (role != 'technician') {
