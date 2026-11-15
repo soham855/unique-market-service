@@ -52,6 +52,11 @@ jobs:
         run: flutter pub get
       - name: Build Customer APK
         run: flutter build apk --debug -t lib/main.dart --dart-define=SUPABASE_URL=https://tfscvycomllamoubtlcf.supabase.co --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_VeJIjcsILLniCHf2HjA20A_xlMydma0
+      - name: Verify Customer APK metadata
+        run: |
+          test -s build/app/outputs/flutter-apk/app-debug.apk
+          sha256sum build/app/outputs/flutter-apk/app-debug.apk
+          ls -lh build/app/outputs/flutter-apk/app-debug.apk
       - name: Save Customer APK
         uses: actions/upload-artifact@v4
         with:
@@ -60,6 +65,11 @@ jobs:
           retention-days: 14
       - name: Build Technician APK
         run: flutter build apk --debug -t lib/technician_main.dart --dart-define=SUPABASE_URL=https://tfscvycomllamoubtlcf.supabase.co --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_VeJIjcsILLniCHf2HjA20A_xlMydma0
+      - name: Verify Technician APK metadata
+        run: |
+          test -s build/app/outputs/flutter-apk/app-debug.apk
+          sha256sum build/app/outputs/flutter-apk/app-debug.apk
+          ls -lh build/app/outputs/flutter-apk/app-debug.apk
       - name: Save Technician APK
         uses: actions/upload-artifact@v4
         with:
@@ -68,6 +78,11 @@ jobs:
           retention-days: 14
       - name: Build Admin APK
         run: flutter build apk --debug -t lib/admin_main.dart --dart-define=SUPABASE_URL=https://tfscvycomllamoubtlcf.supabase.co --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_VeJIjcsILLniCHf2HjA20A_xlMydma0
+      - name: Verify Admin APK metadata
+        run: |
+          test -s build/app/outputs/flutter-apk/app-debug.apk
+          sha256sum build/app/outputs/flutter-apk/app-debug.apk
+          ls -lh build/app/outputs/flutter-apk/app-debug.apk
       - name: Save Admin APK
         uses: actions/upload-artifact@v4
         with:
