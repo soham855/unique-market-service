@@ -65,11 +65,13 @@ class AdminLoginPage extends StatefulWidget {
 }
 class _AdminLoginPageState extends State<AdminLoginPage> {
   final mobile = TextEditingController(), otp = TextEditingController();
+  final email = TextEditingController();
+  bool useEmail = false;
   bool sent=false,busy=false;
   String phone() { var p=mobile.text.trim(); if(p.startsWith('0'))p='+91'+p.substring(1); if(!p.startsWith('+'))p='+91'+p; return p; }
-  Future<void> send() async { setState(()=>busy=true); try { await AuthService(Supabase.instance.client).sendOtp(phone()); if(mounted)setState(()=>sent=true); } catch(e) { if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(e.toString()))); } finally { if(mounted)setState(()=>busy=false); } }
+  Future<void> send() async { setState(()=>busy=true); try { await AuthService(Supabase.instance.client).(useEmail ? AuthService(Supabase.instance.client).sendEmailOtp(email.text) : AuthService(Supabase.instance.client).sendOtp(phone())); if(mounted)setState(()=>sent=true); } catch(e) { if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(e.toString()))); } finally { if(mounted)setState(()=>busy=false); } }
   Future<void> verify() async { setState(()=>busy=true); try {
-    final r=await AuthService(Supabase.instance.client).verifyOtp(phone:phone(),token:otp.text);
+    final r=await AuthService(Supabase.instance.client).(useEmail ? AuthService(Supabase.instance.client).verifyEmailOtp(email: email.text, token: otp.text) : AuthService(Supabase.instance.client).verifyOtp(phone:phone(),token:otp.text));
     if(r.user==null)throw Exception('OTP verification failed.');
     final role=await AuthService(Supabase.instance.client).resolveRole(r.user!.id);
     if(role!='admin'){await Supabase.instance.client.auth.signOut();throw Exception('This account is not an Admin account.');}
@@ -80,10 +82,18 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
     const Icon(Icons.admin_panel_settings_outlined,size:58,color:Color(0xFF0B63F6)),const SizedBox(height:18),
     const Text('UNIQUE MARKET',style:TextStyle(fontSize:28,fontWeight:FontWeight.w900,letterSpacing:1.2)),const Text('Admin Service Portal'),
     const SizedBox(height:36),Text(sent?'Verify OTP':'Admin Login',style:const TextStyle(fontSize:25,fontWeight:FontWeight.w800)),const SizedBox(height:18),
-    if(!sent)TextField(controller:mobile,keyboardType:TextInputType.phone,decoration:const InputDecoration(labelText:'Registered Admin Mobile',prefixIcon:Icon(Icons.phone_outlined)))
+    if(!sent)Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          SegmentedButton<bool>(
+            segments: const [ButtonSegment(value: false, label: Text('Mobile OTP'), icon: Icon(Icons.phone_outlined)), ButtonSegment(value: true, label: Text('Email OTP'), icon: Icon(Icons.email_outlined))],
+            selected: {useEmail},
+            onSelectionChanged: (v) => setState(() { useEmail = v.first; sent = false; otp.clear(); }),
+          ),
+          const SizedBox(height: 14),
+          useEmail ? TextField(controller: email, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(labelText: 'Registered Email ID', prefixIcon: Icon(Icons.email_outlined))) : TextField(controller:mobile,keyboardType:TextInputType.phone,decoration:const InputDecoration(labelText:'Registered Admin Mobile',prefixIcon:Icon(Icons.phone_outlined))),
+        ])
     else TextField(controller:otp,keyboardType:TextInputType.number,maxLength:6,decoration:const InputDecoration(labelText:'OTP',prefixIcon:Icon(Icons.lock_outline))),
     const SizedBox(height:12),SizedBox(width:double.infinity,height:54,child:FilledButton(onPressed:busy?null:(sent?verify:send),child:busy?const CircularProgressIndicator(color:Colors.white):Text(sent?'VERIFY & CONTINUE':'SEND OTP'))),
-    if(sent)TextButton(onPressed:()=>setState(()=>sent=false),child:const Text('Change mobile number')),
+    if(sent)TextButton(onPressed:()=>setState(()=>sent=false),child:const Text('Change login ID')),
     const SizedBox(height:28),const Text('CCTV | IT Security | Service & AMC',style:TextStyle(fontWeight:FontWeight.w700)),const Text('Station Road, Hotel Rajdoot, Ichalkaranji\n7350060071',style:TextStyle(color:Colors.black54))
   ]))))));
 }
