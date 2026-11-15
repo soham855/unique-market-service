@@ -35,3 +35,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+# Android build variants: customer, technician, admin (separate application IDs).
