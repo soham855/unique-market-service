@@ -147,7 +147,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
     ])
   );
   Widget _grid()=>GridView.count(crossAxisCount:2,shrinkWrap:true,physics:const NeverScrollableScrollPhysics(),crossAxisSpacing:10,mainAxisSpacing:10,childAspectRatio:1.45,children:[
-    _metric('Open',summary!['open'].toString(),Icons.pending_actions_outlined),_metric('New',summary!['new'].toString(),Icons.fiber_new_outlined),_metric('In Service',summary!['in_service'].toString(),Icons.build_circle_outlined),_metric('Completed',summary!['completed'].toString(),Icons.check_circle_outline),_metric('Technicians',summary!['technicians'].toString(),Icons.engineering_outlined),_metric('Collected','₹'+(summary!['collected'] as double).toStringAsFixed(0),Icons.payments_outlined)
+    _metric('Open',summary!['open'].toString(),Icons.pending_actions_outlined),_metric('New',summary!['new'].toString(),Icons.fiber_new_outlined),_metric('In Service',summary!['in_service'].toString(),Icons.build_circle_outlined),_metric('Completed',summary!['completed'].toString(),Icons.check_circle_outline),_metric('Technicians',summary!['technicians'].toString(),Icons.engineering_outlined),_metric('Collected','₹'+(num.tryParse((summary?['collected'] ?? 0).toString()) ?? 0).toStringAsFixed(0),Icons.payments_outlined)
   ]);
   Widget _metric(String title,String value,IconData icon)=>Card(child:Padding(padding:const EdgeInsets.all(14),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Icon(icon,color:const Color(0xFF0B63F6)),const SizedBox(height:5),Text(value,style:const TextStyle(fontSize:21,fontWeight:FontWeight.w900)),Text(title,style:const TextStyle(color:Colors.black54))])));
 }
