@@ -10,6 +10,19 @@ class AuthService {
     return client.auth.verifyOTP(phone: phone.trim(), token: token.trim(), type: OtpType.sms);
   }
 
+  Future<void> sendEmailOtp(String email) => client.auth.signInWithOtp(
+    email: email.trim().toLowerCase(),
+    shouldCreateUser: false,
+  );
+
+  Future<AuthResponse> verifyEmailOtp({required String email, required String token}) {
+    return client.auth.verifyOTP(
+      email: email.trim().toLowerCase(),
+      token: token.trim(),
+      type: OtpType.email,
+    );
+  }
+
   Future<void> signOut() => client.auth.signOut();
 
   Future<String?> resolveRole(String userId) async {
